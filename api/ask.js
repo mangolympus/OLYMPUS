@@ -13,12 +13,22 @@
 // Success:  200  { text: string }
 // Failure:  4xx/5xx  { error: string }
 //
-// Model pinned below as a plain constant — swap MODEL if Google retires/replaces it or if
-// you want a different quality/speed/cost tradeoff. 'gemini-2.5-flash' was current and
-// well-established as of this file's writing; if the Gemini API starts rejecting it with a
-// "model not found" error, check https://ai.google.dev/gemini-api/docs/models for the
-// current fast/cheap model name and update the constant — nothing else needs to change.
-const MODEL = 'gemini-2.5-flash';
+// Model pinned below as a plain constant — swap MODEL if Google retires/replaces it again or
+// if you want a different quality/speed/cost tradeoff. 'gemini-2.5-flash' (this file's
+// original choice) was retired for new users sometime after this file was first written;
+// Gemini's own 404 response named 'gemini-3.6-flash' as the replacement, which is what's
+// pinned now. If this starts erroring again with a similar "no longer available" message,
+// the error itself will very likely name the correct replacement — same as it did this
+// time — so start there before searching docs.
+//
+// Google's error also suggested moving to something called the "Interactions API" for
+// "the latest features and improvements" — that's a newer/different API shape than the
+// generateContent REST call this file uses, and I don't have reliable documentation for it
+// (it postdates my training data). Left this file on the plain generateContent endpoint,
+// just with the corrected model name, since that's the minimal, verifiable fix for the
+// actual error reported. Worth revisiting with current docs (or a web search) if Google
+// later deprecates generateContent itself the same way it deprecated this model.
+const MODEL = 'gemini-3.6-flash';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 // Generous ceiling — the longest real prompt from index.html (buildProfileSummaryForAI's
