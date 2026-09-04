@@ -4,7 +4,7 @@
 // The activate handler deletes any cache that doesn't match this string, so bumping it is
 // what makes the "new version available" flow in index.html actually pick up the change —
 // forgetting to bump it means devices keep serving the old cached copy indefinitely.
-const CACHE_VERSION = 'olympus-v43';
+const CACHE_VERSION = 'olympus-v44';
 
 // Same-origin, always-available files only. Google Sign-In (accounts.google.com), Google
 // Fonts, and any Drive/Gemini API calls are all cross-origin and deliberately never touched
@@ -76,6 +76,20 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // never intercept cross-origin requests
+
+  // API routes (/api/sync, /api/ask, etc.) are dynamic — sync data, AI responses — and must
+  // never go through the cache-first strategy below, which exists for the static app shell
+  // (HTML/JS/CSS/icons) so it works offline. Serving these from cache is exactly what broke
+  // chat/timer sync: the main /api/sync GET always hits the same URL, so the very first
+  // successful poll got cached, and every poll after that — no matter how many times
+  // driveSyncLoad() ran, or that it explicitly passed cache:'no-store' — returned that one
+  // frozen snapshot straight from here, never touching the network again. Push notifications
+  // still worked fine since those go through a separate mechanism (the service worker's own
+  // 'push' event, below) that never passes through this fetch handler at all.
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(req));
+    return;
+  }
 
   event.respondWith(
     caches.match(req).then((cached) => {
