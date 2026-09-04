@@ -708,8 +708,7 @@ body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
 .chat-sticker{font-size:72px;line-height:1;padding:4px}
 .chat-gif{border-radius:14px;max-width:260px;max-height:260px;display:block;object-fit:cover}
 .chat-image{border-radius:14px;max-width:220px;max-height:280px;display:block;object-fit:cover;cursor:pointer}
-.chat-lightbox{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn .15s ease}
-.chat-lightbox img{max-width:100%;max-height:100%;border-radius:8px;object-fit:contain}
+
 .chat-poll{min-width:220px;max-width:260px}
 .chat-poll-q{font-weight:800;font-size:13px;margin-bottom:8px}
 .chat-poll-opt{position:relative;display:block;width:100%;text-align:left;padding:8px 10px;border-radius:10px;margin-bottom:6px;
@@ -3397,7 +3396,6 @@ function enterChat(){
   startChatPolling();
   startChatHeartbeat();
   focusComposer();
-  refreshChatPhotosIfNeeded(); // fire-and-forget — doesn't block opening chat on a network fetch
 }
 // Common cleanup, used whether chat was left via the in-app back arrow or the hardware/browser back button.
 function finishLeavingChat(){
@@ -3444,7 +3442,7 @@ let _chatPollTimer = null;
 function startChatPolling(){
   stopChatPolling();
   pollChatUpdates();
-  _chatPollTimer = setInterval(pollChatUpdates, 6000);
+  _chatPollTimer = setInterval(pollChatUpdates, 3000);
   document.addEventListener('visibilitychange', onChatVisibilityChange);
 }
 function stopChatPolling(){
@@ -3453,7 +3451,7 @@ function stopChatPolling(){
 }
 function onChatVisibilityChange(){
   if(document.hidden){ if(_chatPollTimer){ clearInterval(_chatPollTimer); _chatPollTimer=null; } }
-  else if(S.view==='chat' && !_chatPollTimer){ pollChatUpdates(); _chatPollTimer = setInterval(pollChatUpdates, 6000); }
+  else if(S.view==='chat' && !_chatPollTimer){ pollChatUpdates(); _chatPollTimer = setInterval(pollChatUpdates, 3000); }
 }
 async function pollChatUpdates(){
   if(S.view!=='chat' || !S.appSession || !isHosted()) return;
@@ -3462,11 +3460,10 @@ async function pollChatUpdates(){
     if(remote && remote.chat){
       const changed = mergeChatFromRemote(remote);
       const readChanged = markChatRead();
-      if(changed || readChanged){ renderChatMessagesOnly(); saveShared(); }
+      if(changed){ renderChatMessagesOnly(); saveShared(); }
+      else if(readChanged){ renderChatMessagesOnly(); /* read-receipt only — no Drive write */ }
     }
   }catch(e){ console.warn('Chat poll failed', e); }
-  refreshChatPhotosIfNeeded(); // separate from the merge above — a new photo's message can
-  // arrive via the main file while its actual data is still only in the (separate) photos file
 }
 
 // ── Render: page shell ──────────────────────────────────────
@@ -3652,11 +3649,9 @@ function renderChatRow(msg, showAvatar, posClass){
   } else if(msg.type==='gif'){
     inner += `<img class="chat-gif" src="${escChat(msg.gifUrl)}" alt="GIF" loading="lazy">`;
   } else if(msg.type==='image'){
-    const photoSrc = resolveChatPhotoSrc(msg);
-    inner += photoSrc
-      ? `<img class="chat-image" src="${photoSrc}" alt="Photo" loading="lazy" onclick="openImageLightbox('${msg.id}')">`
-      : `<div class="chat-image" style="display:flex;align-items:center;justify-content:center;min-height:120px;color:var(--text-faint);font-size:11px;background:var(--surface2)">Loading photo…</div>`;
-    if(msg.text) inner += `<div style="margin-top:6px">${renderRichText(msg.text)}</div>`;
+    // Photo feature removed — show placeholder for any historic image messages
+    inner += `<div style="color:var(--text-faint);font-size:11px;font-style:italic">📷 Photo (no longer supported)</div>`;
+    if(msg.text) inner += `<div style="margin-top:4px">${renderRichText(msg.text)}</div>`;
   } else if(msg.type==='poll'){
     inner += renderPollBubble(msg);
   }
@@ -3731,16 +3726,6 @@ function chatComposerAreaHtml(){
       <button class="close" onclick="cancelEdit()" aria-label="Cancel edit">${CHAT_ICONS.close}</button>
     </div>`;
   }
-  // Image draft status is additive to (not exclusive with) the reply/edit bar above — you
-  // can attach a photo while replying to something, just not while editing an existing
-  // message (edits only ever change an existing message's text, not swap its photo).
-  if(S._chatImageLoading){
-    bars += `<div class="chat-reply-bar"><div class="info"><div class="who">Attaching photo…</div></div></div>`;
-  } else if(S._chatImageError){
-    bars += `<div class="chat-reply-bar"><div class="info"><div class="who" style="color:var(--bad)">${escChat(S._chatImageError)}</div></div><button class="close" onclick="removeChatImageDraft()" aria-label="Dismiss">${CHAT_ICONS.close}</button></div>`;
-  } else if(S._chatImageDraft){
-    bars += `<div class="chat-reply-bar"><img src="${S._chatImageDraft}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0" alt=""><div class="info"><div class="who">Photo attached</div></div><button class="close" onclick="removeChatImageDraft()" aria-label="Remove photo">${CHAT_ICONS.close}</button></div>`;
-  }
   let tray = '';
   if(S._chatTray==='sticker') tray = chatStickerTrayHtml();
   else if(S._chatTray==='poll') tray = chatPollTrayHtml();
@@ -3749,8 +3734,6 @@ function chatComposerAreaHtml(){
     <div class="chat-composer">
       <button class="chat-compose-icon-btn" onclick="toggleChatTray('sticker')" aria-label="Stickers" aria-pressed="${S._chatTray==='sticker'}">${CHAT_ICONS.sticker}</button>
       <button class="chat-compose-icon-btn" onclick="toggleChatTray('poll')" aria-label="Poll" aria-pressed="${S._chatTray==='poll'}">${CHAT_ICONS.poll}</button>
-      <button class="chat-compose-icon-btn" onclick="document.getElementById('chat-image-input').click()" aria-label="Attach photo" ${S._chatEditing?'disabled':''}>${CHAT_ICONS.image}</button>
-      <input type="file" id="chat-image-input" accept="image/*" style="display:none" onchange="handleChatImageSelect(this)">
       <textarea id="chat-composer-input" class="chat-composer-input" rows="1" placeholder="Message…" aria-label="Message input"
         oninput="chatComposerInput(this)"
         onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChatMessage(); }">${escChat(S._chatDraft||'')}</textarea>
@@ -3928,212 +3911,7 @@ function toggleChatTray(tray){
 }
 
 // ── Sending ──────────────────────────────────────────────────
-// Reads a File, downscales it to at most 1600px on the longest side, and re-encodes as a
-// JPEG data URI — this app has no real backend/file storage, so images ride along inside
-// the same chat message objects that already sync via Drive, and this keeps each one small
-// enough (typically well under 500KB for a normal phone photo) not to balloon that file.
-function readAndCompressImage(file){
-  return new Promise((resolve, reject)=>{
-    if(!file || !file.type || !file.type.startsWith('image/')){ reject(new Error('Please choose an image file.')); return; }
-    if(file.size > 10*1024*1024){ reject(new Error("That image is too large (max 10MB).")); return; }
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Could not read that file.'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('Could not read that image.'));
-      img.onload = () => {
-        const maxDim = 1600;
-        let width = img.naturalWidth, height = img.naturalHeight;
-        if(width > maxDim || height > maxDim){
-          if(width >= height){ height = Math.round(height * maxDim/width); width = maxDim; }
-          else { width = Math.round(width * maxDim/height); height = maxDim; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.72));
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-async function handleChatImageSelect(input){
-  const file = input.files && input.files[0];
-  input.value = ''; // clear so selecting the same file again still fires onchange
-  if(!file) return;
-  S._chatImageError = null;
-  S._chatImageLoading = true;
-  renderChatPage();
-  try{
-    S._chatImageDraft = await readAndCompressImage(file);
-  }catch(e){
-    S._chatImageError = e.message || 'Could not attach that image.';
-  }
-  S._chatImageLoading = false;
-  renderChatPage();
-}
-function removeChatImageDraft(){
-  S._chatImageDraft = null;
-  S._chatImageError = null;
-  renderChatPage();
-}
-function openImageLightbox(msgId){
-  const msg = findMsg(msgId);
-  const photoSrc = msg ? resolveChatPhotoSrc(msg) : null;
-  if(!photoSrc) return;
-  closeImageLightbox();
-  const el = document.createElement('div');
-  el.className = 'chat-lightbox';
-  el.id = 'chat-lightbox';
-  el.onclick = closeImageLightbox;
-  el.innerHTML = `<img src="${photoSrc}" alt="Photo">`;
-  document.body.appendChild(el);
-}
-function closeImageLightbox(){
-  const el = document.getElementById('chat-lightbox');
-  if(el) el.remove();
-}
-// ═══════════════════════════════════════════════════════════
-// CHAT PHOTOS — stored in a SEPARATE Drive file (olympus-chat-photos.json), not embedded in
-// S.shared. This is the real fix for "saving takes time": before this, every photo ever
-// sent lived inline in S.shared.chat.messages[].imageData, so a habit checkbox tap or any
-// unrelated save re-uploaded the entire chat photo history along with it. Now a habit
-// toggle only ever touches the (much smaller) main file; only actually sending a photo
-// touches this one — a cost that's proportional to what you're doing, not a hidden tax on
-// everything else.
-//
-// Backward compatible with every photo sent before this shipped: those messages still carry
-// the old inline imageData field directly and are never auto-migrated (touching old data
-// automatically felt riskier than leaving it alone) — see resolveChatPhotoSrc() below,
-// which checks for both. See compactChatPhotos() in Settings for a manual, on-demand way to
-// migrate old messages if the accumulated legacy weight ever becomes worth clearing out.
-// ═══════════════════════════════════════════════════════════
-const PHOTOS_FILE_NAME = 'olympus-chat-photos.json';
-function resolveChatPhotoSrc(msg){
-  if(msg.imageData) return msg.imageData; // legacy inline — always resolvable, no fetch needed
-  if(msg.photoId) return (S.sharedPhotos && S.sharedPhotos[msg.photoId]) || null; // null = not loaded yet
-  return null;
-}
-async function loadChatPhotos(){
-  if(!S.appSession || !isHosted()) return S.sharedPhotos || {};
-  try{
-    let fileId = S.photosFileId || null;
-    if(!fileId){
-      const existing = await findDriveFile(SHARED_DRIVE_FOLDER_ID, PHOTOS_FILE_NAME);
-      fileId = existing ? existing.id : null;
-    }
-    if(fileId){
-      S.photosFileId = fileId;
-      S.sharedPhotos = (await readDriveFile(fileId)) || {};
-    } else if(!S.sharedPhotos){
-      S.sharedPhotos = {};
-    }
-  }catch(e){ console.warn('Chat photos load failed:', e); if(!S.sharedPhotos) S.sharedPhotos = {}; }
-  return S.sharedPhotos;
-}
-let _photosSaveDebounceTimer = null;
-function saveChatPhotos(){
-  if(!S.appSession || !isHosted()) return;
-  clearTimeout(_photosSaveDebounceTimer);
-  _photosSaveDebounceTimer = setTimeout(async ()=>{
-    try{
-      let fileId = S.photosFileId || null;
-      if(!fileId){
-        const existing = await findDriveFile(SHARED_DRIVE_FOLDER_ID, PHOTOS_FILE_NAME);
-        fileId = existing ? existing.id : null;
-      }
-      try{
-        S.photosFileId = await writeDriveFile(SHARED_DRIVE_FOLDER_ID, fileId, S.sharedPhotos, PHOTOS_FILE_NAME);
-      }catch(writeErr){
-        console.warn('Photos write against cached file id failed, re-resolving:', writeErr);
-        const existing = await findDriveFile(SHARED_DRIVE_FOLDER_ID, PHOTOS_FILE_NAME);
-        S.photosFileId = await writeDriveFile(SHARED_DRIVE_FOLDER_ID, existing?.id||null, S.sharedPhotos, PHOTOS_FILE_NAME);
-      }
-    }catch(e){ console.warn('Chat photos save failed:', e); }
-  }, 900);
-}
-// Cheap, no-network check — safe to call on every chat render/poll. Only chatHasUnresolvedPhotos()
-// returning true ever triggers an actual fetch.
-function chatHasUnresolvedPhotos(){
-  const msgs = (S.shared.chat && S.shared.chat.messages) || [];
-  return msgs.some(m => m.type==='image' && m.photoId && !(S.sharedPhotos && S.sharedPhotos[m.photoId]));
-}
-async function refreshChatPhotosIfNeeded(){
-  if(!chatHasUnresolvedPhotos()) return;
-  await loadChatPhotos();
-  if(S.view==='chat' && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly();
-}
-// Manual "get me the actual latest, right now" — bypasses the 30s poll cadence entirely
-// rather than just nudging it. driveSyncLoad() and loadChatPhotos() both already fetch via
-// appSyncRequest()/readDriveFile(), which always sends cache:'no-store' (see there for why
-// that's load-bearing, not defensive boilerplate) — genuinely fresh data was already
-// guaranteed by the existing plumbing, so this reuses it rather than duplicating a second
-// fetch path with its own cache handling.
-let _chatForceRefreshing = false;
-async function forceRefreshChat(){
-  if(_chatForceRefreshing) return;
-  if(!S.appSession || !isHosted()) return; // nothing on Drive to force-fetch in local-file mode
-  _chatForceRefreshing = true;
-  const btn = document.getElementById('chat-force-refresh-btn');
-  if(btn) btn.classList.add('spin');
-  try{
-    const remote = await driveSyncLoad();
-    if(remote) mergeChatFromRemote(remote);
-    await loadChatPhotos(); // always a fresh fetch, not gated on chatHasUnresolvedPhotos()
-  }catch(e){ console.warn('Force refresh failed:', e); }
-  _chatForceRefreshing = false;
-  if(btn) btn.classList.remove('spin');
-  if(S.view==='chat') renderChatMessagesOnly();
-}
-function legacyPhotoCount(){
-  const msgs = (S.shared.chat && S.shared.chat.messages) || [];
-  return msgs.filter(m => m.type==='image' && m.imageData).length;
-}
-// Manual, on-demand migration for photos sent before this storage split existed — never
-// runs automatically (touching old data without being asked felt riskier than leaving it,
-// even though the fix is straightforward). Skips anything that fails to move rather than
-// aborting the whole batch, so one bad entry can't block the rest.
-async function compactChatPhotos(){
-  const count = legacyPhotoCount();
-  if(!count){ alert('Nothing to compact — every photo is already using the newer storage.'); return; }
-  if(!confirm(`Move ${count} older photo${count===1?'':'s'} to the newer, faster storage? Nothing is deleted — this just changes where they live. May take a moment.`)) return;
-  const msgs = (S.shared.chat && S.shared.chat.messages) || [];
-  if(!S.sharedPhotos) S.sharedPhotos = {};
-  let moved = 0;
-  msgs.forEach(m=>{
-    if(m.type==='image' && m.imageData){
-      try{
-        const photoId = uid();
-        S.sharedPhotos[photoId] = m.imageData;
-        m.photoId = photoId;
-        delete m.imageData;
-        moved++;
-      }catch(e){ console.warn('Skipping one photo during compaction:', e); }
-    }
-  });
-  saveChatPhotos();
-  saveShared();
-  renderApp();
-  alert(`Done — ${moved} photo${moved===1?'':'s'} moved. Future saves should feel noticeably lighter.`);
-}
 
-// ═══════════════════════════════════════════════════════════
-// 30-DAY ARCHIVE — same decoupling idea as chat photos above, applied to bulk history instead
-// of media. olympus-data.json keeps only the trailing 30 days (by todayStr()'s 5 AM boundary)
-// of chat messages, study logs, and habit logs; anything older moves into a SEPARATE Drive
-// file (olympus-archive.json) that's only ever fetched on demand — scrolling to the top of
-// Chat, or opening a Planner calendar day that's out of range — never on every save or even
-// every app load. A habit toggle or a new chat message touches only the (now much smaller)
-// main file; the archive file is untouched by everyday use.
-//
-// S.sharedArchive holds whatever's been lazy-loaded this session ({chat, logs, habitLog});
-// undefined/empty until something actually requests it. Read call sites (logsFor(),
-// chatAllMessagesIncludingArchive()) merge it in transparently when present and are complete
-// no-ops otherwise, so nothing about existing behavior changes until a user actually scrolls
-// or taps into archived territory.
-// ═══════════════════════════════════════════════════════════
 const ARCHIVE_FILE_NAME = 'olympus-archive.json';
 function blankArchive(){ return {chat:[], logs:{}, habitLog:{}}; }
 async function loadArchive(){
@@ -4277,23 +4055,13 @@ function maybeRolloverOverdueTasks(){
 function sendChatMessage(){
   const me = S.local.myProfile; if(!me) return;
   const text = (S._chatDraft||'').trim();
-  const imageData = S._chatImageDraft;
-  if(!text && !imageData) return;
+  if(!text) return;
   const now = nowISO();
   let isNewMessage = false;
   if(S._chatEditing){
     const msg = findMsg(S._chatEditing);
     if(msg && msg.from===me && text){ msg.text=text; msg.edited=true; msg.editedAt=now; msg.updatedAt=now; }
     S._chatEditing = null;
-  } else if(imageData){
-    const photoId = uid();
-    if(!S.sharedPhotos) S.sharedPhotos = {};
-    S.sharedPhotos[photoId] = imageData;
-    S.shared.chat.messages.push({id:uid(), from:me, type:'image', photoId, text, replyTo:S._chatReplyTo||null,
-      forwarded:false, edited:false, editedAt:null, deleted:false, pinned:false, starredBy:{}, reactions:{}, createdAt:now, updatedAt:now});
-    S._chatReplyTo = null;
-    isNewMessage = true;
-    saveChatPhotos(); // separate debounced save, decoupled from saveShared() entirely
   } else {
     S.shared.chat.messages.push({id:uid(), from:me, type:'text', text, replyTo:S._chatReplyTo||null,
       forwarded:false, edited:false, editedAt:null, deleted:false, pinned:false, starredBy:{}, reactions:{}, createdAt:now, updatedAt:now});
@@ -4301,10 +4069,8 @@ function sendChatMessage(){
     isNewMessage = true;
   }
   S._chatDraft = '';
-  S._chatImageDraft = null;
-  S._chatImageError = null;
   saveShared();
-  if(isNewMessage) notifyPartnerNewMessage(me, imageData ? (text || '📷 Photo') : text);
+  if(isNewMessage) notifyPartnerNewMessage(me, text);
   const btn = document.getElementById('chat-send-btn');
   if(btn){ btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
   renderChatPage();
@@ -8086,13 +7852,7 @@ function viewSettings(){
       <button class="btn btn-sm" onclick="driveSyncSaveNow()" style="margin-right:8px">☁️ Sync Now</button>
       <button class="btn btn-sm" onclick="appLogout()">Sign Out</button>
       <div style="font-size:11px;color:var(--good);margin-top:8px">✓ Synced to the shared Drive folder — both profiles read/write the same file</div>
-      ${legacyPhotoCount()>0 ? `
-      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
-        <div style="font-size:12px;font-weight:700;margin-bottom:6px">Storage</div>
-        <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:8px">${legacyPhotoCount()} older chat photo${legacyPhotoCount()===1?' is':'s are'} still stored the old way — bundled into every save, even ones that have nothing to do with Chat. Newer photos already skip this. Moving the old ones out is optional and doesn't delete anything.</div>
-        <button class="btn btn-sm" onclick="compactChatPhotos()">📦 Compact ${legacyPhotoCount()} Old Photo${legacyPhotoCount()===1?'':'s'}</button>
-      </div>
-      ` : ''}
+
     </div>
     ` : isHosted() ? `
     <div style="padding:10px 14px 14px">
@@ -9451,8 +9211,14 @@ function applyTimerNotificationAction(action){
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', (event)=>{
     const d = event.data;
-    if(!d || d.type!=='TIMER_ACTION') return;
-    applyTimerNotificationAction(d.action);
+    if(!d) return;
+    if(d.type==='TIMER_ACTION'){
+      applyTimerNotificationAction(d.action);
+    } else if(d.type==='PUSH_RECEIVED'){
+      // A push just arrived — poll chat immediately so the other person's message
+      // appears without waiting for the next 3-second polling tick.
+      if(typeof pollChatUpdates === 'function') pollChatUpdates();
+    }
   });
 }
 // Cold-start counterpart: if the app tab had been fully killed (not just backgrounded) when

@@ -4,7 +4,7 @@
 // The activate handler deletes any cache that doesn't match this string, so bumping it is
 // what makes the "new version available" flow in index.html actually pick up the change —
 // forgetting to bump it means devices keep serving the old cached copy indefinitely.
-const CACHE_VERSION = 'olympus-v42';
+const CACHE_VERSION = 'olympus-v43';
 
 // Same-origin, always-available files only. Google Sign-In (accounts.google.com), Google
 // Fonts, and any Drive/Gemini API calls are all cross-origin and deliberately never touched
@@ -112,7 +112,16 @@ self.addEventListener('push', (event) => {
     badge: './icon-192.png',
     data: payload.data || {},
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  // Show the notification AND immediately wake any open app window so the chat
+  // poll fires right away instead of waiting for the next 3-second tick.
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((all) => {
+        all.forEach((client) => client.postMessage({ type: 'PUSH_RECEIVED', payload }));
+      }),
+    ])
+  );
 });
 
 // Focuses an already-open Olympus tab/window if one exists, otherwise opens a new one —
