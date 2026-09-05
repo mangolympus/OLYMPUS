@@ -8427,7 +8427,13 @@ function sharedDataHasContent(data){
   const perProfile = PROFILES.some(p=>
     (data.logs?.[p.id]||[]).length > 0 ||
     (data.tasks?.[p.id]||[]).length > 0 ||
-    Object.values(data.lectures?.[p.id]||{}).some(a=>a.length>0) ||
+    // NOT `a.length>0` — buildDefaultShared()/migrateShared() auto-seed DT (~83) and IDT
+    // (~126) lecture rows on literally every blob, done or not, so a bare non-empty check
+    // here was trivially true for a completely untouched account too and provided no real
+    // protection. Same real-progress signal migrateShared() itself already uses to decide
+    // whether a paper "looksSeeded"/"hasRealProgress" (status flipped or a completion date) —
+    // that's what actually distinguishes real activity from the untouched default schedule.
+    Object.values(data.lectures?.[p.id]||{}).some(a=>(a||[]).some(l=>l.status!=='pending'||l.completionDate)) ||
     Object.values(data.chapters?.[p.id]||{}).some(chs=>(chs||[]).some(c=>c.lecDone||c.rev1||c.rev2||c.practice)) ||
     (data.mockScores?.[p.id]||[]).length > 0 ||
     (data.notes?.[p.id]||[]).length > 0 ||
@@ -8449,11 +8455,22 @@ async function doSync(manual){
       if(remote) loaded = migrateShared(remote);
     }
     if(!loaded) loaded = await loadShared(); // offline, not logged in, or the Drive read failed
+    // Same local-vs-Drive recency guard initAfterLogin() already uses (see there for the
+    // full reasoning). Without this, tapping Sync would adopt whatever Drive returned as
+    // long as it was non-empty, even if it was OLDER than what's already in memory — e.g.
+    // because the debounced performDriveSave() from a session that just ended hadn't
+    // actually finished its network write yet. That's what was rolling a just-logged
+    // session back to 0, silently dropping newly-added lectures, and reverting the other
+    // profile's live "Studying now" status back to their last-ended session.
+    const localIsNewer = S.local && S.local.lastLocalSaveAt && _lastDriveModifiedTime
+      && S.local.lastLocalSaveAt > new Date(_lastDriveModifiedTime).getTime();
     // Only replace if the loaded data has actual content — prevents a failed/empty
-    // cloud read from wiping locally-accumulated data (the "refresh zeros everything" bug).
-    if(sharedDataHasContent(loaded)) S.shared = loaded;
+    // cloud read from wiping locally-accumulated data (the "refresh zeros everything" bug) —
+    // and only if it isn't older than what we already have.
+    if(sharedDataHasContent(loaded) && !localIsNewer) S.shared = loaded;
     else if(manual) {
-      // Loaded was empty — push current data back up to sync storage
+      // Loaded was empty, or older than what's already here — push current data back up
+      // to sync storage instead of silently discarding it.
       await saveShared(S.shared);
     }
   } catch(e){ console.warn('doSync failed', e); }
@@ -8667,8 +8684,19 @@ let _syncDebounceTimer = null;
 // mutating chat is covered automatically since this derives from the data itself.
 function chatFingerprint(){
   const msgs = (S.shared.chat && S.shared.chat.messages) || [];
-  const last = msgs[msgs.length-1];
-  return `${msgs.length}:${last?last.id:''}:${last?last.deleted:''}`;
+  // Most recent updatedAt (falling back to createdAt) across ALL messages, not just the last
+  // one — editing, reacting to, starring, pinning, or voting on ANY earlier message updates
+  // that message's own updatedAt without changing the array length or the last message's own
+  // id/deleted flag, none of which the old (length + last-message-id + last-message-deleted)
+  // fingerprint could see. Missing those meant performDriveSave() treated those edits as "chat
+  // didn't change," skipping the safety pre-merge before overwriting Drive — a real (if
+  // narrow) window for silently clobbering a concurrent edit made on the other device.
+  let maxUpdated = 0;
+  msgs.forEach(m=>{
+    const t = new Date(m.updatedAt || m.createdAt || 0).getTime();
+    if(t > maxUpdated) maxUpdated = t;
+  });
+  return `${msgs.length}:${maxUpdated}`;
 }
 let _lastSavedChatFingerprint = null;
 // "Saving takes time" has two separate causes, only one of which this debounce timer
