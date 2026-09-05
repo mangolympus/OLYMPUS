@@ -8433,7 +8433,7 @@ function sharedDataHasContent(data){
     // protection. Same real-progress signal migrateShared() itself already uses to decide
     // whether a paper "looksSeeded"/"hasRealProgress" (status flipped or a completion date) —
     // that's what actually distinguishes real activity from the untouched default schedule.
-    Object.values(data.lectures?.[p.id]||{}).some(a=>(a||[]).some(l=>l.status!=='pending'||l.completionDate)) ||
+    Object.values(data.lectures?.[p.id]||{}).some(a=>(a||[]).some(l=>l && (l.status!=='pending'||l.completionDate))) ||
     Object.values(data.chapters?.[p.id]||{}).some(chs=>(chs||[]).some(c=>c.lecDone||c.rev1||c.rev2||c.practice)) ||
     (data.mockScores?.[p.id]||[]).length > 0 ||
     (data.notes?.[p.id]||[]).length > 0 ||
@@ -8626,12 +8626,30 @@ async function appSyncRequest(method, fileName, payload){
     headers['Content-Type'] = 'application/json';
     body = JSON.stringify({ file: fileName || undefined, payload });
   }
-  const r = await fetch(url, {
-    method, headers, body, cache:'no-store',
-    // cache:'no-store' matters here for the exact same reason it mattered on the old direct
-    // Drive read — the main-file GET gets polled every 30s (see startBackgroundPoll), and a
-    // stale cached response would look exactly like "the partner's live status never updates."
-  });
+  // Bounded wait — without this, a slow or hung request here (flaky mobile signal, a
+  // cold-starting serverless function, anything) left every caller waiting forever with no
+  // way out. initAfterLogin() in particular awaits this before it ever calls renderApp(), so
+  // a hung request meant the whole app sat frozen on the initial "Climbing to base camp…"
+  // placeholder indefinitely — not an error, just silence, since nothing ever actually failed
+  // for the existing try/catch fallbacks (driveSyncLoad() etc.) to catch. 10s is generous for
+  // a real cold start but short enough that a genuinely stuck request fails fast and lets
+  // those existing fallbacks (already written to fall back to cached local data) actually run.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 10000);
+  let r;
+  try{
+    r = await fetch(url, {
+      method, headers, body, cache:'no-store', signal: controller.signal,
+      // cache:'no-store' matters here for the exact same reason it mattered on the old direct
+      // Drive read — the main-file GET gets polled every 30s (see startBackgroundPoll), and a
+      // stale cached response would look exactly like "the partner's live status never updates."
+    });
+  } catch(e){
+    if(e.name === 'AbortError') throw new Error('Sync timed out');
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if(r.status === 401){
     // Token expired or was rejected server-side — drop the local session so the next render
     // shows the login screen again, rather than silently failing sync forever with no
