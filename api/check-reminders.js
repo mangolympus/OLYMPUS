@@ -182,12 +182,20 @@ async function findDataFileId(accessToken) {
   const q = encodeURIComponent(
     `'${DRIVE_FOLDER_ID}' in parents and name='${DATA_FILE_NAME}' and trashed=false`
   );
-  const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+  // orderBy=modifiedTime desc — same reasoning as findFile() in api/sync.js (this is a
+  // separate, independent implementation of the same lookup, so it needed the same fix
+  // applied here too, not just there). Without it, a duplicate same-named file anywhere in
+  // the folder means this cron could silently read from (and, worse, write back to) a stale
+  // copy instead of the one the app actually uses.
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime%20desc&fields=files(id,name,modifiedTime)`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!resp.ok) throw new Error(`Drive search failed: ${resp.status} ${await resp.text()}`);
   const { files } = await resp.json();
   if (!files || !files.length) throw new Error(`${DATA_FILE_NAME} not found in folder ${DRIVE_FOLDER_ID}`);
+  if (files.length > 1) {
+    console.warn(`Found ${files.length} files named '${DATA_FILE_NAME}' — using the most recently modified one (${files[0].modifiedTime}). Consider deleting the older duplicate(s) manually.`);
+  }
   return files[0].id;
 }
 
@@ -240,6 +248,10 @@ export default async function handler(req, res) {
     if (!data.pushSubscriptions) data.pushSubscriptions = {};
 
     let dirty = false;
+    // Track WHICH specific mutations this run makes, rather than mutating `data` in place
+    // and writing it back wholesale — see the re-fetch-before-write block below for why.
+    const remindedToday = []; // profileIds to stamp with today's date
+    const expiredSubProfiles = []; // profileIds whose subscription should be dropped
 
     for (const profileId of PROFILE_IDS) {
       const reasons = buildReminderReasons(data, profileId, todayIST);
@@ -272,12 +284,12 @@ export default async function handler(req, res) {
       });
       try {
         await webpush.sendNotification(subscription, payload);
-        data.pushState.lastReminderSentDate[profileId] = todayIST;
+        remindedToday.push(profileId);
         dirty = true;
         result.sent.push({ profileId, reasons: reasons.map((r) => r.title) });
       } catch (err) {
         if (err.statusCode === 404 || err.statusCode === 410) {
-          delete data.pushSubscriptions[profileId];
+          expiredSubProfiles.push(profileId);
           dirty = true;
           result.skipped.push({ profileId, reason: 'subscription expired, cleared' });
         } else {
@@ -286,7 +298,33 @@ export default async function handler(req, res) {
       }
     }
 
-    if (dirty) await uploadData(accessToken, fileId, data);
+    // Re-fetch and patch onto a FRESH copy rather than writing back `data` (downloaded at the
+    // very start of this run, before the webpush round-trips above — each one a chance for
+    // either profile's device to have saved a real change via the normal app path in the
+    // meantime). Writing back the original stale snapshot would silently discard anything that
+    // landed in that window — and reminders fire in the evening, exactly when study sessions
+    // are actively being logged, so this window mattering in practice isn't a remote edge case.
+    // Only the two fields this cron actually owns get patched in; everything else comes from
+    // whatever is currently on Drive right now, not from the start-of-run snapshot.
+    if (dirty) {
+      let writeTarget = data;
+      try {
+        const fresh = await downloadData(accessToken, fileId);
+        if (fresh && typeof fresh === 'object' && fresh.logs && fresh.targets) {
+          if (!fresh.pushState) fresh.pushState = { targetHitDate: {} };
+          if (!fresh.pushState.lastReminderSentDate) fresh.pushState.lastReminderSentDate = {};
+          if (!fresh.pushSubscriptions) fresh.pushSubscriptions = {};
+          remindedToday.forEach((profileId) => { fresh.pushState.lastReminderSentDate[profileId] = todayIST; });
+          expiredSubProfiles.forEach((profileId) => { delete fresh.pushSubscriptions[profileId]; });
+          writeTarget = fresh;
+        } else {
+          console.warn('Re-fetch before write looked invalid — falling back to the start-of-run snapshot (small risk of clobbering a concurrent change).');
+        }
+      } catch (err) {
+        console.warn('Re-fetch before write failed — falling back to the start-of-run snapshot:', err.message);
+      }
+      await uploadData(accessToken, fileId, writeTarget);
+    }
 
     res.status(200).json(result);
   } catch (err) {

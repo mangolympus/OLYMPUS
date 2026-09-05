@@ -97,8 +97,24 @@ function getDrive() {
 
 async function findFile(drive, fileName) {
   const q = `name='${fileName}' and '${FOLDER_ID}' in parents and trashed=false`;
-  const result = await drive.files.list({ q, fields: 'files(id, name, modifiedTime)' });
-  return (result.data.files && result.data.files[0]) || null;
+  // orderBy is the important part here, not just a nicety: if a same-named file was ever
+  // accidentally duplicated (e.g. two POSTs racing to create it the very first time, before
+  // either had seen the other exist), Drive's list order for otherwise-tied files isn't
+  // guaranteed to put the newest one first. Without this, findFile() could nondeterministically
+  // return whichever copy Drive feels like on a given call — meaning reads AND writes silently
+  // flip between the two files from request to request, which looks exactly like "data
+  // randomly reverts, unrelated to anything I tapped." Sorting newest-first means every call
+  // consistently resolves to the most-recently-written copy even if a duplicate exists.
+  const result = await drive.files.list({ q, fields: 'files(id, name, modifiedTime)', orderBy: 'modifiedTime desc' });
+  const files = result.data.files;
+  if(files && files.length > 1){
+    // Not fatal — we still proceed with the newest one — but worth surfacing loudly, since
+    // this means a duplicate exists and should be cleaned up by hand in Drive (the extra
+    // file is dead weight that can only cause confusion, never gets read once this sorting
+    // is in place, but isn't automatically deleted here to avoid destroying data on a guess).
+    console.warn(`Found ${files.length} files named '${fileName}' in the shared folder — using the most recently modified one (${files[0].modifiedTime}). Consider deleting the older duplicate(s) manually.`);
+  }
+  return (files && files[0]) || null;
 }
 
 // Only letters, digits, dots, hyphens, underscores — every filename this endpoint actually
