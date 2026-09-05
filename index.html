@@ -2000,6 +2000,12 @@ function buildDefaultLocal(){
 
 // Fills in any keys missing from a save made under an earlier phase, without wiping existing data.
 function migrateShared(data){
+  if(data.examDate===undefined) data.examDate = '2027-05-02';
+  if(!data.targets){ data.targets = {}; PROFILES.forEach(p=> data.targets[p.id] = 4); }
+  if(!data.papers){
+    data.papers = {};
+    PROFILES.forEach(p=>{ data.papers[p.id] = {}; PAPERS.forEach(pp=> data.papers[p.id][pp.id] = blankPaperStats()); });
+  }
   if(!data.chapters){ data.chapters = {}; }
   if(!data.lectures){ data.lectures = {}; }
   if(!data.mockScores){ data.mockScores = {}; }
@@ -3464,6 +3470,19 @@ async function pollChatUpdates(){
       else if(readChanged){ renderChatMessagesOnly(); /* read-receipt only — no Drive write */ }
     }
   }catch(e){ console.warn('Chat poll failed', e); }
+}
+// Manual "refresh chat" button — was referenced by the UI (chat-force-refresh-btn's onclick)
+// but never actually implemented, so tapping it silently did nothing (a ReferenceError,
+// swallowed since inline onclick handlers don't surface exceptions anywhere visible). The
+// 3-second background poll (see startChatPolling()) already keeps chat current on its own,
+// same underlying pollChatUpdates() call — this just gives an immediate, visible way to
+// force that same check right now rather than waiting for the next tick, with a spin icon
+// for feedback (same convention as refreshMoneyApp()'s money-refresh-btn above).
+async function forceRefreshChat(){
+  const btn = document.getElementById('chat-force-refresh-btn');
+  if(btn) btn.classList.add('spin');
+  await pollChatUpdates();
+  if(btn) setTimeout(()=> btn.classList.remove('spin'), 400);
 }
 
 // ── Render: page shell ──────────────────────────────────────
