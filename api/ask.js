@@ -66,7 +66,23 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1024, temperature: 0.9 },
+        generationConfig: {
+          maxOutputTokens: 2048,
+          temperature: 0.9,
+          // Gemini 3.x models have "thinking" on by default, and — unlike the separate
+          // thinking-budget Anthropic uses — Gemini's thinking tokens are billed against
+          // and draw from this SAME maxOutputTokens ceiling as the visible answer. With no
+          // thinkingConfig set, the model could spend a variable, sometimes large chunk of
+          // the budget on invisible reasoning before writing any of the actual answer,
+          // leaving an unpredictable remainder — which is exactly why callers were seeing
+          // "Unterminated string in JSON" at a different cutoff position every time: the
+          // visible JSON was getting cut off mid-string once the shrunken remainder ran
+          // out, not because of anything wrong with the prompt or the JSON shape itself.
+          // None of this endpoint's callers (a short tutoring answer, a JSON plan, a
+          // one-line quote) need multi-step reasoning, so thinking is turned off entirely
+          // rather than just budgeted — simpler, faster, and removes the variability outright.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
         // Google's defaults already block high/medium-severity harmful content; not
         // overriding safetySettings here — no reason for a CA-exam study tool to need
         // anything looser than the default, and loosening it server-side would apply to
@@ -108,6 +124,18 @@ export default async function handler(req, res) {
   if (!text) {
     const reason = candidate?.finishReason ? ` (finishReason: ${candidate.finishReason})` : '';
     res.status(502).json({ error: `Gemini returned no text${reason}` });
+    return;
+  }
+  // The MAX_TOKENS case above (empty text) was already covered by the check just above —
+  // this catches the other, more confusing shape: finishReason === 'MAX_TOKENS' WITH some
+  // non-empty text, meaning the response got cut off mid-answer rather than before starting.
+  // That partial text is genuinely unusable for anything expecting well-formed JSON or a
+  // complete sentence, so it needs to fail loudly here — as a clear, specific error — rather
+  // than being forwarded as if it were a normal, complete 200 response, which is exactly what
+  // was silently breaking every JSON.parse() caller downstream (parseAiJson() in index.html)
+  // with a cryptic "Unterminated string" error instead of an explanable one.
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    res.status(502).json({ error: 'Gemini response was cut off (hit the token limit) — try again' });
     return;
   }
 
