@@ -79,9 +79,16 @@ export default async function handler(req, res) {
           // visible JSON was getting cut off mid-string once the shrunken remainder ran
           // out, not because of anything wrong with the prompt or the JSON shape itself.
           // None of this endpoint's callers (a short tutoring answer, a JSON plan, a
-          // one-line quote) need multi-step reasoning, so thinking is turned off entirely
-          // rather than just budgeted — simpler, faster, and removes the variability outright.
-          thinkingConfig: { thinkingBudget: 0 },
+          // one-line quote) need multi-step reasoning, so thinking is turned down as low as
+          // this model allows, rather than just budgeted — simpler, faster, and removes the
+          // variability outright. IMPORTANT: `thinkingBudget` (a raw token count, with 0
+          // meaning "off") is a Gemini 2.5-only field — Gemini 3.x models including this one
+          // (MODEL above) use `thinkingLevel` instead, an enum of minimal/low/medium/high,
+          // and don't support thinkingBudget at all (mixing the two, or sending the wrong
+          // one for the model generation, is a documented 400 INVALID_ARGUMENT — exactly
+          // what this endpoint was returning until this was corrected). 'minimal' is the
+          // lowest level Gemini 3 Flash accepts (there's no true "0/off" the way 2.5 had).
+          thinkingConfig: { thinkingLevel: 'minimal' },
         },
         // Google's defaults already block high/medium-severity harmful content; not
         // overriding safetySettings here — no reason for a CA-exam study tool to need
