@@ -7122,7 +7122,7 @@ function viewPlanner(){
   <div class="section-title"><span>AI Daily Plan</span><button class="ai-info-btn" onclick="showAiInfo('plan')" title="How to use">ⓘ</button></div>
   <div class="card">
     ${isMe ? `
-      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:10px">A quick AI-suggested plan for your remaining hours today, based on overdue lectures and weak chapters. Uses a small Claude AI call.</div>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:10px">A quick AI-suggested plan for your remaining hours today, based on overdue lectures and weak chapters. Uses a small AI call.</div>
       <button class="btn btn-accent" onclick="generateAiDailyPlan()" ${S.aiPlanLoading?'disabled':''}>${S.local.aiDailyPlan?'Regenerate Plan':'Generate Plan'}</button>
       <div style="margin-top:8px"><span style="font-size:11.5px;color:var(--text-faint);text-decoration:underline;cursor:pointer" onclick="toggleAiPlanFocus()">🎯 ${aiPlanFocusIsSet()?'Focus set — tap to edit':'Focus on something specific?'}</span></div>
       ${S.aiPlanFocusOpen?`<div style="margin-top:8px;padding:10px;background:var(--surface2);border-radius:10px">
@@ -8241,7 +8241,16 @@ async function callClaudeAI(promptText){
 }
 function parseAiJson(text){
   const cleaned = text.replace(/```json|```/g,'').trim();
-  return JSON.parse(cleaned);
+  try{
+    return JSON.parse(cleaned);
+  }catch(e){
+    // Was surfacing e.message directly before (a raw "Unterminated string in JSON at
+    // position N" from the native parser) — accurate but meaningless to read in the UI.
+    // The actual root cause (Gemini's thinking tokens silently eating the output budget
+    // and truncating the JSON mid-string) is now fixed server-side in api/ask.js, so this
+    // should be rare going forward — this is just a clearer message for whatever's left.
+    throw new Error(`AI response wasn't valid JSON — try again`);
+  }
 }
 function buildProfileSummaryForAI(profileId){
   const papers = PAPERS.map(p=>{
