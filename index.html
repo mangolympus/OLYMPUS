@@ -3275,14 +3275,27 @@ let _backgroundPollTimer = null;
 function startBackgroundPoll(){
   stopBackgroundPoll();
   _backgroundPollTimer = setInterval(async ()=>{
-    if(S.view==='chat' || !S.appSession || !isHosted() || document.hidden) return;
-    // Keep my own timer's heartbeat alive even off the Home page, so the other profile
-    // doesn't see a stale "running" status just because I navigated elsewhere.
+    if(!S.appSession || !isHosted()) return;
     const me = S.local.myProfile;
-    if(me){
-      const ts = S.shared.timerState && S.shared.timerState[me];
-      if(ts && ts.startTime){ ts.lastHeartbeat = Date.now(); saveShared(); }
-    }
+    const myTs = me && S.shared.timerState && S.shared.timerState[me];
+    const myTimerRunning = !!(myTs && myTs.startTime);
+    // Bypass the document.hidden gate below ONLY while my own timer is actively running —
+    // that's the one case this app already deliberately keeps the tab alive in the background
+    // for (see syncMediaSessionTimer()'s keepalive-audio/Media Session setup), specifically so
+    // a studying person's own heartbeat doesn't go stale just because their screen locked or
+    // they switched apps. The old code gated ALL of this — heartbeat renewal included — behind
+    // document.hidden, which meant that keep-alive machinery was built and paid for (battery, an
+    // interrupted media session) but never actually used for the one thing this feature exists
+    // for: a studying person's own heartbeat froze the instant their screen locked, so the OTHER
+    // profile's device could poll perfectly and would STILL always see them as "not live" for
+    // basically the entire session — not an occasional glitch, the default case, since most
+    // studying happens with the phone put down or the screen off, not held up watching the timer.
+    if(!myTimerRunning && document.hidden) return;
+    // Keep my own timer's heartbeat alive even off the Home page (or with the screen locked,
+    // per above), so the other profile doesn't see a stale "running" status just because I
+    // navigated elsewhere or put my phone down.
+    if(myTimerRunning){ myTs.lastHeartbeat = Date.now(); saveShared(); }
+    if(S.view==='chat') return; // chat has its own polling path (pollChatUpdates) while actually open
     try{
       const remote = await driveSyncLoad();
       if(remote){
@@ -3340,6 +3353,42 @@ function chatStatusInfo(otherId){
 // ── Sync: merge remote chat state into local without clobbering ────────────
 // Returns true if anything actually changed, so callers can decide whether a
 // re-render / re-save is worth doing.
+// Per-profile top-level fields where each profile is the SOLE writer of their own slice —
+// see performDriveSave() for why these get refreshed from a freshly-fetched remote copy
+// before every single save, not just when chat changed. timerState is deliberately excluded
+// here — it already has its own timestamp-guarded merge (mergeTimerStateFromRemote) below,
+// a better fit than a blind replace. pushSubscriptions/pushState/pushPrefs are excluded too —
+// sendPush()'s expiry handling and the reminders cron can also write into those on the OTHER
+// profile's behalf, so a blind replace here could undo one of those; a much lower-stakes risk
+// (a missed notification, not lost study data) left as-is rather than rushed into this fix.
+const SINGLE_OWNER_SHARED_KEYS = ['logs','targets','chapters','lectures','mockScores','tasks',
+  'profileInfo','dailyTargetOverride','prefs','celebratedMilestones','habits','habitLog',
+  'diary','plannerTargets','lectureCompletionTarget','papers'];
+// Replaces this device's cached copy of the OTHER profile's own data with whatever a fresh
+// Drive read just returned. Safe specifically because I never write to their slice of any of
+// these fields myself — the whole point of SINGLE_OWNER_SHARED_KEYS above — so remote's copy
+// of THEIR side is always at least as current as mine, usually more so, and a plain replace
+// (no merge logic needed) can't lose anything of theirs OR of mine. What this actually fixes:
+// every save uploads the ENTIRE S.shared blob (one-shared-JSON-file architecture — see the
+// handoff doc), so without this, whatever this device last happened to have cached for the
+// other profile — however many hours old, e.g. because their device was the one that had been
+// backgrounded, or this one just hadn't reopened Olympus in a while — was what got re-uploaded
+// on literally every save this device made, even ones that had nothing to do with them. That's
+// a plausible way for "I logged a session and it vanished a few hours later" to happen with no
+// button tap or cron involved at all: the OTHER profile's own device saves something unrelated,
+// using its own stale cached view of MY side, and silently rolls my entry back.
+function refreshOtherProfileDataFromRemote(freshRemote){
+  const me = S.local.myProfile;
+  if(!me || !freshRemote) return;
+  const other = otherProfileId(me);
+  SINGLE_OWNER_SHARED_KEYS.forEach(key=>{
+    if(freshRemote[key] && freshRemote[key][other] !== undefined){
+      if(!S.shared[key]) S.shared[key] = {};
+      S.shared[key][other] = freshRemote[key][other];
+    }
+  });
+  mergeTimerStateFromRemote(freshRemote); // separate, timestamp-guarded merge — see its own comment above
+}
 function mergeChatFromRemote(remoteShared){
   if(!remoteShared || !remoteShared.chat) return false;
   let changed = false;
@@ -8695,11 +8744,13 @@ function yieldToMain(){
 }
 
 let _syncDebounceTimer = null;
-// Tracks chat's shape as of the last successful sync save. Comparing this against the
-// current shape at save time is how driveSyncSave() knows whether chat specifically
-// changed this cycle, without needing every chat-mutating call site (send message, mark
-// read, clear history, etc.) to separately remember to flag it — any future way of
-// mutating chat is covered automatically since this derives from the data itself.
+// Tracks chat's shape as of the last successful sync save. Not currently read anywhere —
+// performDriveSave() now derives whether chat changed THIS cycle straight from
+// mergeChatFromRemote()'s return value instead (see there) — but kept up to date here in
+// case a future feature needs "has chat changed since the last save" without redoing that
+// comparison itself. Any way of mutating chat is covered automatically either way, since
+// both this and mergeChatFromRemote() derive from the data itself, not from call sites
+// remembering to flag anything.
 function chatFingerprint(){
   const msgs = (S.shared.chat && S.shared.chat.messages) || [];
   // Most recent updatedAt (falling back to createdAt) across ALL messages, not just the last
@@ -8735,22 +8786,26 @@ let _lastSavedChatFingerprint = null;
 async function performDriveSave(){
   S.syncStatus = 'syncing'; renderNav();
   if(S.view==='settings') renderApp(); // Settings shows sync status inline in its own HTML — renderNav() alone doesn't touch that, only the header/nav chrome
-  const chatChanged = chatFingerprint() !== _lastSavedChatFingerprint;
   try{
-    // Chat is the one section both accounts write to concurrently (everything else is
-    // gated to a single owner via isMe, so a plain overwrite was always safe there). Only
-    // pay for the extra read-and-merge round trip when chat is actually what changed this
-    // cycle — a chapter-flag toggle or log entry has nothing to do with chat and shouldn't
-    // wait on it.
-    if(chatChanged){
-      try{
-        const remote = await driveSyncLoad();
-        if(remote && typeof mergeChatFromRemote === 'function'){
-          const changed = mergeChatFromRemote(remote);
-          if(changed && S.view==='chat' && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly();
-        }
-      } catch(e){ console.warn('Pre-save chat merge failed, proceeding with local copy:', e); }
-    }
+    // Always pull a fresh remote copy right before writing — previously this only happened
+    // when chat specifically had changed (see chatFingerprint() above), on the reasoning that
+    // "everything else is gated to a single owner via isMe, so a plain overwrite was always
+    // safe there." That's true in the sense that only I ever WRITE my own data — but every
+    // save here uploads the ENTIRE S.shared blob, other profile's data included, and my cached
+    // copy of THEIR side can go stale for all kinds of ordinary reasons (their device
+    // backgrounded, mine hadn't polled in a while). A save that used a stale cached copy of
+    // their data would silently roll back whatever they'd added since this device's last
+    // successful poll — see refreshOtherProfileDataFromRemote()'s own comment for the full
+    // reasoning and exactly what's safe to blindly refresh vs. what still needs a real merge.
+    try{
+      const remote = await driveSyncLoad();
+      if(remote){
+        const migratedRemote = migrateShared(remote); // same shape S.shared expects — see doSync()/initAfterLogin()
+        const chatChanged = mergeChatFromRemote(migratedRemote);
+        if(chatChanged && S.view==='chat' && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly();
+        refreshOtherProfileDataFromRemote(migratedRemote);
+      }
+    } catch(e){ console.warn('Pre-save refresh failed, proceeding with local copy:', e); }
     await yieldToMain();
     await appSyncRequest('POST', null, S.shared);
     _lastSavedChatFingerprint = chatFingerprint();
