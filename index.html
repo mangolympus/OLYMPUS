@@ -2030,10 +2030,25 @@ function migrateShared(data){
   if(!data.dailyTargetOverride) data.dailyTargetOverride = {};
   if(!data.prefs) data.prefs = {};
   if(!data.celebratedMilestones) data.celebratedMilestones = {};
-  // Flat key/value store for the embedded Money app (Umang-only page). Kept as opaque
-  // JSON-string values, mirroring exactly what that app previously wrote to its own
-  // window.storage/localStorage — see the money-bridge listener and renderMoneyPage().
-  if(!data.money) data.money = {};
+  // Money (Umang-only page) — migrated from an opaque flat key/value string store (what
+  // the old embedded-iframe app wrote directly) to a clean native schema now that it's a
+  // real in-app view instead of an iframe. Additive/one-way: reads the 3 old keys once
+  // (settings/invoices-list/transactions-list, each a JSON string) and reshapes them —
+  // nothing on Drive gets deleted by this, so if anything ever looks wrong the original
+  // values are still sitting in the old keys under data.money until the next real save.
+  if(!data.money || !data.money.__nativeSchema){
+    const old = data.money || {};
+    const parseOr = (raw, fallback) => { if(!raw) return fallback; try{ const v = JSON.parse(raw); return v==null ? fallback : v; }catch(e){ return fallback; } };
+    data.money = {
+      __nativeSchema: true,
+      settings: Object.assign(
+        { name:'Umang Jain', tagline:'', email:'', phone:'', upiId:'', theme:'navy', startNumbers:{}, openingBalances:{HDFC:0,SBI:0,Cash:0} },
+        parseOr(old['settings'], {})
+      ),
+      invoices: parseOr(old['invoices-list'], []),
+      transactions: parseOr(old['transactions-list'], [])
+    };
+  }
   if(!data.pushSubscriptions) data.pushSubscriptions = {};
   if(!data.pushState) data.pushState = { targetHitDate:{}, minHoursHitDate:{} };
   if(!data.pushPrefs) data.pushPrefs = {};
@@ -3308,6 +3323,20 @@ function startBackgroundPoll(){
           // not just Home — otherwise their status only visibly updates when you navigate
           // away and back, even though the underlying data was already refreshed here.
           if(S.view==='home' || S.view==='timer') renderApp();
+          // Persist what was just merged — this was missing before, and mattered a lot more
+          // than it looks like it should: mergeChatFromRemote()/mergeTimerStateFromRemote()
+          // only mutate S.shared in memory, so a successful merge here (e.g. picking up the
+          // other profile's "studying now" heartbeat) was visible for the rest of THIS page
+          // session but never written to local storage, and never bumped
+          // S.local.lastLocalSaveAt either. Reload the page shortly after, and
+          // initAfterLogin()'s own fresh Drive fetch is supposed to pick the same data back
+          // up independently — but any hiccup in that (a slightly stale read, timing) meant
+          // there was no local fallback holding onto what this device had already correctly
+          // seen, so the live status would silently revert to "last ended at HH:MM" until
+          // the next successful poll, several seconds later, ran and re-merged it from
+          // scratch. Saving here means what this device has already confirmed true survives
+          // a reload even if the next Drive read is momentarily behind.
+          saveShared();
         }
       }
     }catch(e){ console.warn('Background poll failed', e); }
@@ -5398,7 +5427,8 @@ function sbRow(label, val){
 // other lecture-aggregation code elsewhere — IDT's own lecture tracker still works fine from
 // its Workspace page, this only removes the switcher from the Home summary.
 function homeLectureCompletionBlock(profileId){
-  const paperId = 'dt';
+  // Chetna sees Paper 5 — IDT here specifically; Umang keeps Paper 4 — DT, unchanged.
+  const paperId = profileId === 'chetna' ? 'idt' : 'dt';
   const paper = paperById(paperId);
   const lecs = lecturesFor(profileId, paperId);
   const done = lecs.filter(l=>l.status==='done').length;
@@ -8215,7 +8245,15 @@ async function ensureDailyQuote(){
   _dailyQuoteFetching = false;
 }
 async function callClaudeAI(promptText){
+  if(!S.appSession) throw new Error('Not signed in');
   let response;
+  // Same bounded-wait fix as appSyncRequest() — AI generation legitimately takes longer
+  // than a Drive read, so this gets a longer allowance (30s) rather than reusing that one's
+  // 10s, but the failure mode without any timeout at all was identical: a hung request here
+  // would leave whatever called this (the AI Study Chat send button, Regenerate Plan, etc.)
+  // stuck on its loading state forever, with no error and no way out short of reloading.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 30000);
   try {
     // Relative path — frontend and backend (api/ask.js) now live in the same Vercel
     // deployment/root, so this is always same-origin. Was a hardcoded
@@ -8225,11 +8263,15 @@ async function callClaudeAI(promptText){
     // have today).
     response = await fetch('/api/ask', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt: promptText })
+      headers:{'Content-Type':'application/json', 'Authorization':`Bearer ${S.appSession.token}`},
+      body: JSON.stringify({ prompt: promptText }),
+      signal: controller.signal,
     });
   } catch(networkErr){
+    if(networkErr.name === 'AbortError') throw new Error('AI request timed out — try again');
     throw new Error(`Network error — check your internet connection. (${networkErr.message})`);
+  } finally {
+    clearTimeout(timeoutId);
   }
   if(!response.ok){
     const err = await response.json().catch(()=>({}));
@@ -8525,7 +8567,15 @@ async function doSync(manual){
     // Only replace if the loaded data has actual content — prevents a failed/empty
     // cloud read from wiping locally-accumulated data (the "refresh zeros everything" bug) —
     // and only if it isn't older than what we already have.
-    if(sharedDataHasContent(loaded) && !localIsNewer) S.shared = loaded;
+    if(sharedDataHasContent(loaded) && !localIsNewer){
+      S.shared = loaded;
+      // Persist what was just adopted — without this, a successful manual sync updated
+      // what's shown on screen but never wrote it to local storage or bumped
+      // S.local.lastLocalSaveAt, so it could be silently lost again on the very next reload
+      // if that reload's own Drive read didn't land on the exact same freshest data. Same
+      // gap, same fix, as the one in startBackgroundPoll() above.
+      await saveShared();
+    }
     else if(manual) {
       // Loaded was empty, or older than what's already here — push current data back up
       // to sync storage instead of silently discarding it.
@@ -9512,12 +9562,12 @@ function pushPrefEnabled(profileId, key){
   return p[key] !== false;
 }
 async function sendPush(targetProfileId, title, body, data){
-  if(!isHosted()) return;
+  if(!isHosted() || !S.appSession) return;
   const sub = S.shared.pushSubscriptions && S.shared.pushSubscriptions[targetProfileId];
   if(!sub) return;
   try{
     const res = await fetch(PUSH_SEND_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers:{'Content-Type':'application/json', 'Authorization':`Bearer ${S.appSession.token}`},
       body: JSON.stringify({subscription: sub, title, body, data: data||{}})
     });
     const result = await res.json().catch(()=>({}));
