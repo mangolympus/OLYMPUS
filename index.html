@@ -793,8 +793,8 @@ body.targets-mode #targets-root{display:flex}
     background:var(--card); border-top:1px solid var(--border);
     padding:8px 4px calc(8px + env(safe-area-inset-bottom));
   }
-.money-view /* Modal */
-  .modal-bg{
+/* Modal */
+.money-view .modal-bg{
     position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:flex-end; justify-content:center; z-index:200;
   }
 .money-view .modal-bg.show{display:flex; animation:backdropIn var(--dur-med) var(--ease-out);}
@@ -1170,7 +1170,7 @@ body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
 
 <nav class="bottomnav" id="bottomnav"></nav>
 <div id="chat-root"></div>
-<div id="money-root"></div>
+<div id="money-root" class="money-view"></div>
 <div id="stats-root"></div>
 <div id="habits-root"></div>
 <div id="diary-root"></div>
@@ -2915,7 +2915,7 @@ function moneyPageHtml(){
   return `
 
 
-<div id="money-shell" class="money-view">
+<div id="money-shell">
 
   <div class="section-title" id="money-pageTitle" style="margin-top:0">Transactions</div>
   <div style="font-size:12px;color:var(--text-faint);margin:-8px 0 14px" id="money-pageSub">Track your day-to-day money in and out</div>
@@ -4553,7 +4553,7 @@ function moneyPageHtml(){
         <line x1="0" y1="${H-24}" x2="${svgW}" y2="${H-24}" style="stroke:var(--border);" stroke-width="1.5"/>
         ${bars}
       </svg>`;
-    wireBarTooltips('chart-container');
+    wireBarTooltips('money-chart-container');
 
     // top parties
     const byParty = {};
@@ -4818,7 +4818,7 @@ function moneyPageHtml(){
           ${wBars}
         </svg>
       </div>`;
-    wireBarTooltips('exp-week-container');
+    wireBarTooltips('money-exp-week-container');
   }
 
   // Shared tap-to-reveal tooltip for bar charts: shows exact amount + label above the tapped bar.
@@ -4914,7 +4914,7 @@ function moneyPageHtml(){
         </svg>
       </div>
       <div class="hint" style="margin-top:8px; margin-bottom:0;">Apportioned entries (marked ÷) show only their per-day share here — the full amount left your account on its actual date.</div>`;
-    wireBarTooltips('exp-fifteen-container');
+    wireBarTooltips('money-exp-fifteen-container');
 
     // date-wise details list (only days with spending), most recent first
     const detailDays = days.map((d,idx)=>({ d, total: dayTotals[idx] })).filter(x=>x.total>0).reverse();
@@ -5118,10 +5118,10 @@ function moneyPageHtml(){
     $('money-txn-linked-invoice').addEventListener('change', applyLinkedInvoiceToForm);
     $('money-txn-source').addEventListener('change', updateTransferVisibility);
     $('money-txn-cancel-btn').addEventListener('click', closeTxnModal);
-    $('money-txn-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='txn-modal-bg') closeTxnModal(); });
+    $('money-txn-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='money-txn-modal-bg') closeTxnModal(); });
     $('money-txn-search').addEventListener('input', e=> renderTransactionsList(e.target.value));
     $('money-txn-view-close').addEventListener('click', closeTxnViewModal);
-    $('money-txn-view-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='txn-view-modal-bg') closeTxnViewModal(); });
+    $('money-txn-view-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='money-txn-view-modal-bg') closeTxnViewModal(); });
     $('money-txn-view-edit').addEventListener('click', ()=>{ openTxnEditModal(activeTxnViewId); });
     $('money-txn-view-delete').addEventListener('click', async ()=>{
       const t = transactions.find(x=>x.id===activeTxnViewId);
@@ -5163,7 +5163,7 @@ function moneyPageHtml(){
     });
 
     $('money-modal-close').addEventListener('click', closeModal);
-    $('money-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='modal-bg') closeModal(); });
+    $('money-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='money-modal-bg') closeModal(); });
     $('money-modal-edit').addEventListener('click', ()=>{
       if(currentModalId) openInvoiceEditForm(currentModalId);
     });
