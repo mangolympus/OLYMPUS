@@ -547,10 +547,13 @@ body.targets-mode #targets-root{display:flex}
   color:var(--ink);
   display:flex;
   flex-direction:column;
-  border-radius:var(--radius);
-  overflow:hidden;
-  border:1px solid var(--border);
-  margin-bottom:14px;
+  /* No outer border/radius/background/overflow here anymore — this used to render Money as
+     one big bordered "app card", which fought two things: (1) Olympus's own pages don't wrap
+     themselves in a single outer card, individual sections (.card, .stat-card, etc.) already
+     have their own border/radius, so this was actually working against "looks native"; (2)
+     overflow:hidden here would have clipped/broken position:sticky on the new frozen
+     sub-header below (a sticky element needs an unobstructed path up to the viewport, not an
+     ancestor establishing its own clipping/scroll context). */
 }
 .money-view h1, .money-view h2, .money-view h3, .money-view .display{font-family:'Plus Jakarta Sans',system-ui,sans-serif;}
 .money-view button{font-family:inherit;}
@@ -613,6 +616,19 @@ body.targets-mode #targets-root{display:flex}
 .money-view .flow-label{font-family:'Plus Jakarta Sans',sans-serif; font-weight:800; font-size:15px;}
 .money-view .flow-sub{font-size:11px; opacity:.85;}
 .money-view .seg-control{display:flex; background:var(--input-bg); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:14px;}
+.money-view .money-source-btn-row{display:flex; gap:8px;}
+.money-view .money-source-btn{flex:1; padding:11px 8px; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); font-weight:700; font-size:13.5px; cursor:pointer; transition:background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);}
+.money-view .money-source-btn.active{background:var(--umang); border-color:var(--umang); color:#fff;}
+/* Sticky sub-header — sticks right below Olympus's own sticky <header>. --money-header-h is
+   set from JS (see moneySetStickyOffset()) by measuring that header's real rendered height,
+   since it isn't a fixed constant across devices/font scaling; 64px is just a reasonable
+   fallback for the first paint before that measurement has run. */
+.money-view .money-sticky-header{position:sticky; top:var(--money-header-h,64px); z-index:10; background:var(--bg); padding-top:12px; padding-bottom:10px;}
+.money-view .money-corner-row{display:flex; justify-content:flex-end; margin-bottom:10px;}
+.money-view .money-icon-btn{width:34px; height:34px; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.money-view .money-subnav-row{display:flex; gap:10px; margin:14px 0;}
+.money-view .money-subnav-btn{flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:13px 8px; border-radius:12px; border:1px solid var(--border); background:var(--input-bg); color:var(--ink); font-weight:700; font-size:13.5px; cursor:pointer;}
+.money-view .money-back-btn{display:flex; align-items:center; gap:6px; font-weight:700; font-size:14px; color:var(--ink); background:none; border:none; padding:10px 0; margin-bottom:6px; cursor:pointer;}
 .money-view .seg-btn{flex:1; border:none; background:transparent; padding:9px; border-radius:9px; font-weight:700; font-size:13px; color:var(--muted); cursor:pointer; position:relative; transition:color var(--dur-fast) var(--ease-out);}
 .money-view .seg-btn.active{background:var(--card); color:var(--navy-800); box-shadow:0 1px 3px rgba(0,0,0,.3); transition:background var(--dur-med) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-med) var(--ease-out);}
 .money-view .subpage{display:none;}
@@ -2909,7 +2925,23 @@ function renderMoneyPage(){
     // without re-wiring every event listener a second time.
     window.moneyRefresh();
   }
+  moneySetStickyOffset();
 }
+// The Transactions page's own header (settings button, Inflow/Outflow, balances, the
+// Dashboard/Invoices buttons, search) sticks below Olympus's own sticky <header> while the
+// transaction list scrolls underneath — see .money-sticky-header's top:var(--money-header-h).
+// Olympus's header doesn't have a fixed pixel height (font scaling, wrapping), so this reads
+// its real rendered height and pushes that into the CSS variable the sticky rule uses,
+// instead of a hardcoded number that could drift out of sync and either leave a gap or
+// (worse) let the two headers overlap.
+function moneySetStickyOffset(){
+  requestAnimationFrame(()=>{
+    const header = document.querySelector('header');
+    if(!header || !header.offsetHeight) return;
+    document.documentElement.style.setProperty('--money-header-h', header.offsetHeight + 'px');
+  });
+}
+window.addEventListener('resize', ()=>{ if(S.view==='money') moneySetStickyOffset(); });
 
 function moneyPageHtml(){
   return `
@@ -2917,65 +2949,82 @@ function moneyPageHtml(){
 
 <div id="money-shell">
 
-  <div class="section-title" id="money-pageTitle" style="margin-top:0">Transactions</div>
-  <div style="font-size:12px;color:var(--text-faint);margin:-8px 0 14px" id="money-pageSub">Track your day-to-day money in and out</div>
-  <div class="seg-control">
-    <button class="seg-btn tab-btn active" data-page="transactions" onclick="moneySwitchTab('transactions')">Transactions</button>
-    <button class="seg-btn tab-btn" data-page="dashboard" onclick="moneySwitchTab('dashboard')">Dashboard</button>
-    <button class="seg-btn tab-btn" data-page="invoices" onclick="moneySwitchTab('invoices')">Invoices</button>
-    <button class="seg-btn tab-btn" data-page="settings" onclick="moneySwitchTab('settings')">Settings</button>
-  </div>
-
   <!-- PAGE 1: TRANSACTIONS -->
   <main class="page active" id="money-page-transactions">
 
-    <div class="flow-btn-row">
-      <button class="flow-btn flow-in" id="money-btn-open-inflow" type="button">
-        <div class="flow-ico">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+    <div class="money-sticky-header">
+      <div class="money-corner-row">
+        <button class="money-icon-btn" onclick="moneySwitchTab('settings')" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+
+      <div class="flow-btn-row">
+        <button class="flow-btn flow-in" id="money-btn-open-inflow" type="button">
+          <div class="flow-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </div>
+          <div class="flow-label">Inflow</div>
+          <div class="flow-sub">Money In</div>
+        </button>
+        <button class="flow-btn flow-out" id="money-btn-open-outflow" type="button">
+          <div class="flow-ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </div>
+          <div class="flow-label">Outflow</div>
+          <div class="flow-sub">Money Out</div>
+        </button>
+      </div>
+
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="stat-card" style="padding:12px;">
+          <div class="lbl">HDFC</div>
+          <div class="val" id="money-bal-hdfc" style="font-size:15.5px;">₹0.00</div>
         </div>
-        <div class="flow-label">Inflow</div>
-        <div class="flow-sub">Money In</div>
-      </button>
-      <button class="flow-btn flow-out" id="money-btn-open-outflow" type="button">
-        <div class="flow-ico">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        <div class="stat-card" style="padding:12px;">
+          <div class="lbl">SBI</div>
+          <div class="val" id="money-bal-sbi" style="font-size:15.5px;">₹0.00</div>
         </div>
-        <div class="flow-label">Outflow</div>
-        <div class="flow-sub">Money Out</div>
-      </button>
+        <div class="stat-card" style="padding:12px;">
+          <div class="lbl">Cash</div>
+          <div class="val" id="money-bal-cash" style="font-size:15.5px;">₹0.00</div>
+        </div>
+      </div>
+      <div class="hint" style="margin:-4px 0 0;">Balances reflect only what you log here — add an opening entry if you'd like them to match your real account balances.</div>
+
+      <div class="money-subnav-row">
+        <button class="money-subnav-btn" onclick="moneySwitchTab('dashboard')" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+          Dashboard
+        </button>
+        <button class="money-subnav-btn" onclick="moneySwitchTab('invoices')" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          Invoices
+        </button>
+      </div>
+
+      <div class="search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--muted);" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="money-txn-search" placeholder="Search by category, source or remarks">
+      </div>
     </div>
 
-    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
-      <div class="stat-card" style="padding:12px;">
-        <div class="lbl">HDFC</div>
-        <div class="val" id="money-bal-hdfc" style="font-size:15.5px;">₹0.00</div>
-      </div>
-      <div class="stat-card" style="padding:12px;">
-        <div class="lbl">SBI</div>
-        <div class="val" id="money-bal-sbi" style="font-size:15.5px;">₹0.00</div>
-      </div>
-      <div class="stat-card" style="padding:12px;">
-        <div class="lbl">Cash</div>
-        <div class="val" id="money-bal-cash" style="font-size:15.5px;">₹0.00</div>
-      </div>
-    </div>
-    <div class="hint" style="margin:-4px 0 14px;">Balances reflect only what you log here — add an opening entry if you'd like them to match your real account balances.</div>
-
-    <div class="search-bar">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--muted);" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" id="money-txn-search" placeholder="Search by category, source or remarks">
-    </div>
     <div id="money-transactions-list"></div>
   </main>
 
   <!-- PAGE 3: INVOICES -->
   <main class="page" id="money-page-invoices">
 
+    <button class="money-back-btn" onclick="moneySwitchTab('transactions')" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Transactions
+    </button>
+
     <div class="seg-control">
       <button class="seg-btn active" data-sub="new" type="button">New Invoice</button>
       <button class="seg-btn" data-sub="history" type="button">History</button>
     </div>
+
 
     <div class="subpage active" id="money-inv-sub-new">
 
@@ -3069,6 +3118,11 @@ function moneyPageHtml(){
   <!-- PAGE 4: DASHBOARD -->
   <main class="page" id="money-page-dashboard">
 
+    <button class="money-back-btn" onclick="moneySwitchTab('transactions')" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Transactions
+    </button>
+
     <div class="seg-control">
       <button class="seg-btn active" data-dashsub="expenses" type="button">Expenses</button>
       <button class="seg-btn" data-dashsub="sales" type="button">Sales</button>
@@ -3140,7 +3194,7 @@ function moneyPageHtml(){
 
       <div class="card">
         <h2><span class="n">📅</span>Weekly Tracker</h2>
-        <div class="hint" style="margin-top:0; margin-bottom:8px;">Real spending only — inter-bank transfers excluded, apportioned entries spread across their selected days.</div>
+        <div class="hint" style="margin-top:0; margin-bottom:8px;">Real spending only — inter-bank transfers excluded, each entry shown on its actual date.</div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
           <button class="icon-btn" id="money-week-prev-btn" type="button" title="Previous week">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -3218,6 +3272,11 @@ function moneyPageHtml(){
 
   <!-- PAGE 4: SETTINGS -->
   <main class="page" id="money-page-settings">
+    <button class="money-back-btn" onclick="moneySwitchTab('transactions')" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Transactions
+    </button>
+
     <div class="card" id="money-storage-status-card" style="display:flex; align-items:center; gap:10px;">
       <div id="money-storage-status-dot" style="width:10px;height:10px;border-radius:50%;background:var(--good);flex:none;"></div>
       <div style="font-size:12.5px; color:var(--muted); line-height:1.4;" id="money-storage-status-text">Checking storage…</div>
@@ -3225,7 +3284,7 @@ function moneyPageHtml(){
 
     <div class="card">
       <h2><span class="n">🎨</span>Colour Theme</h2>
-      <div class="hint" style="margin-top:0;margin-bottom:12px;">Changes the app's accent colour and the colour used on your exported invoices.</div>
+      <div class="hint" style="margin-top:0;margin-bottom:12px;">Changes the colour used on your exported invoices.</div>
       <div class="theme-grid" id="money-theme-grid"></div>
     </div>
     <div class="card">
@@ -3352,11 +3411,11 @@ function moneyPageHtml(){
     </div>
     <div class="field">
       <label>Source</label>
-      <select id="money-txn-source">
-        <option value="HDFC">HDFC</option>
-        <option value="SBI">SBI</option>
-        <option value="Cash">Cash</option>
-      </select>
+      <div class="money-source-btn-row" id="money-txn-source-row">
+        <button type="button" class="money-source-btn" data-source="HDFC">HDFC</button>
+        <button type="button" class="money-source-btn" data-source="SBI">SBI</button>
+        <button type="button" class="money-source-btn" data-source="Cash">Cash</button>
+      </div>
     </div>
     <div class="field">
       <label>Category</label>
@@ -3372,15 +3431,6 @@ function moneyPageHtml(){
       <label>Transfer To</label>
       <select id="money-txn-transfer-to"></select>
       <div class="hint" style="margin-top:6px; margin-bottom:0;">Balance moves out of Source above and into this account.</div>
-    </div>
-    <div class="field" id="money-txn-apportion-wrap" style="display:none;">
-      <label>Apportion Over</label>
-      <select id="money-txn-apportion">
-        <option value="0">No — single day</option>
-        <option value="30">This Month (~30 days)</option>
-        <option value="90">3 Months (~90 days)</option>
-      </select>
-      <div class="hint" style="margin-top:6px; margin-bottom:0;">Spreads this expense evenly across the dashboard's charts so it doesn't spike a single day. Your account balance still moves on the actual date.</div>
     </div>
     <div class="field" style="margin-bottom:0;">
       <label>Remarks <span style="font-weight:400;">(optional)</span></label>
@@ -3495,6 +3545,7 @@ function moneyPageHtml(){
   let activeTxnType = null;
   let activeTxnViewId = null;
   let editingTxnId = null;
+  let selectedTxnSource = 'HDFC'; // tracked here now instead of a <select>'s own .value — see setTxnSource()
   const OUTFLOW_CATEGORIES = ['Travel','Food','Shopping','Recharge','Investment','Inter Bank Transactions','Others'];
   const INFLOW_CATEGORIES = ['Salary','Business','Investment','Reimbursement','Others'];
   const ACCOUNT_SOURCES = ['HDFC','SBI','Cash'];
@@ -3654,13 +3705,11 @@ function moneyPageHtml(){
     $('money-txn-date').value = todayStr();
     $('money-txn-amount').value = '';
     $('money-txn-remarks').value = '';
-    $('money-txn-source').value = 'HDFC';
+    setTxnSource('HDFC');
     const cats = isIn ? INFLOW_CATEGORIES : OUTFLOW_CATEGORIES;
     $('money-txn-category').innerHTML = cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    $('money-txn-apportion').value = '0';
     updateInvoiceLinkVisibility();
     updateTransferVisibility();
-    updateApportionVisibility();
     openModalAnimated($('money-txn-modal-bg'));
   }
 
@@ -3679,7 +3728,7 @@ function moneyPageHtml(){
     $('money-txn-date').value = t.date;
     $('money-txn-amount').value = t.amount;
     $('money-txn-remarks').value = t.remarks || '';
-    $('money-txn-source').value = t.source;
+    setTxnSource(t.source);
     const cats = isIn ? INFLOW_CATEGORIES : OUTFLOW_CATEGORIES;
     $('money-txn-category').innerHTML = cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
     $('money-txn-category').value = t.category;
@@ -3687,8 +3736,6 @@ function moneyPageHtml(){
     if(t.linkedInvoiceId) $('money-txn-linked-invoice').value = t.linkedInvoiceId;
     updateTransferVisibility();
     if(t.transferId) $('money-txn-transfer-to').value = t.transferPeer;
-    $('money-txn-apportion').value = String(t.apportionDays || 0);
-    updateApportionVisibility();
     closeTxnViewModal();
     openModalAnimated($('money-txn-modal-bg'));
   }
@@ -3722,6 +3769,19 @@ function moneyPageHtml(){
     $('money-txn-remarks').value = `Invoice ${inv.invoiceNo} — ${inv.billTo.name}`;
   }
 
+  // Replaces $('money-txn-source').value now that Source is 3 buttons instead of a
+  // <select> — selectedTxnSource is the single source of truth; every caller that used to
+  // read the select's .value reads this instead, and every caller that used to set the
+  // select's .value calls this instead (which also drives the active-button highlight and,
+  // same as the old <select>'s change listener did, keeps Transfer To in sync).
+  function setTxnSource(val){
+    selectedTxnSource = val;
+    document.querySelectorAll('#money-txn-source-row .money-source-btn').forEach(b=>{
+      b.classList.toggle('active', b.getAttribute('data-source')===val);
+    });
+    updateTransferVisibility();
+  }
+
   function updateTransferVisibility(){
     const isTransfer = activeTxnType === 'outflow' && $('money-txn-category').value === 'Inter Bank Transactions';
     const wrap = $('money-txn-transfer-wrap');
@@ -3729,7 +3789,7 @@ function moneyPageHtml(){
       wrap.style.display = 'none';
       return;
     }
-    const sourceVal = $('money-txn-source').value;
+    const sourceVal = selectedTxnSource;
     const sel = $('money-txn-transfer-to');
     const current = sel.value;
     sel.innerHTML = ACCOUNT_SOURCES.filter(s=>s!==sourceVal).map(s=>`<option value="${s}">${s}</option>`).join('');
@@ -3737,21 +3797,10 @@ function moneyPageHtml(){
     wrap.style.display = '';
   }
 
-  function updateApportionVisibility(){
-    const isApportionable = activeTxnType === 'outflow' && $('money-txn-category').value !== 'Inter Bank Transactions';
-    const wrap = $('money-txn-apportion-wrap');
-    if(!isApportionable){
-      wrap.style.display = 'none';
-      $('money-txn-apportion').value = '0';
-      return;
-    }
-    wrap.style.display = '';
-  }
-
   async function saveTransactionEntry(){
     const date = $('money-txn-date').value || todayStr();
     const amount = parseFloat($('money-txn-amount').value);
-    const source = $('money-txn-source').value;
+    const source = selectedTxnSource;
     const category = $('money-txn-category').value;
     const remarks = $('money-txn-remarks').value.trim();
     if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
@@ -3793,7 +3842,7 @@ function moneyPageHtml(){
         id: 'txn_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
         date, type:'outflow', amount, source, category,
         remarks: remarks || `Transfer to ${destination}`,
-        linkedInvoiceId:'', linkedInvoiceNo:'', apportionDays:0,
+        linkedInvoiceId:'', linkedInvoiceNo:'',
         transferId, transferPeer: destination,
         createdAt: new Date().toISOString()
       };
@@ -3801,7 +3850,7 @@ function moneyPageHtml(){
         id: 'txn_' + (Date.now()+1) + '_' + Math.random().toString(36).slice(2,7),
         date, type:'inflow', amount, source: destination, category,
         remarks: remarks || `Transfer from ${source}`,
-        linkedInvoiceId:'', linkedInvoiceNo:'', apportionDays:0,
+        linkedInvoiceId:'', linkedInvoiceNo:'',
         transferId, transferPeer: source,
         createdAt: new Date().toISOString()
       };
@@ -3822,12 +3871,11 @@ function moneyPageHtml(){
       return;
     }
 
-    const apportionDays = (activeTxnType==='outflow') ? (parseInt($('money-txn-apportion').value,10)||0) : 0;
     const reuse = (isEdit && removedTxns && removedTxns.length===1) ? removedTxns[0] : null;
     const rec = {
       id: reuse ? reuse.id : ('txn_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
       date, type: activeTxnType, amount, source, category, remarks,
-      linkedInvoiceId, linkedInvoiceNo, transferId:'', transferPeer:'', apportionDays,
+      linkedInvoiceId, linkedInvoiceNo, transferId:'', transferPeer:'',
       createdAt: reuse ? reuse.createdAt : new Date().toISOString()
     };
     transactions.unshift(rec);
@@ -3895,7 +3943,7 @@ function moneyPageHtml(){
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${isIn? '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>' : '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'}</svg>
         </div>
         <div class="rec-mid">
-          <div class="rec-name">${escapeHtml(t.category)}${t.linkedInvoiceNo? ` <span class="txn-tag">🔗 ${escapeHtml(t.linkedInvoiceNo)}</span>` : ''}${t.transferId? ` <span class="txn-tag">🔁 ${isIn?'from':'to'} ${escapeHtml(t.transferPeer)}</span>` : ''}${t.apportionDays>1? ` <span class="txn-tag">÷ ${t.apportionDays}d</span>` : ''}</div>
+          <div class="rec-name">${escapeHtml(t.category)}${t.linkedInvoiceNo? ` <span class="txn-tag">🔗 ${escapeHtml(t.linkedInvoiceNo)}</span>` : ''}${t.transferId? ` <span class="txn-tag">🔁 ${isIn?'from':'to'} ${escapeHtml(t.transferPeer)}</span>` : ''}</div>
           <div class="rec-sub">${escapeHtml(dateDisplay)} · ${escapeHtml(t.source)}${t.remarks? ' · '+escapeHtml(t.remarks) : ''}</div>
         </div>
         <div class="rec-amt txn-amt ${isIn?'in':'out'}">${isIn?'+':'-'}${fmt(t.amount)}</div>
@@ -3913,7 +3961,7 @@ function moneyPageHtml(){
     const isIn = t.type === 'inflow';
     const dateDisplay = new Date(t.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
     $('money-txn-view-title').textContent = t.category;
-    $('money-txn-view-sub').textContent = `${dateDisplay} · ${t.source} · ${isIn?'+':'-'}${fmt(t.amount)}${t.remarks? ' · '+t.remarks : ''}${t.linkedInvoiceNo? ' · 🔗 '+t.linkedInvoiceNo : ''}${t.transferId? ' · 🔁 '+(isIn?'from ':'to ')+t.transferPeer : ''}${t.apportionDays>1? ' · spread over '+t.apportionDays+' days' : ''}`;
+    $('money-txn-view-sub').textContent = `${dateDisplay} · ${t.source} · ${isIn?'+':'-'}${fmt(t.amount)}${t.remarks? ' · '+t.remarks : ''}${t.linkedInvoiceNo? ' · 🔗 '+t.linkedInvoiceNo : ''}${t.transferId? ' · 🔁 '+(isIn?'from ':'to ')+t.transferPeer : ''}`;
     openModalAnimated($('money-txn-view-modal-bg'));
   }
   function closeTxnViewModal(){ closeModalAnimated($('money-txn-view-modal-bg'), ()=>{ activeTxnViewId = null; }); }
@@ -4615,33 +4663,16 @@ function moneyPageHtml(){
     return d >= range.start && d <= range.end;
   }
 
-  // Apportionment: a big one-off outflow (e.g. a 3-month recharge) can be spread evenly
-  // across `apportionDays` days starting on its transaction date, for reporting purposes
-  // only. Account balances always use the full amount on the real transaction date —
-  // only these two helpers (used by charts/stat cards) spread it out.
+  // Every transaction counts in full on its own actual date — no spreading a large
+  // one-off across multiple days for reporting purposes (that's what this app used to
+  // call "apportioning"; removed so the charts always show real spending on the real day).
   function dailyExpenseContribution(t, dayDate){
     const txDate = new Date(t.date + 'T00:00:00');
-    if(!t.apportionDays || t.apportionDays<=1){
-      return (dayDate.getFullYear()===txDate.getFullYear() && dayDate.getMonth()===txDate.getMonth() && dayDate.getDate()===txDate.getDate()) ? t.amount : 0;
-    }
-    const diffDays = Math.round((dayDate - txDate)/86400000);
-    if(diffDays>=0 && diffDays < t.apportionDays) return t.amount / t.apportionDays;
-    return 0;
+    return (dayDate.getFullYear()===txDate.getFullYear() && dayDate.getMonth()===txDate.getMonth() && dayDate.getDate()===txDate.getDate()) ? t.amount : 0;
   }
 
   function expenseContributionInRange(t, range){
-    const txDate = new Date(t.date + 'T00:00:00');
-    if(!t.apportionDays || t.apportionDays<=1){
-      return dateInRange(t.date, range) ? t.amount : 0;
-    }
-    const perDay = t.amount / t.apportionDays;
-    const txEnd = new Date(txDate.getTime() + (t.apportionDays-1)*86400000);
-    const overlapStart = txDate > range.start ? txDate : range.start;
-    const overlapEnd = txEnd < range.end ? txEnd : range.end;
-    const overlapMs = overlapEnd - overlapStart;
-    if(overlapMs < 0) return 0;
-    const overlapDays = Math.floor(overlapMs/86400000) + 1;
-    return Math.max(overlapDays,0) * perDay;
+    return dateInRange(t.date, range) ? t.amount : 0;
   }
 
   const PERIOD_LABELS = { week:'this week', month:'this month', last3:'the last 3 months', year:'this year', all:'all time' };
@@ -4681,7 +4712,7 @@ function moneyPageHtml(){
     $('money-exp-bal-cash').textContent = fmt(bal.Cash);
     $('money-exp-bal-total').textContent = fmt(bal.HDFC + bal.SBI + bal.Cash);
 
-    // period-scoped data (apportioned entries contribute a fraction of each day within their spread window)
+    // period-scoped data — each transaction counts in full on its own actual date
     const allRealExpenses = transactions.filter(isRealExpense);
     const periodInflow = transactions.filter(t=> isRealIncome(t) && dateInRange(t.date, range));
 
@@ -4721,7 +4752,7 @@ function moneyPageHtml(){
     // breakdown card: all categories (period+catFilter n/a) or by-source when one category chosen
     if(dashCategory==='all'){
       $('money-exp-breakdown-title').textContent = 'Category Breakdown';
-      $('money-exp-breakdown-hint').textContent = 'Inter-bank transfers are excluded, and apportioned entries are spread across their selected period. Showing ' + PERIOD_LABELS[dashPeriod] + '.';
+      $('money-exp-breakdown-hint').textContent = 'Inter-bank transfers are excluded. Showing ' + PERIOD_LABELS[dashPeriod] + '.';
       const byCat = {};
       allRealExpenses.forEach(t=>{
         const c = expenseContributionInRange(t, range);
@@ -4742,7 +4773,7 @@ function moneyPageHtml(){
       `).join('') : `<div class="hint" style="margin:0;">No spending in ${PERIOD_LABELS[dashPeriod]}.</div>`;
     } else {
       $('money-exp-breakdown-title').textContent = dashCategory + ' — By Account';
-      $('money-exp-breakdown-hint').textContent = 'Showing ' + PERIOD_LABELS[dashPeriod] + ' for ' + dashCategory + ' only (apportioned entries spread across their selected period).';
+      $('money-exp-breakdown-hint').textContent = 'Showing ' + PERIOD_LABELS[dashPeriod] + ' for ' + dashCategory + ' only.';
       const bySource = {};
       allRealExpenses.filter(catMatch).forEach(t=>{
         const c = expenseContributionInRange(t, range);
@@ -4912,8 +4943,7 @@ function moneyPageHtml(){
           <line x1="0" y1="${dH-32}" x2="${dSvgW}" y2="${dH-32}" stroke="var(--border)" stroke-width="1.5"/>
           ${dBars}
         </svg>
-      </div>
-      <div class="hint" style="margin-top:8px; margin-bottom:0;">Apportioned entries (marked ÷) show only their per-day share here — the full amount left your account on its actual date.</div>`;
+      </div>`;
     wireBarTooltips('money-exp-fifteen-container');
 
     // date-wise details list (only days with spending), most recent first
@@ -4925,11 +4955,10 @@ function moneyPageHtml(){
       const catLine = fifteenCategory==='all'
         ? Object.entries(byCatForDay).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`${c} (${fmt(v)})`).join(', ')
         : (dayContribs[0] ? dayContribs[0].t.source + (dayContribs.length>1? ' +'+(dayContribs.length-1)+' more' : '') : '');
-      const hasApportioned = dayContribs.some(x=>x.t.apportionDays>1);
       return `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${Math.min(i*30,300)}ms;">
           <div style="min-width:0;">
-            <div style="font-weight:700; color:var(--ink);">${d.toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short'})}${hasApportioned? ' <span class="txn-tag">÷</span>' : ''}</div>
+            <div style="font-weight:700; color:var(--ink);">${d.toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short'})}</div>
             <div style="font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(catLine)}</div>
           </div>
           <div style="font-weight:700; color:var(--danger); flex:none; margin-left:10px;">-${fmt(total)}</div>
@@ -4941,34 +4970,22 @@ function moneyPageHtml(){
     document.querySelectorAll('#money-page-dashboard .subpage').forEach(p=>p.classList.remove('active'));
     $('money-dash-sub-'+name).classList.add('active');
     document.querySelectorAll('#money-page-dashboard .seg-btn').forEach(b=>b.classList.toggle('active', b.getAttribute('data-dashsub')===name));
-    $('money-pageSub').textContent = name==='expenses' ? 'Your expenses at a glance' : 'Track your revenue at a glance';
     if(name==='expenses') renderExpenseDashboard();
     else renderDashboard();
   }
 
   /* ---------- Tab switching ---------- */
-  const titles = {
-    transactions:{t:'Transactions', s:'Track your day-to-day money in and out'},
-    invoices:{t:'Invoices', s:'Create and manage your invoices'},
-    dashboard:{t:'Dashboard', s:'Your expenses at a glance'},
-    settings:{t:'Settings', s:'Manage your sender details'}
-  };
   function switchTab(name){
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     $('money-page-'+name).classList.add('active');
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.getAttribute('data-page')===name));
-    $('money-pageTitle').textContent = titles[name].t;
-    $('money-pageSub').textContent = titles[name].s;
     if(name==='transactions'){ renderTransactionsList($('money-txn-search').value); computeBalances(); }
     if(name==='invoices') renderRecords($('money-rec-search').value);
     if(name==='dashboard'){
       renderDashboard();
       renderExpenseDashboard();
-      const activeSub = document.querySelector('#page-dashboard .seg-btn.active');
-      const subName = activeSub ? activeSub.getAttribute('data-dashsub') : 'expenses';
-      $('money-pageSub').textContent = subName==='expenses' ? 'Your expenses at a glance' : 'Track your revenue at a glance';
     }
     if(name==='settings') refreshStartNumberField();
+    window.scrollTo(0,0); // land at the top of whichever page we just switched to, not wherever the previous one happened to be scrolled to
   }
 
   function switchInvoiceSub(name){
@@ -5063,10 +5080,6 @@ function moneyPageHtml(){
   }
 
   async function init(){
-    document.querySelectorAll('.tab-btn').forEach(b=>{
-      b.addEventListener('click', ()=> switchTab(b.getAttribute('data-page')));
-    });
-
     $('money-storage-status-dot').style.background = 'var(--good)';
     $('money-storage-status-text').innerHTML = '<b style="color:var(--ink);">Synced via Olympus</b> — saved with your Olympus data and backed up to Google Drive.';
 
@@ -5114,9 +5127,11 @@ function moneyPageHtml(){
     $('money-btn-open-inflow').addEventListener('click', ()=> openTxnModal('inflow'));
     $('money-btn-open-outflow').addEventListener('click', ()=> openTxnModal('outflow'));
     $('money-txn-save-btn').addEventListener('click', saveTransactionEntry);
-    $('money-txn-category').addEventListener('change', ()=>{ updateInvoiceLinkVisibility(); updateTransferVisibility(); updateApportionVisibility(); });
+    $('money-txn-category').addEventListener('change', ()=>{ updateInvoiceLinkVisibility(); updateTransferVisibility(); });
     $('money-txn-linked-invoice').addEventListener('change', applyLinkedInvoiceToForm);
-    $('money-txn-source').addEventListener('change', updateTransferVisibility);
+    document.querySelectorAll('#money-txn-source-row .money-source-btn').forEach(b=>{
+      b.addEventListener('click', ()=> setTxnSource(b.getAttribute('data-source')));
+    });
     $('money-txn-cancel-btn').addEventListener('click', closeTxnModal);
     $('money-txn-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='money-txn-modal-bg') closeTxnModal(); });
     $('money-txn-search').addEventListener('input', e=> renderTransactionsList(e.target.value));
