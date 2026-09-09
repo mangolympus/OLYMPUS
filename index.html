@@ -619,11 +619,14 @@ body.targets-mode #targets-root{display:flex}
 .money-view .money-source-btn-row{display:flex; gap:8px;}
 .money-view .money-source-btn{flex:1; padding:11px 8px; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); font-weight:700; font-size:13.5px; cursor:pointer; transition:background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);}
 .money-view .money-source-btn.active{background:var(--umang); border-color:var(--umang); color:#fff;}
-/* Sticky sub-header — sticks right below Olympus's own sticky <header>. --money-header-h is
-   set from JS (see moneySetStickyOffset()) by measuring that header's real rendered height,
-   since it isn't a fixed constant across devices/font scaling; 64px is just a reasonable
-   fallback for the first paint before that measurement has run. */
-.money-view .money-sticky-header{position:sticky; top:var(--money-header-h,64px); z-index:10; background:var(--bg); padding-top:12px; padding-bottom:10px;}
+/* top:60px = Olympus's own <header> height: 13px+13px padding + 33px .icon-btn (its tallest
+   content) + 1px border-bottom (see header{} and .icon-btn{} above). Fixed px on both sides,
+   not measured at runtime — this used to read header.offsetHeight via JS into a CSS custom
+   property, which was fragile (depended on that measurement having already run, and re-running
+   correctly on resize) for no real benefit, since Olympus's header has always rendered at a
+   consistent height in practice. If header{} 's padding or its tallest child ever changes,
+   update this number too. */
+.money-view .money-sticky-header{position:sticky; top:60px; z-index:10; background:var(--bg); padding-top:12px; padding-bottom:10px;}
 .money-view .money-corner-row{display:flex; justify-content:flex-end; margin-bottom:10px;}
 .money-view .money-icon-btn{width:34px; height:34px; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
 .money-view .money-subnav-row{display:flex; gap:10px; margin:14px 0;}
@@ -2925,23 +2928,7 @@ function renderMoneyPage(){
     // without re-wiring every event listener a second time.
     window.moneyRefresh();
   }
-  moneySetStickyOffset();
 }
-// The Transactions page's own header (settings button, Inflow/Outflow, balances, the
-// Dashboard/Invoices buttons, search) sticks below Olympus's own sticky <header> while the
-// transaction list scrolls underneath — see .money-sticky-header's top:var(--money-header-h).
-// Olympus's header doesn't have a fixed pixel height (font scaling, wrapping), so this reads
-// its real rendered height and pushes that into the CSS variable the sticky rule uses,
-// instead of a hardcoded number that could drift out of sync and either leave a gap or
-// (worse) let the two headers overlap.
-function moneySetStickyOffset(){
-  requestAnimationFrame(()=>{
-    const header = document.querySelector('header');
-    if(!header || !header.offsetHeight) return;
-    document.documentElement.style.setProperty('--money-header-h', header.offsetHeight + 'px');
-  });
-}
-window.addEventListener('resize', ()=>{ if(S.view==='money') moneySetStickyOffset(); });
 
 function moneyPageHtml(){
   return `
