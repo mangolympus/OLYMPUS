@@ -5774,7 +5774,18 @@ function renderRichText(text){
   s = s.replace(/\*([^\n*]+?)\*/g, '<span class="rt-i">$1</span>');
   return s.replace(/\n/g, '<br>');
 }
-function findMsg(id){ return (S.shared.chat.messages||[]).find(m=>m.id===id); }
+// Searches live messages first, then the in-memory archive if already fetched this session.
+// Read-only callers (reply bar preview, reply-quote display, jump-to) work correctly once
+// archive is in memory. Write callers (delete, edit, pin, star, react) guard separately
+// via isLiveMsg() below — archive messages are shown but can't be mutated through the sheet.
+function findMsg(id){
+  return (S.shared.chat.messages||[]).find(m=>m.id===id)
+      || ((S.sharedArchive && S.sharedArchive.chat)||[]).find(m=>m.id===id);
+}
+// True only when the message lives in the live (non-archived) array — used by write
+// operations to block mutations on archive messages (which would need saveArchive() and
+// aren't worth the complexity for such a rare action).
+function isLiveMsg(id){ return !!(S.shared.chat.messages||[]).find(m=>m.id===id); }
 function chatPlainPreview(msg){
   if(!msg) return '';
   if(msg.deleted) return 'Message deleted';
@@ -5792,7 +5803,13 @@ function buildChatGroups(messages){
   const days = [];
   let curDay = null, curDayObj = null;
   messages.forEach(m=>{
-    const day = localDateStr(new Date(m.createdAt));
+    // Bucket by STUDY day (todayStr's 5 AM boundary), not raw calendar date. fmtDateSeparator
+    // compares its argument against todayStr(), so using localDateStr here meant a message sent
+    // at 1 AM got bucketed to the new calendar date while todayStr() was still reporting the
+    // previous one — the separator above a message you'd just sent read "Wednesday, 15 Jan"
+    // instead of "Today", and yesterday's messages read as a bare weekday too. Everything else
+    // in this app (streaks, hours, Planner) already buckets on the 5 AM rule; chat now matches.
+    const day = todayStr(new Date(m.createdAt));
     if(day !== curDay){
       curDay = day;
       curDayObj = {dateKey:day, dateLabel:fmtDateSeparator(day), clusters:[]};
@@ -5984,7 +6001,17 @@ function mergeChatFromRemote(remoteShared){
     if(!remote[k]) return;
     PROFILES.forEach(p=>{
       const lv = local[k][p.id], rv = remote[k][p.id];
-      if(rv && (!lv || new Date(rv) > new Date(lv))){ local[k][p.id]=rv; changed=true; }
+      if(k === 'typingUntil'){
+        // null is a meaningful signal here (= sender stopped typing / sent a message) and must
+        // overwrite a stale non-null local value, otherwise the typing indicator never clears
+        // on the recipient's side until the timestamp expires naturally (~4 s). readUpto and
+        // lastActive are monotonically increasing and should never be reset to null, so they
+        // keep the existing "only update if remote is newer" rule below.
+        const shouldUpdate = rv !== lv && (rv === null || !lv || new Date(rv) > new Date(lv));
+        if(shouldUpdate){ local[k][p.id] = rv; changed = true; }
+      } else {
+        if(rv && (!lv || new Date(rv) > new Date(lv))){ local[k][p.id]=rv; changed=true; }
+      }
     });
   });
   return changed;
@@ -6034,7 +6061,15 @@ function finishLeavingChat(){
   const el = document.getElementById('chat-root');
   if(el) el.innerHTML = '';
   const me = S.local.myProfile;
-  if(me) S.shared.chat.typingUntil[me] = null;
+  if(me){
+    // Stamp a final lastActive so "Last seen" is accurate to the moment of leaving, not just
+    // the last 25 s heartbeat tick. Clear typingUntil at the same time — if the user was
+    // mid-compose when they backed out, the other person's typing indicator clears immediately
+    // rather than waiting up to 4 s for the timestamp to expire. Save so both reach Drive.
+    S.shared.chat.lastActive[me] = nowISO();
+    S.shared.chat.typingUntil[me] = null;
+    saveShared();
+  }
   S.view = S._chatReturnView || 'home';
   S._justNavigated = true;
   renderNav(); renderApp();
@@ -6044,6 +6079,19 @@ function finishLeavingChat(){
 function exitChatPage(){
   if(_chatHistoryActive) history.back();
   else finishLeavingChat();
+}
+// True when the message list is scrolled close enough to the bottom that the newest message
+// is actually on screen. Used to gate read-marking: previously pollChatUpdates() called
+// markChatRead() unconditionally, so a message arriving while the user was scrolled up
+// reading old history was instantly stamped "read" and given a blue double-tick on the
+// sender's device — a read receipt for something nobody had looked at. It also made an
+// unread badge impossible, since the count was zeroed the moment the message landed.
+// Returns true when the list isn't rendered at all (e.g. enterChat before first paint),
+// since those paths scroll to the bottom anyway.
+function chatIsNearBottom(){
+  const el = document.getElementById('chat-messages-list');
+  if(!el) return true;
+  return (el.scrollHeight - el.scrollTop - el.clientHeight) < 120;
 }
 function markChatRead(){
   const me = S.local.myProfile; if(!me) return false;
@@ -6076,8 +6124,24 @@ function stopChatPolling(){
   document.removeEventListener('visibilitychange', onChatVisibilityChange);
 }
 function onChatVisibilityChange(){
-  if(document.hidden){ if(_chatPollTimer){ clearInterval(_chatPollTimer); _chatPollTimer=null; } }
-  else if(S.view==='chat' && !_chatPollTimer){ pollChatUpdates(); _chatPollTimer = setInterval(pollChatUpdates, 3000); }
+  if(document.hidden){
+    if(_chatPollTimer){ clearInterval(_chatPollTimer); _chatPollTimer=null; }
+    // Stop the heartbeat too. lastActive is the cross-device "they're looking at Chat right
+    // now" signal, and notifyPartnerNewMessage() SKIPS the push entirely when the recipient's
+    // lastActive is under 90s old. Leaving the heartbeat running while the tab is hidden meant
+    // a phone with Chat open but screen locked kept advertising itself as actively watching,
+    // so the sender's device suppressed the push and the recipient was never notified at all —
+    // exactly the case push exists for. Pausing here lets lastActive go stale within ~90s of
+    // backgrounding, which is what the recipient actually is.
+    stopChatHeartbeat();
+  } else if(S.view==='chat'){
+    if(!_chatPollTimer){ pollChatUpdates(); _chatPollTimer = setInterval(pollChatUpdates, 3000); }
+    // Stamp immediately on return so "Online" comes back at once rather than after 25s,
+    // then resume the interval.
+    const me = S.local.myProfile;
+    if(me){ S.shared.chat.lastActive[me] = nowISO(); saveShared(); }
+    if(!_chatHeartbeatTimer) startChatHeartbeat();
+  }
 }
 async function pollChatUpdates(){
   if(S.view!=='chat' || !S.appSession || !isHosted()) return;
@@ -6085,9 +6149,17 @@ async function pollChatUpdates(){
     const remote = await driveSyncLoad();
     if(remote && remote.chat){
       const changed = mergeChatFromRemote(remote);
-      const readChanged = markChatRead();
+      // Only mark read if the newest message is actually on screen — see chatIsNearBottom().
+      const readChanged = chatIsNearBottom() ? markChatRead() : false;
       if(changed){ renderChatMessagesOnly(); saveShared(); }
-      else if(readChanged){ renderChatMessagesOnly(); /* read-receipt only — no Drive write */ }
+      else if(readChanged){
+        renderChatMessagesOnly();
+        // Persist the updated readUpto to localStorage only — no full Drive write here to
+        // avoid hammering the API on every 3s poll for a minor read-receipt advance. The
+        // 25s heartbeat handles Drive propagation. Without this local persist, closing the
+        // app within that window would revert the pointer and show messages as unread again.
+        storageSet('olympusData', JSON.stringify(S.shared), true).catch(()=>{});
+      }
     }
   }catch(e){ console.warn('Chat poll failed', e); }
 }
@@ -6194,19 +6266,26 @@ function chatSheetHtml(){
   const mine = msg.from === me;
   const iStarred = !!(msg.starredBy && msg.starredBy[me]);
   const preview = chatPlainPreview(msg);
+  // Live messages get all actions; archive messages get read-only actions only (Reply, Copy,
+  // Forward, Select) — write operations (react, edit, pin, star, delete) are suppressed
+  // entirely rather than shown-then-alerting, since showing buttons that immediately say
+  // "can't do that" erodes trust in the UI. The isLiveMsg guard on each action function
+  // still catches any path that bypasses this (e.g. a reaction pill on an archive message).
+  const live = isLiveMsg(id);
   return `<div class="chat-sheet-overlay" onclick="if(event.target===this) dismissChatSheet()">
     <div class="chat-sheet" role="menu" aria-label="Message actions">
       <div class="chat-sheet-handle"></div>
       <div class="chat-sheet-preview">${escChat(preview).slice(0,160)}</div>
-      ${!msg.deleted ? `<div class="chat-sheet-reactrow">${QUICK_REACTIONS.map(e=>`<button onclick="reactToMessage('${id}','${e}')" aria-label="React ${e}">${e}</button>`).join('')}</div>` : ''}
+      ${live && !msg.deleted ? `<div class="chat-sheet-reactrow">${QUICK_REACTIONS.map(e=>`<button onclick="reactToMessage('${id}','${e}')" aria-label="React ${e}">${e}</button>`).join('')}</div>` : ''}
       ${!msg.deleted ? `<button class="opt" role="menuitem" onclick="replyToMessage('${id}')">${CHAT_ICONS.reply}Reply</button>` : ''}
       ${!msg.deleted && msg.type==='text' ? `<button class="opt" role="menuitem" onclick="copyMessageText('${id}')">${CHAT_ICONS.copy}Copy</button>` : ''}
       ${!msg.deleted ? `<button class="opt" role="menuitem" onclick="forwardMessage('${id}')">${CHAT_ICONS.forward}Forward</button>` : ''}
-      ${mine && !msg.deleted && msg.type==='text' ? `<button class="opt" role="menuitem" onclick="editChatMessage('${id}')">${CHAT_ICONS.edit}Edit</button>` : ''}
-      ${!msg.deleted ? `<button class="opt" role="menuitem" onclick="pinChatMessage('${id}')">${CHAT_ICONS.pin}${msg.pinned?'Unpin':'Pin'}</button>` : ''}
-      ${!msg.deleted ? `<button class="opt" role="menuitem" onclick="starChatMessage('${id}')">${CHAT_ICONS.star}${iStarred?'Unstar':'Star'}</button>` : ''}
+      ${live && mine && !msg.deleted && msg.type==='text' ? `<button class="opt" role="menuitem" onclick="editChatMessage('${id}')">${CHAT_ICONS.edit}Edit</button>` : ''}
+      ${live && !msg.deleted ? `<button class="opt" role="menuitem" onclick="pinChatMessage('${id}')">${CHAT_ICONS.pin}${msg.pinned?'Unpin':'Pin'}</button>` : ''}
+      ${live && !msg.deleted ? `<button class="opt" role="menuitem" onclick="starChatMessage('${id}')">${CHAT_ICONS.star}${iStarred?'Unstar':'Star'}</button>` : ''}
       <button class="opt" role="menuitem" onclick="toggleSelectMode('${id}')">${CHAT_ICONS.select}Select</button>
-      ${mine && !msg.deleted ? `<button class="opt danger" role="menuitem" onclick="deleteChatMessage('${id}')">${CHAT_ICONS.trash}Delete</button>` : ''}
+      ${live && mine && !msg.deleted ? `<button class="opt danger" role="menuitem" onclick="deleteChatMessage('${id}')">${CHAT_ICONS.trash}Delete</button>` : ''}
+      ${!live ? `<div style="font-size:11px;color:var(--text-faint);padding:8px 14px 4px;text-align:center">Archived message — tap Reply or Forward to respond</div>` : ''}
     </div>
   </div>`;
 }
@@ -6267,14 +6346,18 @@ function chatMessagesInnerHtml(){
 function renderChatRow(msg, showAvatar, posClass){
   const me = S.local.myProfile || 'umang';
   const isOut = msg.from === me;
-  const p = profileById(msg.from);
+  // profileById returns undefined for any sender id that isn't 'umang'/'chetna'. A single
+  // corrupted or future-schema message would otherwise throw on p.nick[0] and take down the
+  // ENTIRE message list render (chatMessagesInnerHtml builds one string), blanking the chat.
+  const p = profileById(msg.from) || {nick:'?', color:'umang', name:'Unknown'};
   const time = fmtMsgTime(msg.createdAt);
   const selected = S._chatSelectMode && S._chatSelected.has(msg.id);
   let inner = '';
   if(msg.replyTo && !msg.deleted){
     const orig = findMsg(msg.replyTo);
+    const origP = orig ? (profileById(orig.from) || {nick:'?'}) : null;
     inner += `<div class="chat-reply-quote" onclick="jumpToOriginal('${msg.replyTo}')">
-      <div class="who">${orig ? escChat(profileById(orig.from).nick) : 'Unknown'}</div>
+      <div class="who">${origP ? escChat(origP.nick) : 'Unknown'}</div>
       <div class="txt">${orig ? escChat(chatPlainPreview(orig)) : 'Original message unavailable'}</div>
     </div>`;
   }
@@ -6284,7 +6367,10 @@ function renderChatRow(msg, showAvatar, posClass){
   } else if(msg.type==='text'){
     inner += `<div>${renderRichText(msg.text)}</div>`;
   } else if(msg.type==='sticker'){
-    inner += `<div class="chat-sticker">${msg.stickerId}</div>`;
+    // Escaped even though stickerId is normally one of our own STUDY_STICKERS emoji — this
+    // value round-trips through a shared Drive JSON that both devices write, so it's
+    // user-influenced data by the project's own escaping convention.
+    inner += `<div class="chat-sticker">${escChat(msg.stickerId)}</div>`;
   } else if(msg.type==='gif'){
     inner += `<img class="chat-gif" src="${escChat(msg.gifUrl)}" alt="GIF" loading="lazy">`;
   } else if(msg.type==='image'){
@@ -6330,7 +6416,12 @@ function chatTicksHtml(msg){
 function renderPollBubble(msg){
   const me = S.local.myProfile || 'umang';
   const poll = msg.poll; const votes = poll.votes || {};
-  const totalVoters = Object.keys(votes).length;
+  // Count only people who currently have at least one option selected. In a multi-choice poll
+  // votePoll() leaves an empty array behind when someone deselects their last option — the old
+  // Object.keys(votes).length counted that person as a voter forever, so a 1-of-2-voters option
+  // showed 50% when it was really 100%, and percentages could never reach 100% again once
+  // anyone had unvoted.
+  const totalVoters = Object.values(votes).filter(arr=> (arr||[]).length > 0).length;
   const myVotes = new Set(votes[me]||[]);
   const counts = {}; poll.options.forEach(o=> counts[o.id]=0);
   Object.values(votes).forEach(arr=> (arr||[]).forEach(optId=>{ if(counts[optId]!==undefined) counts[optId]++; }));
@@ -6356,7 +6447,7 @@ function chatComposerAreaHtml(){
   let bars = '';
   if(replyMsg){
     bars += `<div class="chat-reply-bar">
-      <div class="info"><div class="who">Replying to ${escChat(profileById(replyMsg.from).nick)}</div><div class="txt">${escChat(chatPlainPreview(replyMsg))}</div></div>
+      <div class="info"><div class="who">Replying to ${escChat((profileById(replyMsg.from)||{nick:'?'}).nick)}</div><div class="txt">${escChat(chatPlainPreview(replyMsg))}</div></div>
       <button class="close" onclick="cancelReply()" aria-label="Cancel reply">${CHAT_ICONS.close}</button>
     </div>`;
   } else if(editingMsg){
@@ -6425,7 +6516,13 @@ function renderChatPage(){
   }
   if(S._chatSearchOpen){
     const si = document.getElementById('chat-search-input');
-    if(si) si.value = S._chatSearchQuery||'';
+    if(si){
+      si.value = S._chatSearchQuery||'';
+      // Re-focus the input — renderChatPage() destroys and recreates the entire DOM so
+      // any focus the user had on the search bar is lost. Restore it here so they can
+      // keep typing without having to tap the bar again.
+      if(!composerHadFocus) si.focus();
+    }
     updateChatSearchNav();
   }
 }
@@ -6461,6 +6558,23 @@ function updateScrollToBottomFab(el){
   if(!fab || !el) return;
   const nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 120;
   fab.classList.toggle('show', !nearBottom);
+  // Unread badge on the FAB. The .chat-scrollbottom .unread-dot CSS rule already existed but
+  // nothing ever created the element, so scrolling up while new messages arrived gave no
+  // indication anything had come in — you just saw the plain arrow. Counts the other
+  // profile's messages newer than my readUpto, same definition as the nav badge, and only
+  // while actually scrolled up (at the bottom they're read by definition).
+  let dot = fab.querySelector('.unread-dot');
+  const n = nearBottom ? 0 : unreadChatCount();
+  if(n > 0){
+    if(!dot){
+      dot = document.createElement('span');
+      dot.className = 'unread-dot';
+      fab.appendChild(dot);
+    }
+    dot.textContent = n > 99 ? '99+' : String(n);
+  } else if(dot){
+    dot.remove();
+  }
 }
 let _loadingOlderChat = false;
 // Two-tier: first widen the window over whatever's already in memory (local + any
@@ -6507,16 +6621,37 @@ async function loadOlderMessages(){
 function onChatScroll(el){
   if(el.scrollTop < 80) loadOlderMessages();
   updateScrollToBottomFab(el);
+  // Scrolling back down to the newest message is the moment those messages are genuinely
+  // seen — mark them read here, since pollChatUpdates() now deliberately skips read-marking
+  // while scrolled up. Without this the read pointer would never advance for anyone who
+  // scrolled up once, and the FAB badge would stick permanently.
+  if(chatIsNearBottom() && markChatRead()){
+    updateScrollToBottomFab(el);
+    renderNav();
+    storageSet('olympusData', JSON.stringify(S.shared), true).catch(()=>{});
+  }
 }
 function jumpToOriginal(id){ jumpToChatId(id); }
 function jumpToPinned(){
   const pinned = pinnedMessages();
   if(pinned.length) jumpToChatId(pinned[pinned.length-1].id);
 }
-function jumpToChatId(id){
-  const idx = S.shared.chat.messages.findIndex(m=>m.id===id);
-  if(idx<0) return;
-  const total = S.shared.chat.messages.length;
+// Now searches the full combined list (live + archive) so reply-quote taps and pinned-strip
+// clicks work even when the target message was swept to the archive. If the message isn't
+// found and the archive hasn't been loaded this session yet, it fetches it first and retries
+// — this is the only path where a jump can trigger a lazy archive load mid-session.
+async function jumpToChatId(id){
+  let all = chatAllMessagesIncludingArchive();
+  let idx = all.findIndex(m=>m.id===id);
+  // Not found yet — try loading the archive once if we haven't already
+  if(idx < 0 && !S._archiveChecked && S.appSession && isHosted()){
+    S._archiveChecked = true;
+    try{ await loadArchive(); }catch(e){ console.warn('Archive load for jump failed:', e); }
+    all = chatAllMessagesIncludingArchive();
+    idx = all.findIndex(m=>m.id===id);
+  }
+  if(idx < 0) return;
+  const total = all.length;
   const needed = total - idx + 5;
   if(needed > S._chatWindow) S._chatWindow = Math.min(total, needed);
   renderChatMessagesOnly();
@@ -6613,7 +6748,10 @@ async function sweepToArchive(){
 
   const msgs = S.shared.chat.messages || [];
   const stayMsgs = [], moveMsgs = [];
-  msgs.forEach(m=>{ (todayStr(new Date(m.createdAt)) < cutoff ? moveMsgs : stayMsgs).push(m); });
+  // Pinned messages are excluded from the sweep regardless of age — sweeping a pinned
+  // message would silently remove it from pinnedMessages() (which only reads the live array)
+  // and break jumpToPinned(), making the pin strip disappear with no explanation.
+  msgs.forEach(m=>{ (todayStr(new Date(m.createdAt)) < cutoff && !m.pinned ? moveMsgs : stayMsgs).push(m); });
   if(moveMsgs.length){
     const seen = new Set((archive.chat||[]).map(m=>m.id));
     archive.chat = (archive.chat||[]).concat(moveMsgs.filter(m=>!seen.has(m.id)));
@@ -6708,6 +6846,9 @@ function sendChatMessage(){
     isNewMessage = true;
   }
   S._chatDraft = '';
+  // Clear the typing indicator immediately — without this it lingers for up to 4 more
+  // seconds after the message already arrived on the other person's screen.
+  if(S.shared.chat.typingUntil) S.shared.chat.typingUntil[me] = null;
   saveShared();
   if(isNewMessage) notifyPartnerNewMessage(me, text);
   const btn = document.getElementById('chat-send-btn');
@@ -6721,6 +6862,7 @@ function sendSticker(char){
   S.shared.chat.messages.push({id:uid(), from:me, type:'sticker', stickerId:char, replyTo:S._chatReplyTo||null,
     forwarded:false, edited:false, editedAt:null, deleted:false, pinned:false, starredBy:{}, reactions:{}, createdAt:now, updatedAt:now});
   S._chatReplyTo = null; S._chatTray = null;
+  if(S.shared.chat.typingUntil) S.shared.chat.typingUntil[me] = null;
   saveShared(); renderChatPage(); scrollChatToBottom();
 }
 function pollDraftAddOption(){ if(S._chatPollDraft.options.length<6){ S._chatPollDraft.options.push(''); renderChatPage(); } }
@@ -6743,10 +6885,14 @@ function submitPoll(){
     replyTo:S._chatReplyTo||null, forwarded:false, edited:false, editedAt:null, deleted:false, pinned:false,
     starredBy:{}, reactions:{}, createdAt:now, updatedAt:now});
   S._chatReplyTo = null; S._chatTray = null; S._chatPollDraft = null;
+  if(S.shared.chat.typingUntil) S.shared.chat.typingUntil[me] = null;
   saveShared(); renderChatPage(); scrollChatToBottom();
 }
 function votePoll(msgId, optId){
   const msg = findMsg(msgId); if(!msg || !msg.poll || msg.poll.closed) return;
+  // Archive messages: the vote would mutate the in-memory sharedArchive copy but saveShared()
+  // only persists S.shared, so the vote would silently disappear on the next page load.
+  if(!isLiveMsg(msgId)){ alert('Archived polls can\'t be voted on.'); return; }
   const me = S.local.myProfile; if(!me) return;
   if(!msg.poll.votes) msg.poll.votes = {};
   if(msg.poll.multi){
@@ -6773,6 +6919,7 @@ function cancelReply(){ S._chatReplyTo = null; renderChatPage(); }
 function editChatMessage(id){
   const msg = findMsg(id);
   if(!msg || msg.from !== S.local.myProfile) return;
+  if(!isLiveMsg(id)){ closeChatSheet(); alert('Archived messages can\'t be edited.'); renderChatPage(); return; }
   closeChatSheet(); S._chatReplyTo = null; S._chatEditing = id; S._chatDraft = msg.text||'';
   renderChatPage(); focusComposer();
 }
@@ -6800,11 +6947,13 @@ function forwardMessage(id){
 }
 function pinChatMessage(id){
   const msg = findMsg(id); if(!msg) return;
+  if(!isLiveMsg(id)){ closeChatSheet(); alert('Archived messages can\'t be pinned.'); renderChatPage(); return; }
   msg.pinned = !msg.pinned; msg.updatedAt = nowISO();
   closeChatSheet(); saveShared(); renderChatPage();
 }
 function starChatMessage(id){
   const msg = findMsg(id); if(!msg) return;
+  if(!isLiveMsg(id)){ closeChatSheet(); alert('Archived messages can\'t be starred.'); renderChatPage(); return; }
   const me = S.local.myProfile; if(!msg.starredBy) msg.starredBy = {};
   msg.starredBy[me] = !msg.starredBy[me]; msg.updatedAt = nowISO();
   closeChatSheet(); saveShared(); renderChatPage();
@@ -6812,6 +6961,7 @@ function starChatMessage(id){
 function deleteChatMessage(id){
   const msg = findMsg(id); closeChatSheet();
   if(!msg || msg.from !== S.local.myProfile){ renderChatPage(); return; }
+  if(!isLiveMsg(id)){ alert('Archived messages can\'t be deleted.'); renderChatPage(); return; }
   if(!confirm('Delete this message? This cannot be undone.')){ renderChatPage(); return; }
   msg.deleted = true; msg.text=''; msg.stickerId=null; msg.gifUrl=null; msg.poll=null;
   msg.reactions = {}; msg.pinned=false; msg.updatedAt = nowISO();
@@ -6819,6 +6969,7 @@ function deleteChatMessage(id){
 }
 function reactToMessage(id, emoji){
   const msg = findMsg(id); if(!msg || msg.deleted){ closeChatSheet(); renderChatPage(); return; }
+  if(!isLiveMsg(id)){ closeChatSheet(); alert('Archived messages can\'t be reacted to.'); renderChatPage(); return; }
   const me = S.local.myProfile;
   if(!msg.reactions) msg.reactions = {};
   const hadThis = (msg.reactions[emoji]||[]).includes(me);
@@ -6848,8 +6999,10 @@ function cancelSelectMode(){ S._chatSelectMode = false; S._chatSelected = new Se
 function deleteSelectedMessages(){
   const me = S.local.myProfile;
   const ids = [...S._chatSelected];
-  const mine = ids.filter(id=>{ const m=findMsg(id); return m && m.from===me; });
-  if(mine.length===0){ alert('You can only delete your own messages.'); return; }
+  // Only own messages; only live (non-archived) ones — archive mutations via findMsg would
+  // mutate the in-memory archive object but saveShared() doesn't persist sharedArchive.
+  const mine = ids.filter(id=>{ const m=findMsg(id); return m && m.from===me && isLiveMsg(id); });
+  if(mine.length===0){ alert('You can only delete your own non-archived messages.'); return; }
   if(!confirm(`Delete ${mine.length} message${mine.length>1?'s':''}?`)) return;
   mine.forEach(id=>{
     const m = findMsg(id);
@@ -6859,7 +7012,9 @@ function deleteSelectedMessages(){
 }
 function starSelectedMessages(){
   const me = S.local.myProfile;
+  // Skip archive messages — same reason as deleteSelectedMessages above.
   [...S._chatSelected].forEach(id=>{
+    if(!isLiveMsg(id)) return;
     const m = findMsg(id); if(!m) return;
     if(!m.starredBy) m.starredBy={};
     m.starredBy[me] = true; m.updatedAt = nowISO();
@@ -6870,20 +7025,44 @@ function starSelectedMessages(){
 // ── Header menu / starred filter / clear ─────────────────────
 function toggleChatHeaderMenu(){ S._chatHeaderMenuOpen = !S._chatHeaderMenuOpen; renderChatPage(); }
 function viewStarredMessages(){ S._chatHeaderMenuOpen = false; S._chatStarredFilter = !S._chatStarredFilter; renderChatPage(); }
-function clearChatHistory(){
+async function clearChatHistory(){
   S._chatHeaderMenuOpen = false;
   if(!confirm('Clear the entire chat history for both of you? This cannot be undone.')){ renderChatPage(); return; }
   S.shared.chat.messages = [];
-  saveShared(); renderChatPage();
+  // Re-render immediately so the chat visually clears before the async archive operation
+  // completes — without this, messages stay on screen for the full duration of the archive
+  // fetch (potentially several seconds on a slow network), which looks like the clear didn't work.
+  renderChatPage();
+  // Also clear the archive's chat array — without this, "Load earlier messages" immediately
+  // brings all the history back, making the confirmation dialog's claim ("clear the entire
+  // chat history") silently false. Load the archive first if it hasn't been fetched yet.
+  if(S.appSession && isHosted()){
+    try{
+      const archive = await loadArchive();
+      archive.chat = [];
+      S.sharedArchive = archive;
+      saveArchive();
+    }catch(e){ console.warn('Archive clear failed:', e); }
+  } else if(S.sharedArchive){
+    S.sharedArchive.chat = [];
+  }
+  // Mark archive as checked so the "Load earlier messages" pill no longer appears
+  S._archiveChecked = true;
+  saveShared();
 }
 
 // ── Search ───────────────────────────────────────────────────
 function openChatSearch(){
+  clearTimeout(_chatSearchDebounce);
   S._chatSearchOpen = true; S._chatSearchQuery=''; S._chatSearchMatches=[]; S._chatSearchIdx=-1;
   renderChatPage();
   const el = document.getElementById('chat-search-input'); if(el) el.focus();
 }
 function closeChatSearch(){
+  // Cancel any in-flight debounce — otherwise a timeout scheduled just before closing fires
+  // ~280ms later with the OLD query still captured in its closure, repopulating the matches
+  // we just cleared and yanking the view to a random old message after the bar has gone.
+  clearTimeout(_chatSearchDebounce);
   S._chatSearchOpen = false; S._chatSearchQuery=''; S._chatSearchMatches=[]; S._chatSearchIdx=-1;
   renderChatPage();
 }
@@ -6894,8 +7073,14 @@ function onChatSearchInput(val){
   _chatSearchDebounce = setTimeout(()=>{
     const q = val.trim().toLowerCase();
     if(!q){ S._chatSearchMatches=[]; S._chatSearchIdx=-1; updateChatSearchNav(); return; }
-    S._chatSearchMatches = (S.shared.chat.messages||[]).filter(m=> !m.deleted && m.type==='text' && (m.text||'').toLowerCase().includes(q)).map(m=>m.id);
-    S._chatSearchIdx = S._chatSearchMatches.length ? 0 : -1;
+    // Search the full combined list so archive messages (already loaded into memory) are
+    // also findable — matches are still IDs, and jumpToChatId handles both live and archive.
+    S._chatSearchMatches = chatAllMessagesIncludingArchive()
+      .filter(m=> !m.deleted && m.type==='text' && (m.text||'').toLowerCase().includes(q))
+      .map(m=>m.id);
+    // Start at the NEWEST match (last entry, since messages are chronological oldest-first)
+    // — most chat apps land on the most recent result rather than the oldest.
+    S._chatSearchIdx = S._chatSearchMatches.length ? S._chatSearchMatches.length - 1 : -1;
     updateChatSearchNav();
     if(S._chatSearchIdx>=0) jumpToChatId(S._chatSearchMatches[S._chatSearchIdx]);
   }, 280);
