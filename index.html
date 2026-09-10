@@ -930,7 +930,15 @@ body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
   flex:1;overflow-y:auto;overflow-x:hidden;
   padding:14px 12px 10px;
   display:flex;flex-direction:column;gap:2px;
-  scroll-behavior:smooth;
+  /* NO scroll-behavior:smooth here. Per spec it makes EVERY scroll of this box animate —
+     including plain `el.scrollTop = x` assignments, not just scrollTo(). All the scroll
+     restoration in renderChatPage()/renderChatMessagesOnly()/loadOlderMessages() needs to be
+     instant and land on the exact pixel; animating it meant those handlers read a
+     mid-animation scrollTop and computed wasAtBottom wrong. On entering chat that produced
+     the "chat opens at the top" bug: the entry scroll-to-bottom was still animating from 0
+     when the first poll's re-render measured it, saw "not at bottom", and restored to ~0.
+     Smooth scrolling where it IS wanted (the scroll-to-bottom FAB) is requested explicitly
+     via scrollTo({behavior:'smooth'}) in scrollChatToBottom(). */
   -webkit-overflow-scrolling:touch;
   background-color:var(--bg);
   background-size:cover;background-position:center top;background-repeat:no-repeat;
@@ -1347,6 +1355,7 @@ const S = {
   _chatStarredFilter: false,
   _chatSheetFor: null,
   _chatJustEntered: false,
+  _chatPinToBottom: false,  // true from enterChat() until the user first scrolls up
   _chatLastTypingPing: 0,
   // PWA install prompt — the stashed beforeinstallprompt event, and whether it's already
   // installed. Both browser/session state, never persisted (see registerServiceWorker()).
@@ -6032,6 +6041,10 @@ function enterChat(){
   S._chatTray = null; S._chatSearchOpen = false; S._chatSearchQuery = ''; S._chatSearchMatches = []; S._chatSearchIdx = -1;
   S._chatHeaderMenuOpen = false; S._chatStarredFilter = false; S._chatSheetFor = null;
   S._chatJustEntered = true;
+  // Hold the view at the newest message until the user deliberately scrolls up. Without
+  // this, startChatPolling()'s immediate first poll can resolve mid-entry and its
+  // re-render restores whatever half-settled scroll position it happens to measure.
+  S._chatPinToBottom = true;
   if(S._chatDraft===undefined) S._chatDraft = '';
   if(!_chatHistoryActive){
     try{ history.pushState({olympusChat:true}, '', location.href); }catch(e){}
@@ -6045,7 +6058,7 @@ function enterChat(){
     saveShared();
   }
   renderChatPage();
-  scrollChatToBottom();
+  scrollChatToBottomOnEntry();
   startChatPolling();
   startChatHeartbeat();
   focusComposer();
@@ -6497,7 +6510,7 @@ function renderChatPage(){
   const root = document.getElementById('chat-root');
   if(!root) return;
   const msgListOld = document.getElementById('chat-messages-list');
-  const wasAtBottom = !msgListOld || (msgListOld.scrollHeight - msgListOld.scrollTop - msgListOld.clientHeight < 80);
+  const wasAtBottom = S._chatPinToBottom || !msgListOld || (msgListOld.scrollHeight - msgListOld.scrollTop - msgListOld.clientHeight < 80);
   const prevScrollTop = msgListOld ? msgListOld.scrollTop : 0;
   const prevScrollHeight = msgListOld ? msgListOld.scrollHeight : 0;
   const composerHadFocus = document.activeElement && document.activeElement.id==='chat-composer-input';
@@ -6529,7 +6542,7 @@ function renderChatPage(){
 function renderChatMessagesOnly(){
   const msgList = document.getElementById('chat-messages-list');
   if(!msgList){ renderChatPage(); return; }
-  const wasAtBottom = (msgList.scrollHeight - msgList.scrollTop - msgList.clientHeight) < 80;
+  const wasAtBottom = S._chatPinToBottom || (msgList.scrollHeight - msgList.scrollTop - msgList.clientHeight) < 80;
   const prevScrollTop = msgList.scrollTop, prevScrollHeight = msgList.scrollHeight;
   msgList.innerHTML = chatMessagesInnerHtml();
   if(wasAtBottom) msgList.scrollTop = msgList.scrollHeight;
@@ -6550,8 +6563,33 @@ function renderChatMessagesOnly(){
 function scrollChatToBottom(smooth){
   const el = document.getElementById('chat-messages-list');
   if(!el) return;
-  if(smooth && !prefersReducedMotion()) el.scrollTo({top:el.scrollHeight, behavior:'smooth'});
-  else el.scrollTop = el.scrollHeight;
+  if(smooth && !prefersReducedMotion()){
+    el.scrollTo({top:el.scrollHeight, behavior:'smooth'});
+    return;
+  }
+  // Belt-and-braces instant scroll. The CSS no longer sets scroll-behavior:smooth on this
+  // container (see the note there), but forcing it inline for the duration of the write
+  // means this stays instant even if a future style, a UA default, or an inherited rule
+  // reintroduces smooth — an animated "instant" scroll here is what broke chat entry.
+  const prev = el.style.scrollBehavior;
+  el.style.scrollBehavior = 'auto';
+  el.scrollTop = el.scrollHeight;
+  el.style.scrollBehavior = prev;
+}
+// Entry scroll. A single synchronous scrollTop write at mount time is not reliable: the
+// container's final height depends on things that settle a frame or more later — webfont
+// swap changing bubble heights, env(safe-area-inset-*) resolving, and on mobile the
+// keyboard opening from focusComposer() shrinking 100dvh. Any of those changes scrollHeight
+// after we've already scrolled, leaving the view part-way up. So pin to the bottom now,
+// again next frame, and once more after the keyboard/layout has had time to settle —
+// each pass is cheap and idempotent, and they stop mattering the moment the user scrolls.
+function scrollChatToBottomOnEntry(){
+  scrollChatToBottom(false);
+  requestAnimationFrame(()=>{
+    scrollChatToBottom(false);
+    setTimeout(()=>{ if(S.view==='chat') scrollChatToBottom(false); }, 120);
+    setTimeout(()=>{ if(S.view==='chat' && S._chatPinToBottom) scrollChatToBottom(false); }, 400);
+  });
 }
 function updateScrollToBottomFab(el){
   const fab = document.getElementById('chat-scrollbottom-fab');
@@ -6584,6 +6622,7 @@ let _loadingOlderChat = false;
 // before that first check even when local history alone would already fill the window.
 async function loadOlderMessages(){
   if(_loadingOlderChat) return;
+  S._chatPinToBottom = false; // deliberately going back through history
   const combinedTotal = chatAllMessagesIncludingArchive().length;
   const msgList = document.getElementById('chat-messages-list');
   if(S._chatWindow < combinedTotal){
@@ -6619,6 +6658,12 @@ async function loadOlderMessages(){
   });
 }
 function onChatScroll(el){
+  // The user has taken control of the scroll position — stop force-pinning to the bottom.
+  // Only released on a real move away from the bottom, so the entry passes (which land
+  // exactly at the bottom and fire scroll events of their own) don't cancel the pin.
+  if(S._chatPinToBottom && (el.scrollHeight - el.scrollTop - el.clientHeight) >= 120){
+    S._chatPinToBottom = false;
+  }
   if(el.scrollTop < 80) loadOlderMessages();
   updateScrollToBottomFab(el);
   // Scrolling back down to the newest message is the moment those messages are genuinely
@@ -6641,6 +6686,7 @@ function jumpToPinned(){
 // found and the archive hasn't been loaded this session yet, it fetches it first and retries
 // — this is the only path where a jump can trigger a lazy archive load mid-session.
 async function jumpToChatId(id){
+  S._chatPinToBottom = false; // jumping to a specific message overrides the entry pin
   let all = chatAllMessagesIncludingArchive();
   let idx = all.findIndex(m=>m.id===id);
   // Not found yet — try loading the archive once if we haven't already
