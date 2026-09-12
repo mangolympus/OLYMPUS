@@ -779,6 +779,11 @@ body.targets-mode #targets-root{display:flex}
 .money-view .chart-tooltip .ct-day{ font-size:10px; color:#c9d6f2; margin-top:1px; }
 .money-view .bar-fill{ animation:barFillIn var(--dur-slow) var(--ease-out) backwards; transform-origin:left; }
 @keyframes barFillIn{ from{transform:scaleX(0);} to{transform:scaleX(1);} }
+.money-view /* Dashboard: new Expenses widgets (velocity / 30-day cash flow / budget burn / footprint) */
+  #money-exp-velocity .week-bars{height:64px;}
+.money-view #money-exp-velocity .week-bar{border-radius:4px 4px 0 0;}
+.money-view #money-exp-trend-container svg{max-width:none;}
+.money-view #money-exp-burn-container .hbar-lbl{width:88px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .money-view /* Settings */
   .danger-zone{border:1.5px solid var(--danger-bg); background:var(--danger-bg);}
 .money-view .danger-zone h2{color:var(--danger);}
@@ -3200,6 +3205,30 @@ function moneyPageHtml(){
         </div>
       </div>
 
+      <div class="card" id="money-exp-velocity-card">
+        <h2><span class="n">⚡</span>7-Day Velocity</h2>
+        <div class="hint" style="margin-top:0; margin-bottom:10px;">Daily spend over the last 7 days — a glanceable read on your current pace.</div>
+        <div id="money-exp-velocity"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="n">📈</span>30-Day Cash Flow</h2>
+        <div class="hint" id="money-exp-trend-cap" style="margin-top:0; margin-bottom:10px;">Money in vs money out, last 30 days. Tap a day for the breakdown.</div>
+        <div class="chart-wrap" id="money-exp-trend-container"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="n">🔥</span>Budget Burn Rate</h2>
+        <div class="hint" id="money-exp-burn-cap" style="margin-top:0; margin-bottom:12px;">Each category vs its spend in the previous period.</div>
+        <div id="money-exp-burn-container"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="n">🕸</span>Category Footprint</h2>
+        <div class="hint" style="margin-top:0; margin-bottom:6px;">How this period’s spend is spread across your top categories.</div>
+        <div class="chart-wrap" id="money-exp-radar-container"></div>
+      </div>
+
       <div class="card">
         <h2><span class="n">📅</span>Weekly Tracker</h2>
         <div class="hint" style="margin-top:0; margin-bottom:8px;">Real spending only — inter-bank transfers excluded, each entry shown on its actual date.</div>
@@ -4761,27 +4790,24 @@ function moneyPageHtml(){
     if(dashCategory==='all'){
       $('money-exp-breakdown-title').textContent = 'Category Breakdown';
       $('money-exp-breakdown-hint').textContent = 'Inter-bank transfers are excluded. Showing ' + PERIOD_LABELS[dashPeriod] + '.';
-      const byCat = {};
-      allRealExpenses.forEach(t=>{
-        const c = expenseContributionInRange(t, range);
-        if(c>0) byCat[t.category] = (byCat[t.category]||0) + c;
-      });
-      const catEntries = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+      const catEntries = categorySpendEntries(range);
+      const colorMap = categoryColorMap(catEntries.map(e=>e[0]));
       const catMax = catEntries.length ? catEntries[0][1] : 1;
       $('money-exp-top-categories').innerHTML = catEntries.length ? catEntries.map(([cat,val],i)=>`
         <div style="margin-bottom:10px; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${i*40}ms;">
           <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px;">
-            <span style="font-weight:600; color:var(--ink);">${escapeHtml(cat)}</span>
+            <span style="font-weight:600; color:var(--ink);"><span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:${colorMap[cat]}; margin-right:6px; vertical-align:middle;"></span>${escapeHtml(cat)}</span>
             <span style="font-weight:700; color:var(--navy-800);">${fmt(val)}</span>
           </div>
           <div style="height:6px; background:var(--border); border-radius:4px; overflow:hidden;">
-            <div class="bar-fill" style="height:100%; width:${Math.max((val/catMax)*100,4)}%; background:var(--danger); border-radius:4px; animation-delay:${i*40+80}ms;"></div>
+            <div class="bar-fill" style="height:100%; width:${Math.max((val/catMax)*100,4)}%; background:${colorMap[cat]}; border-radius:4px; animation-delay:${i*40+80}ms;"></div>
           </div>
         </div>
       `).join('') : `<div class="hint" style="margin:0;">No spending in ${PERIOD_LABELS[dashPeriod]}.</div>`;
     } else {
       $('money-exp-breakdown-title').textContent = dashCategory + ' — By Account';
       $('money-exp-breakdown-hint').textContent = 'Showing ' + PERIOD_LABELS[dashPeriod] + ' for ' + dashCategory + ' only.';
+      const selColor = categoryColorMap(categorySpendEntries(range).map(e=>e[0]))[dashCategory] || 'var(--umang)';
       const bySource = {};
       allRealExpenses.filter(catMatch).forEach(t=>{
         const c = expenseContributionInRange(t, range);
@@ -4796,11 +4822,21 @@ function moneyPageHtml(){
             <span style="font-weight:700; color:var(--navy-800);">${fmt(val)}</span>
           </div>
           <div style="height:6px; background:var(--border); border-radius:4px; overflow:hidden;">
-            <div class="bar-fill" style="height:100%; width:${Math.max((val/srcMax)*100,4)}%; background:var(--danger); border-radius:4px; animation-delay:${i*40+80}ms;"></div>
+            <div class="bar-fill" style="height:100%; width:${Math.max((val/srcMax)*100,4)}%; background:${selColor}; border-radius:4px; animation-delay:${i*40+80}ms;"></div>
           </div>
         </div>
       `).join('') : `<div class="hint" style="margin:0;">No ${escapeHtml(dashCategory)} spending in ${PERIOD_LABELS[dashPeriod]}.</div>`;
     }
+
+    // ── New Expenses widgets (velocity / 30-day cash flow / budget burn / footprint) ──
+    renderVelocitySparkline(now);
+    renderThirtyDayTrend(now);
+    renderBudgetBurn(range, prevRange);
+    renderCategoryRadar(range);
+    // Fire entrance animations for the new .chart-animate elements, scoped to the Expenses
+    // subpage so the Weekly/15-Day trackers (their own bar-grow system) and the Sales
+    // dashboard are untouched. triggerChartAnimations() no-ops under reduced motion.
+    triggerChartAnimations($('money-dash-sub-expenses'));
   }
 
   function renderWeeklyTracker(now, navDir){
@@ -4972,6 +5008,267 @@ function moneyPageHtml(){
           <div style="font-weight:700; color:var(--danger); flex:none; margin-left:10px;">-${fmt(total)}</div>
         </div>`;
     }).join('') : `<div class="hint" style="margin:0;">No ${fifteenCategory==='all'?'':escapeHtml(fifteenCategory)+' '}spending in this 15-day window.</div>`;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // New Expenses-dashboard widgets (Dashboard → Expenses only). All of this lives
+  // inside the Money closure alongside renderExpenseDashboard; nothing on Home,
+  // Habits, Chat, Timer, Sales, or the service worker is touched. Shared global
+  // keyframes (.chart-animate trend-line/trend-area/trend-dot/radar-poly, .hbar-*,
+  // .week-*) are reused read-only.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Stable colour per spend category so the radar, its vertex labels, and the
+  // Category Breakdown bars all agree. Cycles the app's own accent tokens.
+  const CATEGORY_PALETTE = ['--umang','--purple','--green','--amber','--chetna','--umang-2'];
+  function categoryColorMap(cats){
+    const map = {};
+    cats.forEach((c,i)=>{ map[c] = 'var('+CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]+')'; });
+    return map;
+  }
+  // Real expense spend per category within a range, highest first — the single
+  // source of truth shared by the breakdown, the radar and the colour map so a
+  // given category keeps the same colour across all three.
+  function categorySpendEntries(range){
+    const byCat = {};
+    transactions.filter(isRealExpense).forEach(t=>{
+      const c = expenseContributionInRange(t, range);
+      if(c>0) byCat[t.category] = (byCat[t.category]||0) + c;
+    });
+    return Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  }
+
+  // Tap-to-reveal for the 30-day trend. Reuses the exact same floating
+  // .chart-tooltip + showChartTooltip() the bar charts use, but targets the
+  // per-day hit groups (.trend-tap) instead of .bar-grow, so trend nodes don't
+  // inherit the bars' scaleY grow animation.
+  function wireTrendTooltips(containerId){
+    const container = $(containerId);
+    if(!container) return;
+    container.querySelectorAll('.trend-tap').forEach(g=>{
+      g.addEventListener('click', (e)=>{ e.stopPropagation(); showChartTooltip(g, container); });
+    });
+  }
+
+  // #5 — 7-Day Expense Velocity. Compact glanceable sparkline for the summary
+  // area, distinct from the full Weekly Tracker below. Days well above the week's
+  // typical spend are flagged in --danger.
+  function renderVelocitySparkline(now){
+    const host = $('money-exp-velocity');
+    if(!host) return;
+    const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days=[]; for(let i=6;i>=0;i--){ days.push(new Date(base.getFullYear(), base.getMonth(), base.getDate()-i)); }
+    const catMatch = t => dashCategory==='all' || t.category===dashCategory;
+    const realExp = transactions.filter(t=> isRealExpense(t) && catMatch(t));
+    const totals = days.map(d=> realExp.reduce((s,t)=> s + dailyExpenseContribution(t,d),0));
+    const max = Math.max(1, ...totals);
+    const nonZero = totals.filter(v=>v>0);
+    const mean = nonZero.length ? nonZero.reduce((a,b)=>a+b,0)/nonZero.length : 0;
+    const highThreshold = mean>0 ? mean*1.5 : Infinity;
+    const week = totals.reduce((a,b)=>a+b,0);
+    const avg = week/7;
+    const compact = v => Math.round(v)>=1000 ? (Math.round(v/100)/10)+'k' : Math.round(v);
+    const valsRow = totals.map(v=>`<div class="week-val-cell">${v>0?compact(v):''}</div>`).join('');
+    const barsRow = totals.map((v,i)=>{
+      const h = v>0 ? Math.max((v/max)*100,6) : 2;
+      const high = v>0 && v>=highThreshold;
+      const bg = high ? 'var(--danger)' : 'linear-gradient(135deg,var(--umang),var(--umang-2))';
+      return `<div class="week-bar-col"><div class="week-bar" style="height:${h}%; background:${bg};"></div></div>`;
+    }).join('');
+    const datesRow = days.map(d=>`<div class="week-date-cell">${d.toLocaleDateString('en-IN',{weekday:'narrow'})}</div>`).join('');
+    const anyHigh = totals.some(v=>v>0 && v>=highThreshold);
+    host.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+        <div style="font-size:11.5px; color:var(--muted); font-weight:600;">7-day total <b style="color:var(--navy-900);">${fmt(week)}</b></div>
+        <div style="font-size:11.5px; color:var(--muted); font-weight:600;">avg / day <b style="color:var(--navy-900);">${fmt(avg)}</b></div>
+      </div>
+      <div class="week-vals">${valsRow}</div>
+      <div class="week-bars">${barsRow}</div>
+      <div class="week-dates">${datesRow}</div>
+      ${anyHigh?`<div class="hint" style="margin-top:8px; margin-bottom:0;"><span style="color:var(--danger); font-weight:800;">&#9679;</span> Flagged days are well above your typical daily spend.</div>`:''}`;
+  }
+
+  // #2 — 30-Day Cash Flow Trend. Shared-scale money-in vs money-out overlay (both
+  // are ₹, so a single y-axis rather than a misleading twin-axis). Expenses honour
+  // the category filter; money-in is always the full inflow (inflow isn't split by
+  // the outflow categories in this data model), and the caption says so. Fixed-
+  // width SVG on purpose so the reused showChartTooltip() positioning stays exact.
+  function renderThirtyDayTrend(now){
+    const host = $('money-exp-trend-container');
+    if(!host) return;
+    const catMatch = t => dashCategory==='all' || t.category===dashCategory;
+    const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days=[]; for(let i=29;i>=0;i--){ days.push(new Date(base.getFullYear(), base.getMonth(), base.getDate()-i)); }
+    const realExp = transactions.filter(isRealExpense);
+    const realInc = transactions.filter(isRealIncome);
+    const outDaily = days.map(d => realExp.reduce((s,t)=> catMatch(t) ? s + dailyExpenseContribution(t,d) : s, 0));
+    const inDaily  = days.map(d => realInc.reduce((s,t)=> s + dailyExpenseContribution(t,d), 0));
+    const maxVal = Math.max(1, ...outDaily, ...inDaily);
+
+    const cap = $('money-exp-trend-cap');
+    if(cap){ cap.innerHTML = dashCategory==='all'
+      ? 'Money in vs money out, last 30 days. Tap a day for the breakdown.'
+      : escapeHtml(dashCategory)+' spend vs all money in, last 30 days. Tap a day for the breakdown.'; }
+
+    const W=330, padL=30, padR=10, padT=14, padB=24;
+    const plotL=padL, plotR=W-padR, plotW=plotR-plotL;
+    const H=168, plotT=padT, plotB=H-padB, plotH=plotB-plotT;
+    const stepX = plotW/((days.length-1)||1);
+    const xAt = i => plotL + i*stepX;
+    const yAt = v => plotB - (v/maxVal)*plotH;
+    const outPts = outDaily.map((v,i)=>[xAt(i), yAt(v)]);
+    const inPts  = inDaily.map((v,i)=>[xAt(i), yAt(v)]);
+    const lineD = pts => pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+    const outLine = lineD(outPts), inLine = lineD(inPts);
+    const outArea = `${outLine} L ${outPts[outPts.length-1][0].toFixed(1)} ${plotB.toFixed(1)} L ${outPts[0][0].toFixed(1)} ${plotB.toFixed(1)} Z`;
+    const gid = 'expTrendFill'+Math.round(Math.random()*1e6);
+    const pathLen = pts => { let L=0; for(let i=1;i<pts.length;i++){ const dx=pts[i][0]-pts[i-1][0], dy=pts[i][1]-pts[i-1][1]; L+=Math.sqrt(dx*dx+dy*dy); } return L; };
+    const outLen = pathLen(outPts), inLen = pathLen(inPts);
+    const compact = v => v>=1000 ? (Math.round(v/100)/10)+'k' : Math.round(v);
+
+    const grid = `
+      <line x1="${plotL}" y1="${plotB.toFixed(1)}" x2="${plotR}" y2="${plotB.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+      <line x1="${plotL}" y1="${plotT.toFixed(1)}" x2="${plotR}" y2="${plotT.toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 3"/>
+      <text x="${plotL-4}" y="${(plotB+3).toFixed(1)}" font-size="8" fill="var(--muted)" text-anchor="end">0</text>
+      <text x="${plotL-4}" y="${(plotT+3).toFixed(1)}" font-size="8" fill="var(--muted)" text-anchor="end">${compact(maxVal)}</text>`;
+    const tickIdx = [0,7,14,21,29];
+    const xLabels = tickIdx.map(i=>`<text x="${xAt(i).toFixed(1)}" y="${H-7}" font-size="8" fill="var(--muted)" text-anchor="${i===0?'start':i===29?'end':'middle'}">${days[i].toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</text>`).join('');
+    const dotsOut = outPts.map((p,i)=> outDaily[i]>0 ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.3" fill="var(--danger)" class="chart-animate trend-dot" style="animation-delay:${(i*0.02).toFixed(2)}s"/>`:'').join('');
+    const dotsIn  = inPts.map((p,i)=> inDaily[i]>0 ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.3" fill="var(--umang)" class="chart-animate trend-dot" style="animation-delay:${(i*0.02).toFixed(2)}s"/>`:'').join('');
+    const hitW = Math.max(stepX, 8);
+    const hits = days.map((d,i)=>{
+      const inflow=inDaily[i], outflow=outDaily[i], net=inflow-outflow;
+      const amt = `In ${fmt(inflow)} \u00b7 Out ${fmt(outflow)}`;
+      const dayStr = `${d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} \u00b7 Net ${net>=0?'+':'\u2212'}${fmt(Math.abs(net))}`;
+      const hx = xAt(i);
+      return `<g class="trend-tap" data-amt="${escapeHtml(amt)}" data-day="${escapeHtml(dayStr)}" data-x="${hx.toFixed(1)}" data-y="${plotT.toFixed(1)}">
+        <rect x="${(hx-hitW/2).toFixed(1)}" y="${plotT}" width="${hitW.toFixed(1)}" height="${plotH.toFixed(1)}" fill="transparent" style="cursor:pointer"/>
+      </g>`;
+    }).join('');
+
+    host.innerHTML = `
+      <div style="display:flex; gap:14px; align-items:center; margin-bottom:8px; font-size:11px; font-weight:700;">
+        <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:11px;height:3px;border-radius:2px;background:var(--umang);display:inline-block;"></span><span style="color:var(--muted);">Money in</span></span>
+        <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:11px;height:3px;border-radius:2px;background:var(--danger);display:inline-block;"></span><span style="color:var(--muted);">Money out</span></span>
+      </div>
+      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
+        <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="var(--danger)" stop-opacity="0.26"/>
+          <stop offset="1" stop-color="var(--danger)" stop-opacity="0"/>
+        </linearGradient></defs>
+        ${grid}
+        ${xLabels}
+        <path d="${outArea}" fill="url(#${gid})" class="chart-animate trend-area"/>
+        <path d="${outLine}" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${outLen.toFixed(1)}" style="--dash-len:${outLen.toFixed(1)}" class="chart-animate trend-line"/>
+        <path d="${inLine}" fill="none" stroke="var(--umang)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${inLen.toFixed(1)}" style="--dash-len:${inLen.toFixed(1)}" class="chart-animate trend-line"/>
+        ${dotsOut}
+        ${dotsIn}
+        ${hits}
+      </svg>`;
+    wireTrendTooltips('money-exp-trend-container');
+  }
+
+  // #4 — Budget Burn Rate. No per-category budget exists in the data model, so the
+  // soft budget is each category's spend in the immediately-preceding period of
+  // equal length (getPreviousRange). Fill steps accent -> --warn -> --bad across
+  // <75% / 75-100% / >100%. Meaningless for the "All Time" period (no prior window)
+  // so that shows a hint instead.
+  function renderBudgetBurn(range, prevRange){
+    const host = $('money-exp-burn-container');
+    const cap = $('money-exp-burn-cap');
+    if(!host) return;
+    if(dashPeriod==='all'){
+      if(cap) cap.textContent = 'Each category vs the previous period of the same length.';
+      host.innerHTML = `<div class="hint" style="margin:0;">Pick a specific range (This Week, This Month, …) so there's a previous period to measure against.</div>`;
+      return;
+    }
+    const prevLabel = ({week:'week', month:'month', last3:'3 months', year:'year'})[dashPeriod] || 'period';
+    if(cap) cap.textContent = 'Soft budget = each category\u2019s spend in the previous '+prevLabel+'.';
+
+    const catMatch = t => dashCategory==='all' || t.category===dashCategory;
+    const realExp = transactions.filter(t=> isRealExpense(t) && catMatch(t));
+    const cur = {}, prev = {};
+    realExp.forEach(t=>{
+      const c1 = expenseContributionInRange(t, range);     if(c1>0) cur[t.category]=(cur[t.category]||0)+c1;
+      const c0 = expenseContributionInRange(t, prevRange); if(c0>0) prev[t.category]=(prev[t.category]||0)+c0;
+    });
+    const cats = Array.from(new Set([...Object.keys(cur), ...Object.keys(prev)]));
+    cats.sort((a,b)=>(cur[b]||0)-(cur[a]||0));
+    const shown = dashCategory==='all' ? cats.slice(0,6) : cats;
+    if(!shown.length){
+      host.innerHTML = `<div class="hint" style="margin:0;">No spending ${PERIOD_LABELS[dashPeriod]} to measure yet.</div>`;
+      return;
+    }
+    host.innerHTML = shown.map((c,i)=>{
+      const spent = cur[c]||0, budget = prev[c]||0;
+      const delay = `animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${i*40}ms;`;
+      if(budget<=0){
+        return `
+          <div class="hbar-row" style="margin-bottom:3px; ${delay}">
+            <div class="hbar-lbl" style="color:var(--ink); font-weight:700;">${escapeHtml(c)}</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:100%; background:repeating-linear-gradient(45deg,var(--umang) 0 6px,color-mix(in srgb,var(--umang) 45%,transparent) 6px 12px);"></div></div>
+            <div class="hbar-val" style="color:var(--muted);">new</div>
+          </div>
+          <div class="hint" style="margin:-2px 0 10px; font-size:10.5px;">${fmt(spent)} spent \u00b7 no baseline last ${prevLabel}.</div>`;
+      }
+      const pct = Math.round((spent/budget)*100);
+      const color = pct>100 ? 'var(--danger)' : (pct>=75 ? 'var(--warn)' : 'var(--umang)');
+      const barW = Math.min(pct,100);
+      return `
+        <div class="hbar-row" style="margin-bottom:3px; ${delay}">
+          <div class="hbar-lbl" style="color:var(--ink); font-weight:700;">${escapeHtml(c)}</div>
+          <div class="hbar-track"><div class="hbar-fill" style="width:${barW}%; background:${color};"></div></div>
+          <div class="hbar-val" style="color:${color};">${pct}%</div>
+        </div>
+        <div class="hint" style="margin:-2px 0 10px; font-size:10.5px;">${fmt(spent)} of ${fmt(budget)}${pct>100?' \u00b7 over by '+fmt(spent-budget):''}</div>`;
+    }).join('');
+  }
+
+  // #3 — Category Footprint (radar). Axes are the top spend categories (up to 6)
+  // for the current period, coloured with the shared category map so they line up
+  // with the breakdown bars. Only meaningful across categories, so it needs the
+  // All Categories filter and at least 3 categories with spend; otherwise a hint.
+  function renderCategoryRadar(range){
+    const host = $('money-exp-radar-container');
+    if(!host) return;
+    if(dashCategory!=='all'){
+      host.innerHTML = `<div class="hint" style="margin:0;">Set the category filter to <b>All Categories</b> to see how your spend is spread.</div>`;
+      return;
+    }
+    const all = categorySpendEntries(range);
+    const entries = all.slice(0,6);
+    if(entries.length < 3){
+      host.innerHTML = `<div class="hint" style="margin:0;">Not enough spread yet — the footprint needs at least 3 categories with spending ${PERIOD_LABELS[dashPeriod]}.</div>`;
+      return;
+    }
+    const colorMap = categoryColorMap(all.map(e=>e[0]));
+    const n = entries.length;
+    const maxVal = entries[0][1] || 1;
+    const cx=110, cy=104, R=72;
+    const angleFor = i => -Math.PI/2 + i*(2*Math.PI/n);
+    const pt = (i,val)=>{ const a=angleFor(i); const r=R*(val/maxVal); return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; };
+    const ring = frac => { let d=''; for(let i=0;i<n;i++){ const a=angleFor(i); const x=cx+R*frac*Math.cos(a), y=cy+R*frac*Math.sin(a); d+=(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1); } return d+'Z'; };
+    const spokes = entries.map((_,i)=>{ const a=angleFor(i); const x=cx+R*Math.cos(a), y=cy+R*Math.sin(a); return `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`; }).join('');
+    const polyPts = entries.map(([c,v],i)=>pt(i,v));
+    const polyD = polyPts.map(([x,y],i)=>(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)).join('')+'Z';
+    const dots = polyPts.map(([x,y],i)=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${colorMap[entries[i][0]]}"/>`).join('');
+    const labels = entries.map(([c,v],i)=>{
+      const a=angleFor(i); const lx=cx+(R+15)*Math.cos(a), ly=cy+(R+15)*Math.sin(a);
+      const anchor = Math.abs(Math.cos(a))<0.35 ? 'middle' : (Math.cos(a)>0 ? 'start':'end');
+      const short = c.length>10 ? c.slice(0,9)+'\u2026' : c;
+      return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle">
+        <tspan font-size="9" font-weight="700" fill="${colorMap[c]}">${escapeHtml(short)}</tspan>
+        <tspan x="${lx.toFixed(1)}" dy="10" font-size="8" font-weight="700" fill="var(--muted)">${fmt(v)}</tspan>
+      </text>`;
+    }).join('');
+    host.innerHTML = `
+      <svg viewBox="0 0 220 212" width="100%" style="max-width:340px;display:block;margin:0 auto;overflow:visible">
+        ${[0.25,0.5,0.75,1].map(f=>`<path d="${ring(f)}" fill="none" stroke="var(--border)" stroke-width="1"/>`).join('')}
+        ${spokes}
+        <path d="${polyD}" fill="var(--umang)" fill-opacity="0.16" stroke="var(--umang)" stroke-width="1.6" class="chart-animate radar-poly"/>
+        ${dots}
+        ${labels}
+      </svg>`;
   }
 
   function switchDashboardSub(name){
