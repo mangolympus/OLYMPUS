@@ -1317,6 +1317,214 @@ button, a, .btn, .ptab, .icon-btn, .bottomnav button, .profile-pill button,
   outline:2px solid var(--active-accent,var(--umang)); outline-offset:2px;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM VISUAL UPGRADE — Changes 11-25, 40, 41, 45, 51
+   Purely additive. All selectors here are either NEW or sit after originals.
+   Money page (.money-view) is untouched. Reduced-motion kill-switch at line 54
+   neutralises all transitions/animations below automatically.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 11. PROFILE PILL — animated accent transition + active indicator ─────── */
+.profile-pill{
+  position:relative;
+  border-radius:22px;
+  background:var(--surface2);
+  box-shadow:inset 0 0 0 1px var(--border);
+  overflow:hidden;
+  isolation:isolate;
+}
+/* Sliding active pill indicator — purely CSS, behind text */
+.profile-pill::after{
+  content:'';
+  position:absolute;
+  inset:2px;
+  width:calc(50% - 2px);
+  border-radius:18px;
+  background:var(--accent-gradient, linear-gradient(135deg, var(--active-accent,var(--umang)), var(--active-accent-2,var(--umang-2))));
+  box-shadow:0 0 12px color-mix(in srgb, var(--active-accent,var(--umang)) 50%, transparent);
+  transition:transform var(--motion-standard) var(--ease-out-premium),
+             background var(--motion-standard) var(--ease-out-premium),
+             box-shadow var(--motion-standard) var(--ease-out-premium);
+  pointer-events:none;
+  z-index:0;
+}
+/* Shift pill right when Chetna is active */
+.profile-pill:has(button.on-chetna)::after{ transform:translateX(100%); }
+.profile-pill button{
+  position:relative; z-index:1;
+  background:transparent !important; /* override .on-umang / .on-chetna fill */
+  transition:color var(--motion-standard) var(--ease-out-premium),
+             transform var(--motion-micro) var(--ease-out-premium);
+}
+.profile-pill button.on-umang,
+.profile-pill button.on-chetna{ color:#fff !important; }
+
+/* ── 12. CARD ARCHITECTURE — card-header / card-body / card-footer shells ─── */
+.card-header{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-bottom:12px;
+}
+.card-title{ font-size:13px; font-weight:800; letter-spacing:-.01em; color:var(--text); }
+.card-subtitle{ font-size:11px; color:var(--text-faint); margin-top:1px; }
+.card-body{ flex:1; }
+.card-footer{
+  margin-top:12px; padding-top:10px;
+  border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:8px;
+  font-size:11.5px; color:var(--text-faint);
+}
+/* Hero card — gradient atmosphere + accent glow */
+.card-hero{
+  background:
+    var(--ambient-accent, transparent),
+    linear-gradient(180deg, color-mix(in srgb, var(--active-accent,var(--umang)) 7%, transparent), transparent 45%),
+    var(--surface);
+  border-color:var(--accent-border);
+  box-shadow:var(--shadow), 0 0 0 1px color-mix(in srgb, var(--active-accent,var(--umang)) 15%, transparent);
+}
+
+/* ── 13. TYPOGRAPHY IMPROVEMENTS ──────────────────────────────────────────── */
+/* Stronger hero metrics */
+.hero-num{
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.03em;
+  line-height:1;
+}
+.metric-value{
+  font-size:clamp(22px, 5vw, 32px);
+  font-weight:800;
+  line-height:1;
+  letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;
+  background:var(--accent-gradient, linear-gradient(135deg, var(--active-accent,var(--umang)), var(--active-accent-2,var(--umang-2))));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.metric-label{
+  font-size:10.5px; font-weight:700; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--text-faint); margin-top:3px;
+}
+
+/* ── 14. HERO METRIC COUNT-UP — gradient text + contextual label ──────────── */
+[data-countup]{
+  /* Gradient text treatment — inherits from .hero-num parent */
+  display:inline-block;
+}
+
+/* ── 15. PROGRESS RINGS — gradient stroke + soft glow ────────────────────── */
+/* Hero rings get the gradient stroke via an SVG linearGradient injected in JS */
+.ring-track{ stroke:var(--surface2); }
+.ring-fg-glow{
+  filter:drop-shadow(0 0 6px color-mix(in srgb, var(--active-accent,var(--umang)) 70%, transparent));
+}
+
+/* ── 16. SUMMIT — gradient fill + glow + clean outline ───────────────────── */
+.summit-svg path.summit-fill-grad{
+  filter:drop-shadow(0 0 8px color-mix(in srgb, var(--active-accent,var(--umang)) 55%, transparent));
+}
+.summit-score{
+  font-size:clamp(18px, 4.5vw, 26px);
+  font-weight:800;
+  letter-spacing:-.03em;
+}
+
+/* ── 17-20. CHART SYSTEM — grid, gradients, bar caps, tooltip ─────────────── */
+/* Touch tooltip */
+.chart-tooltip-premium{
+  position:absolute;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:8px 12px;
+  font-size:12px;
+  font-weight:600;
+  pointer-events:none;
+  white-space:nowrap;
+  box-shadow:var(--shadow);
+  z-index:20;
+  opacity:0;
+  transform:translateY(4px);
+  transition:opacity 150ms ease, transform 150ms ease;
+}
+.chart-tooltip-premium.show{ opacity:1; transform:translateY(0); }
+.chart-tooltip-premium .ctp-val{
+  font-size:14px; font-weight:800; color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+.chart-tooltip-premium .ctp-sub{ color:var(--text-faint); font-weight:600; margin-top:1px; }
+
+/* Chart wrap — relative position for tooltip overlay */
+.chart-wrap-premium{ position:relative; overflow:visible; }
+
+/* Selected point halo */
+.chart-selected-halo{
+  fill:none;
+  stroke:color-mix(in srgb, var(--active-accent,var(--umang)) 40%, transparent);
+  stroke-width:6;
+  pointer-events:none;
+}
+
+/* Week bars — rounded caps + gradient + entrance animation */
+.week-bar{
+  border-radius:4px 4px 0 0;
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--active-accent-2,var(--umang-2)) 80%, #fff 20%) 0%,
+    var(--active-accent,var(--umang)) 100%);
+  transition:height var(--motion-standard) var(--ease-out-premium),
+             filter var(--motion-micro) var(--ease-out-premium);
+}
+.week-bar:active{ filter:brightness(1.15); }
+.week-bar-col.selected .week-bar{
+  filter:drop-shadow(0 0 6px color-mix(in srgb, var(--active-accent,var(--umang)) 70%, transparent));
+}
+
+/* ── 21. RADAR — gradient polygon fill ────────────────────────────────────── */
+/* Handled in radarSVG() via inline SVG defs — CSS side is minimal */
+.radar-ring{ stroke:var(--border); stroke-width:1; fill:none; }
+
+/* ── 25. MICRO-INTERACTIONS — complete pass ───────────────────────────────── */
+/* Checkbox / toggle items */
+.task-check, .habit-check{
+  transition:background var(--motion-micro) var(--ease-out-premium),
+             border-color var(--motion-micro) var(--ease-out-premium),
+             box-shadow var(--motion-micro) var(--ease-out-premium),
+             transform var(--motion-micro) var(--ease-spring-premium);
+}
+.task-check.on, .habit-check.done{
+  box-shadow:0 0 10px color-mix(in srgb, var(--active-accent,var(--umang)) 55%, transparent);
+}
+/* Toggle switches */
+.toggle{
+  transition:background var(--motion-standard) var(--ease-out-premium),
+             box-shadow var(--motion-standard) var(--ease-out-premium);
+}
+/* Achievement badges */
+.achievement-badge:active{ transform:scale(.93); }
+
+/* ── 40. BOTTOM SHEET — spring easing + drag handle + safe areas ──────────── */
+/* Upgrade existing modal/sheet entrance */
+@keyframes sheetSpringIn{
+  from{ transform:translateY(100%); opacity:.6; }
+  to{ transform:translateY(0); opacity:1; }
+}
+.ai-modal{ animation:sheetSpringIn var(--motion-emphasis) var(--ease-spring-premium) both; }
+.chat-sheet-inner{ animation:sheetSpringIn var(--motion-emphasis) var(--ease-spring-premium) both; }
+
+/* ── 41. PRESS FEEDBACK — universal subtle scale on all interactive items ──── */
+.btn:not(:disabled):active,
+.seg-btn:active,
+.daynight-switch button:active,
+.toggle:active{
+  transform:scale(.97);
+  transition:transform var(--motion-micro) var(--ease-out-premium);
+}
+
+/* ── F. CHART AREA GRADIENT FILLS ─────────────────────────────────────────── */
+/* Used by upgraded dualTrendChartSVG and habitScoreChartSVG */
+.trend-area-fill{
+  opacity:.18;
+}
+html[data-mode="dark"] .trend-area-fill{ opacity:.25; }
+
 </style>
 <!-- Money (Umang-only) — invoice PDF export dependencies. These were present in the
      original standalone app's <head> but got missed when it was merged in natively
@@ -8794,12 +9002,25 @@ function summitSVG(score, colorKey){
   const h = 90, w = 110;
   const fillH = h * (score/100);
   const clipY = h - fillH;
+  const uid = 'sv'+(Math.random()*1e6|0);
+  // Triangle path: apex top-centre, base bottom
+  const triPath = `M ${w/2} 6 L ${w-6} ${h-6} L 6 ${h-6} Z`;
   return `
-  <svg class="summit-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-    <defs><clipPath id="clip-${colorKey}"><rect x="0" y="${clipY}" width="${w}" height="${fillH}"/></clipPath></defs>
-    <path d="M ${w/2} 6 L ${w-6} ${h-6} L 6 ${h-6} Z" fill="none" stroke="var(--border)" stroke-width="2"/>
-    <path d="M ${w/2} 6 L ${w-6} ${h-6} L 6 ${h-6} Z" fill="var(--${colorKey})" opacity="0.9" clip-path="url(#clip-${colorKey})" class="chart-animate summit-fill"/>
-    <text x="${w/2}" y="${h+2}" text-anchor="middle" font-size="0"></text>
+  <svg class="summit-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible">
+    <defs>
+      <clipPath id="clip-${uid}"><rect x="0" y="${clipY.toFixed(2)}" width="${w}" height="${(fillH+2).toFixed(2)}"/></clipPath>
+      <linearGradient id="sg-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="var(--active-accent-2,var(--umang-2))" stop-opacity="0.95"/>
+        <stop offset="100%" stop-color="var(--active-accent,var(--umang))" stop-opacity="1"/>
+      </linearGradient>
+      <filter id="sglow-${uid}" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <path d="${triPath}" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="${triPath}" fill="url(#sg-${uid})" filter="url(#sglow-${uid})"
+      clip-path="url(#clip-${uid})" class="chart-animate summit-fill"/>
   </svg>
   <div style="text-align:center;margin-top:-4px">
     <div class="summit-score hero-num" data-countup="${score}" data-countup-suffix="%">0%</div>
@@ -8809,17 +9030,44 @@ function summitSVG(score, colorKey){
 
 // Reusable circular progress ring — used for chapter completion + lecture stats.
 // hero=true (used sparingly, for single standout moments) adds the gradient-text number
-// treatment and makes the ring eligible for the sweep-in animation; small repeated-list
-// rings (e.g. one per chapter) stay plain so a long list doesn't animate all at once.
+// treatment, a gradient stroke, a soft glow filter, and makes the ring eligible for the
+// sweep-in animation; small repeated-list rings (e.g. one per chapter) stay plain so a
+// long list doesn't animate all at once. Gradient/glow are no-ops under reduced-motion
+// since the filter and linearGradient still render their final state correctly.
 function circleProgress(pct, size, stroke, colorVar, hero){
   size = size||64; stroke = stroke||7; colorVar = colorVar || 'var(--active-accent,var(--umang))';
   const clamped = Math.max(0, Math.min(100, pct));
   const r = (size-stroke)/2, c = size/2, circumference = 2*Math.PI*r;
   const offset = circumference * (1-clamped/100);
+  const uid = 'rg'+(Math.random()*1e6|0); // unique id for gradient+filter defs per ring
   const ringClass = hero ? 'chart-animate ring-fg' : '';
   const ringStyle = hero ? `--ring-circ:${circumference.toFixed(2)};--ring-offset:${offset.toFixed(2)};` : '';
   const numClass = hero ? 'hero-num' : '';
   const numStyle = hero ? '' : `color:${colorVar};`;
+
+  if(hero){
+    // Gradient stroke + soft glow for hero rings
+    const defs = `<defs>
+      <linearGradient id="${uid}-lg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="var(--active-accent-2,var(--umang-2))"/>
+        <stop offset="100%" stop-color="var(--active-accent,var(--umang))"/>
+      </linearGradient>
+      <filter id="${uid}-glow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="${Math.max(2, stroke*0.6)}" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>`;
+    return `<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);overflow:visible">
+        ${defs}
+        <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--surface2)" stroke-width="${stroke}" class="ring-track"/>
+        <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="url(#${uid}-lg)" stroke-width="${stroke}" stroke-linecap="round"
+          filter="url(#${uid}-glow)"
+          stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" class="${ringClass}" style="${ringStyle}"/>
+      </svg>
+      <div class="${numClass}" data-countup="${clamped}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-variant-numeric:tabular-nums;font-size:${Math.round(size*0.24)}px;">0</div>
+    </div>`;
+  }
   return `<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0">
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg)">
       <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--surface2)" stroke-width="${stroke}"/>
@@ -8993,6 +9241,21 @@ function trendChartSVG(data, height, colorVar, valueSuffix){
 // labelEvery controls how many points get a visible date label under them — both current
 // callers (7-point Weekly, 9-point Month) are sparse enough to label every point, but this
 // is kept in case a denser series is ever plotted here.
+// Build a smooth cubic-bezier SVG path through an array of [x,y] points.
+// Uses 1/3 distance control-point tension — visually smooth without distorting data.
+function _smoothPath(pts){
+  if(pts.length===0) return '';
+  if(pts.length===1) return `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for(let i=1;i<pts.length;i++){
+    const [x0,y0]=pts[i-1], [x1,y1]=pts[i];
+    const cx=x0+(x1-x0)/3, cy=y0; // flat tangent to keep data accurate
+    const cx2=x1-(x1-x0)/3, cy2=y1;
+    d+=` C${cx.toFixed(1)},${cy.toFixed(1)} ${cx2.toFixed(1)},${cy2.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
+  }
+  return d;
+}
+
 function dualTrendChartSVG(dataA, dataB, colorA, colorB, height, labelEvery){
   height = height||140;
   labelEvery = labelEvery||1;
@@ -9005,27 +9268,45 @@ function dualTrendChartSVG(dataA, dataB, colorA, colorB, height, labelEvery){
   const valueToY = v => plotBottom - (safeChartNum(v)/niceMax)*(plotBottom-plotTop);
   const buildLine = (data)=>{
     const pts = data.map((d,i)=>[padLeft + i*stepX, valueToY(d.hours)]);
-    const line = pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-    return {pts, line};
+    return {pts, smooth:_smoothPath(pts)};
   };
   const A = buildLine(dataA), B = buildLine(dataB);
   const labelIdxs = [];
   for(let i=0;i<n;i++){ if(i%labelEvery===0 || i===n-1) labelIdxs.push(i); }
-  // Gridlines/labels still fade in first, then each line's dots pop in a little cascade —
-  // the lines themselves are static now (see comment above), so there's nothing to
-  // sequence for them specifically.
+
+  const uid = 'dtc'+(Math.random()*1e6|0);
+  const baseY = valueToY(0).toFixed(1);
+
+  // Area paths: close back along bottom baseline
+  const areaPath = (pts, line)=> `${line} L${pts[pts.length-1][0].toFixed(1)},${baseY} L${pts[0][0].toFixed(1)},${baseY} Z`;
+
   return `<svg width="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="overflow:visible;display:block">
+    <defs>
+      <linearGradient id="${uid}-ga" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${colorA}" stop-opacity="0.32"/>
+        <stop offset="100%" stop-color="${colorA}" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="${uid}-gb" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${colorB}" stop-opacity="0.22"/>
+        <stop offset="100%" stop-color="${colorB}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
     <g class="chart-animate trend-area" style="animation-delay:0s">
-      <line x1="${padLeft}" y1="${valueToY(0).toFixed(1)}" x2="${width}" y2="${valueToY(0).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
-      <line x1="${padLeft}" y1="${valueToY(niceMax).toFixed(1)}" x2="${width}" y2="${valueToY(niceMax).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 3"/>
+      <line x1="${padLeft}" y1="${baseY}" x2="${width}" y2="${baseY}" stroke="var(--border)" stroke-width="1"/>
+      <line x1="${padLeft}" y1="${valueToY(niceMax).toFixed(1)}" x2="${width}" y2="${valueToY(niceMax).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 4" stroke-opacity="0.6"/>
       <text x="0" y="${(valueToY(0)+3).toFixed(1)}" font-size="8" fill="var(--text-faint)">0</text>
       <text x="0" y="${(valueToY(niceMax)+3).toFixed(1)}" font-size="8" fill="var(--text-faint)">${niceMax}h</text>
       ${labelIdxs.map(i=>`<text x="${A.pts[i][0].toFixed(1)}" y="${height}" font-size="7.5" fill="var(--text-faint)" text-anchor="${i===0?'start':i===n-1?'end':'middle'}">${dataA[i].label}</text>`).join('')}
     </g>
-    <path d="${B.line}" fill="none" stroke="${colorB}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-    <path d="${A.line}" fill="none" stroke="${colorA}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-    ${B.pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${colorB}" class="chart-animate trend-dot" style="animation-delay:${(0.35+i*0.05).toFixed(2)}s"/>`).join('')}
-    ${A.pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${colorA}" class="chart-animate trend-dot" style="animation-delay:${(0.6+i*0.05).toFixed(2)}s"/>`).join('')}
+    <!-- Area fills behind lines -->
+    <path d="${areaPath(B.pts, B.smooth)}" fill="url(#${uid}-gb)" class="trend-area-fill chart-animate trend-area" style="animation-delay:0.1s"/>
+    <path d="${areaPath(A.pts, A.smooth)}" fill="url(#${uid}-ga)" class="trend-area-fill chart-animate trend-area" style="animation-delay:0.15s"/>
+    <!-- Lines: 2.5px smooth curves -->
+    <path d="${B.smooth}" fill="none" stroke="${colorB}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <path d="${A.smooth}" fill="none" stroke="${colorA}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <!-- Dots with staggered entrance -->
+    ${B.pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${colorB}" stroke="var(--surface)" stroke-width="1.5" class="chart-animate trend-dot" style="animation-delay:${(0.35+i*0.05).toFixed(2)}s"/>`).join('')}
+    ${A.pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${colorA}" stroke="var(--surface)" stroke-width="1.5" class="chart-animate trend-dot" style="animation-delay:${(0.6+i*0.05).toFixed(2)}s"/>`).join('')}
   </svg>`;
 }
 function timerTrendData(profileId, days, offsetDays){
@@ -9093,22 +9374,34 @@ function habitScoreChartSVG(data, height, labelEvery){
   const stepX = plotW/((n-1)||1);
   const valueToY = v => plotBottom - (safeChartNum(v)/100)*(plotBottom-plotTop);
   const pts = data.map((d,i)=>[padLeft + i*stepX, valueToY(d.score)]);
-  const line = pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const smooth = _smoothPath(pts);
+  const baseY = valueToY(0).toFixed(1);
+  const areaD = pts.length>1
+    ? `${smooth} L${pts[pts.length-1][0].toFixed(1)},${baseY} L${pts[0][0].toFixed(1)},${baseY} Z`
+    : '';
   let dashLen = 0;
   for(let i=1;i<pts.length;i++){ const dx=pts[i][0]-pts[i-1][0], dy=pts[i][1]-pts[i-1][1]; dashLen += Math.sqrt(dx*dx+dy*dy); }
   const labelIdxs = [];
   for(let i=0;i<n;i++){ if(i%labelEvery===0 || i===n-1) labelIdxs.push(i); }
+  const uid = 'hsc'+(Math.random()*1e6|0);
   return `<svg width="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="overflow:visible;display:block">
+    <defs>
+      <linearGradient id="${uid}-ga" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--active-accent,var(--umang))" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="var(--active-accent,var(--umang))" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
     <g class="chart-animate trend-area" style="animation-delay:0s">
-      <line x1="${padLeft}" y1="${valueToY(0).toFixed(1)}" x2="${width}" y2="${valueToY(0).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
-      <line x1="${padLeft}" y1="${valueToY(100).toFixed(1)}" x2="${width}" y2="${valueToY(100).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 3"/>
+      <line x1="${padLeft}" y1="${baseY}" x2="${width}" y2="${baseY}" stroke="var(--border)" stroke-width="1"/>
+      <line x1="${padLeft}" y1="${valueToY(100).toFixed(1)}" x2="${width}" y2="${valueToY(100).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 4" stroke-opacity="0.6"/>
       <text x="0" y="${(valueToY(0)+3).toFixed(1)}" font-size="8" fill="var(--text-faint)">0</text>
       <text x="0" y="${(valueToY(100)+3).toFixed(1)}" font-size="8" fill="var(--text-faint)">100%</text>
       ${labelIdxs.map(i=>`<text x="${pts[i][0].toFixed(1)}" y="${height}" font-size="7.5" fill="var(--text-faint)" text-anchor="${i===0?'start':i===n-1?'end':'middle'}">${data[i].label}</text>`).join('')}
     </g>
-    <path d="${line}" fill="none" stroke="var(--active-accent, var(--umang))" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"
+    ${areaD ? `<path d="${areaD}" fill="url(#${uid}-ga)" class="trend-area-fill chart-animate trend-area" style="animation-delay:0.1s"/>` : ''}
+    <path d="${smooth}" fill="none" stroke="var(--active-accent, var(--umang))" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"
       stroke-dasharray="${dashLen.toFixed(1)}" style="--dash-len:${dashLen.toFixed(1)};animation-delay:.15s" class="chart-animate trend-line"/>
-    ${pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="var(--active-accent, var(--umang))" class="chart-animate trend-dot" style="animation-delay:${(0.7+i*0.05).toFixed(2)}s"/>`).join('')}
+    ${pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="var(--active-accent, var(--umang))" stroke="var(--surface)" stroke-width="1.5" class="chart-animate trend-dot" style="animation-delay:${(0.7+i*0.05).toFixed(2)}s"/>`).join('')}
   </svg>`;
 }
 function habitChartData(profileId, days, offsetDays){
@@ -9394,6 +9687,7 @@ function radarSVG(){
   const a = radarMetrics('umang'), b = radarMetrics('chetna');
   const n = a.length;
   const cx=110, cy=100, R=78;
+  const uid = 'rdr'+(Math.random()*1e6|0);
   const pt = (i,val)=>{
     const ang = -Math.PI/2 + i*(2*Math.PI/n);
     const r = R*(val/100);
@@ -9404,25 +9698,57 @@ function radarSVG(){
     for(let i=0;i<n;i++){
       const ang=-Math.PI/2+i*(2*Math.PI/n);
       const x=cx+R*frac*Math.cos(ang), y=cy+R*frac*Math.sin(ang);
-      d += (i===0?'M':'L')+x+','+y;
+      d += (i===0?'M':'L')+x.toFixed(2)+','+y.toFixed(2);
     }
     return d+'Z';
   };
-  const poly = (data)=> data.map((m,i)=>pt(i,m.value)).map(([x,y],i)=>(i===0?'M':'L')+x+','+y).join('')+'Z';
+  const poly = (data)=> data.map((m,i)=>pt(i,m.value)).map(([x,y],i)=>(i===0?'M':'L')+x.toFixed(2)+','+y.toFixed(2)).join('')+'Z';
   const labels = a.map((m,i)=>{
     const bVal = b[i].value;
     const ang=-Math.PI/2+i*(2*Math.PI/n);
     const x=cx+(R+18)*Math.cos(ang), y=cy+(R+18)*Math.sin(ang);
-    return `<text x="${x}" y="${y}" text-anchor="middle" fill="var(--text-faint)">
-      <tspan x="${x}" dy="-3" font-size="9">${m.label}</tspan>
-      <tspan x="${x}" dy="11" font-size="8.5" font-weight="800"><tspan fill="var(--umang)">${Math.round(m.value)}</tspan><tspan fill="var(--text-faint)"> · </tspan><tspan fill="var(--chetna)">${Math.round(bVal)}</tspan></tspan>
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" fill="var(--text-faint)">
+      <tspan x="${x.toFixed(1)}" dy="-3" font-size="9">${m.label}</tspan>
+      <tspan x="${x.toFixed(1)}" dy="11" font-size="8.5" font-weight="800"><tspan fill="var(--umang)">${Math.round(m.value)}</tspan><tspan fill="var(--text-faint)"> · </tspan><tspan fill="var(--chetna)">${Math.round(bVal)}</tspan></tspan>
     </text>`;
   }).join('');
+  // Active point markers for both polygons
+  const dotMarkers = (data, colorVar, delay)=>
+    data.map((m,i)=>{
+      const [x,y]=pt(i,m.value);
+      return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3" fill="${colorVar}" stroke="var(--surface)" stroke-width="1.5" class="chart-animate trend-dot" style="animation-delay:${(delay+i*0.04).toFixed(2)}s"/>`;
+    }).join('');
+
   return `
-  <svg viewBox="0 0 220 200" width="100%" style="max-width:320px;display:block;margin:0 auto">
-    ${[0.25,0.5,0.75,1].map(f=>`<path d="${ring(f)}" fill="none" stroke="var(--border)" stroke-width="1"/>`).join('')}
-    <path d="${poly(a)}" fill="var(--umang)" fill-opacity="0.18" stroke="var(--umang)" stroke-width="1.5" class="chart-animate radar-poly"/>
-    <path d="${poly(b)}" fill="var(--chetna)" fill-opacity="0.18" stroke="var(--chetna)" stroke-width="1.5" class="chart-animate radar-poly" style="animation-delay:.08s"/>
+  <svg viewBox="0 0 220 200" width="100%" style="max-width:320px;display:block;margin:0 auto;overflow:visible">
+    <defs>
+      <radialGradient id="${uid}-ga" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="var(--umang)" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="var(--umang)" stop-opacity="0.08"/>
+      </radialGradient>
+      <radialGradient id="${uid}-gb" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="var(--chetna)" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="var(--chetna)" stop-opacity="0.06"/>
+      </radialGradient>
+      <filter id="${uid}-glow-a" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="bl"/>
+        <feMerge><feMergeNode in="bl"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="${uid}-glow-b" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="bl"/>
+        <feMerge><feMergeNode in="bl"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <!-- Grid rings: subtle concentric, alternating tone -->
+    ${[0.25,0.5,0.75,1].map((f,fi)=>`<path d="${ring(f)}" class="radar-ring" stroke-opacity="${fi===3?0.5:0.3}" stroke-dasharray="${fi===3?'none':'3 3'}"/>`).join('')}
+    <!-- Spoke lines -->
+    ${a.map((_,i)=>{const ang=-Math.PI/2+i*(2*Math.PI/n);return `<line x1="${cx}" y1="${cy}" x2="${(cx+R*Math.cos(ang)).toFixed(2)}" y2="${(cy+R*Math.sin(ang)).toFixed(2)}" stroke="var(--border)" stroke-width="1" stroke-opacity="0.4"/>`;}).join('')}
+    <!-- B polygon behind A -->
+    <path d="${poly(b)}" fill="url(#${uid}-gb)" filter="url(#${uid}-glow-b)" stroke="var(--chetna)" stroke-width="1.8" stroke-linejoin="round" class="chart-animate radar-poly" style="animation-delay:.06s"/>
+    <path d="${poly(a)}" fill="url(#${uid}-ga)" filter="url(#${uid}-glow-a)" stroke="var(--umang)" stroke-width="1.8" stroke-linejoin="round" class="chart-animate radar-poly"/>
+    <!-- Active vertex markers -->
+    ${dotMarkers(b,'var(--chetna)',0.45)}
+    ${dotMarkers(a,'var(--umang)',0.6)}
     ${labels}
   </svg>`;
 }
@@ -12862,11 +13188,18 @@ async function sendPush(targetProfileId, title, body, data){
   if(!isHosted() || !S.appSession) return;
   const sub = S.shared.pushSubscriptions && S.shared.pushSubscriptions[targetProfileId];
   if(!sub) return;
+  // 10 s timeout — matches the convention used for every other network call in this file
+  // (sync calls). Push sends are fire-and-forget and failures are non-fatal, but without
+  // a timeout a hung /api/send-push response would keep the caller waiting indefinitely.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
   try{
     const res = await fetch(PUSH_SEND_URL, {
       method:'POST', headers:{'Content-Type':'application/json', 'Authorization':`Bearer ${S.appSession.token}`},
-      body: JSON.stringify({subscription: sub, title, body, data: data||{}})
+      body: JSON.stringify({subscription: sub, title, body, data: data||{}}),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     const result = await res.json().catch(()=>({}));
     if(result && result.expired){
       if(S.shared.pushSubscriptions && S.shared.pushSubscriptions[targetProfileId]){
@@ -12874,7 +13207,10 @@ async function sendPush(targetProfileId, title, body, data){
         saveShared();
       }
     }
-  }catch(err){ console.warn('Push send failed (non-fatal):', err); }
+  }catch(err){
+    clearTimeout(timeoutId);
+    console.warn('Push send failed (non-fatal):', err);
+  }
 }
 function nudgePartner(){
   const me = S.local.myProfile; if(!me) return;
