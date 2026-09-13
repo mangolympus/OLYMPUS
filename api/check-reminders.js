@@ -23,6 +23,16 @@
 import crypto from 'crypto';
 import webpush from 'web-push';
 
+// Constant-time string comparison — prevents an attacker from learning the CRON_SECRET value
+// one character at a time by measuring how quickly the comparison returns (timing attack).
+// Matches the same helper used in auth.js / sync.js / ask.js / send-push.js for consistency.
+function safeEqual(a, b) {
+  const bufA = Buffer.from(a || '', 'utf8');
+  const bufB = Buffer.from(b || '', 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 const DRIVE_FOLDER_ID = '1Wr2t2KJUw5vEi0Vbi2290m09kacBdM0s'; // "Olympus CA Tracker"
 const DATA_FILE_NAME = 'olympus-data.json';
 const IST_OFFSET_MINUTES = 5 * 60 + 30;
@@ -221,10 +231,18 @@ async function uploadData(accessToken, fileId, data) {
 }
 
 export default async function handler(req, res) {
-  if (
-    process.env.CRON_SECRET &&
-    req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
+  // Fail CLOSED, not open — if CRON_SECRET were ever unset (a future config slip, a fresh
+  // deploy missing an env var), that's a misconfiguration to surface loudly, not a reason to
+  // leave an endpoint that sends real push notifications and writes to the shared Drive file
+  // reachable by anyone who finds the URL with no protection at all. Matches the same
+  // "always require the token, no if-configured escape hatch" principle now applied
+  // consistently across every other endpoint in this app (api/ask.js, api/send-push.js,
+  // api/sync.js).
+  if (!process.env.CRON_SECRET) {
+    res.status(500).json({ error: 'CRON_SECRET is not set on the server' });
+    return;
+  }
+  if (!safeEqual(req.headers.authorization, `Bearer ${process.env.CRON_SECRET}`)) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
