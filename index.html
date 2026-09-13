@@ -3007,13 +3007,13 @@ function mockScoresFor(profileId, paperId){ return S.shared.mockScores[profileId
 function notesFor(paperId){ return S.shared.notes[paperId]; }
 
 function paperComponents(profileId, paperId){
-  const chs = chaptersFor(profileId, paperId);
+  const chs = chaptersFor(profileId, paperId) || [];
   const total = chs.length;
   const pct = key => total ? Math.round(chs.filter(c=>c[key]).length/total*100) : 0;
   const usesLectureTracker = LECTURE_TRACKER_PAPERS.includes(paperId);
   let lecPct, lecDone, lecTotal;
   if(usesLectureTracker){
-    const lecs = lecturesFor(profileId, paperId);
+    const lecs = lecturesFor(profileId, paperId) || [];
     lecTotal = lecs.length;
     lecDone = lecs.filter(l=>l.status==='done').length;
     lecPct = lecTotal ? Math.round(lecDone/lecTotal*100) : 0;
@@ -3023,7 +3023,7 @@ function paperComponents(profileId, paperId){
     lecPct = pct('lecDone');
   }
   const rev1Pct = pct('rev1'), rev2Pct = pct('rev2'), practicePct = pct('practice');
-  const scores = mockScoresFor(profileId, paperId);
+  const scores = mockScoresFor(profileId, paperId) || [];
   const mockAvg = scores.length ? Math.round(scores.reduce((s,x)=>s+Number(x.score||0),0)/scores.length) : 0;
   const prepScore = Math.round((lecPct+rev1Pct+rev2Pct+practicePct+mockAvg)/5);
   return {lecPct, rev1Pct, rev2Pct, practicePct, mockAvg, prepScore, total, done:lecDone, lecTotal, usesLectureTracker};
@@ -11442,7 +11442,24 @@ function habitFormHtml(){
 // are the app's existing global ones — note that .bar-grow is scoped to .money-view and
 // deliberately NOT used, since it silently does nothing outside that subtree.
 // ═══════════════════════════════════════════════════════════
+// Every "All Time" number on this page (hoursAll, streak, activeDaysCount, sessions,
+// daysSinceFirstLog, the chapter/mock funnels) reads through logsFor(), which quietly
+// leaves out anything the daily archive sweep has already moved into S.sharedArchive (see
+// sweepToArchive()/logsFor() near the top of the file) until that archive has been
+// lazy-loaded. Before this, the only things that ever triggered that load were Chat's
+// "load older messages" and Calendar's "Load archived history" prompt — neither of which a
+// Stats-only visit would ever hit — so anything older than the rolling 30-day cutoff just
+// silently dropped out of every All-Time stat with no indication why. Fire-and-forget: does
+// NOT block or delay the current render (which may still be missing archived data the very
+// first time), just kicks off the fetch once and re-renders when it resolves — same
+// convention as the chat archive check (S._archiveChecked) and generateAiInsights() below.
+function ensureStatsArchiveLoaded(){
+  if(S.sharedArchive || S._statsArchiveLoading || !S.appSession || !isHosted()) return;
+  S._statsArchiveLoading = true;
+  loadArchive().finally(()=>{ S._statsArchiveLoading = false; renderApp(); });
+}
 function viewStats(){
+  ensureStatsArchiveLoaded();
   const vp = S.viewingProfile;
   const prof = profileById(vp);
   if(S.statsPaper && !PAPERS.some(p=>p.id===S.statsPaper)) S.statsPaper = null;
@@ -12822,7 +12839,7 @@ function parseAiJson(text){
 function buildProfileSummaryForAI(profileId){
   const papers = PAPERS.map(p=>{
     const comp = paperComponents(profileId,p.id);
-    const chs = chaptersFor(profileId,p.id);
+    const chs = chaptersFor(profileId,p.id) || [];
     const weakChapters = chs.filter(c=>c.lecDone && !c.rev1).map(c=>c.name).slice(0,5);
     const notStarted = chs.filter(c=>!c.lecDone).map(c=>c.name).slice(0,5);
     return {code:p.code, name:p.name, prepScore:comp.prepScore, lecturesDonePct:comp.lecPct,
