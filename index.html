@@ -843,6 +843,7 @@ body.games-mode #games-root{display:flex}
 #games-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
 #games-root .stats-exit-bar button:active{background:var(--surface2)}
 #games-root .games-empty{flex:1 1 auto;display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:14px}
+#games-root .games-frame{flex:1 1 auto;width:100%;border:0;background:#000}
 
 .features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px}
 .feature-card{background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:var(--radius);
@@ -6285,10 +6286,12 @@ function quickAddTarget(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// GAMES — placeholder overlay, same pattern as Stats/Habits above (own history checkpoint,
-// own state flag). Nothing lives here yet beyond "Coming soon" — this exists so the
-// Features grid has somewhere real to route to, ready to be filled in later.
+// GAMES — Mango Bros, embedded via iframe inside the existing full-screen overlay (same
+// pattern as Stats/Habits above: own history checkpoint, own state flag). Deployed
+// separately on Vercel rather than folded into this file, so it loads independently and a
+// bug in the game can never touch the study-tracker app around it.
 // ═══════════════════════════════════════════════════════════
+const MANGO_BROS_URL = 'https://mangobros.vercel.app';
 let _gamesHistoryActive = false;
 function onGamesBackButton(){
   if(S.gamesPopupOpen) closeGamesPopup();
@@ -6311,7 +6314,10 @@ function closeGamesPopup(){
   S.gamesPopupOpen = false;
   document.body.classList.remove('games-mode');
   const el = document.getElementById('games-root');
-  if(el) el.innerHTML = '';
+  // Actually clear the iframe's src (not just wipe the innerHTML) — an <iframe> left in a
+  // detached DOM subtree can keep running (Three.js render loop, audio) in some browsers
+  // until GC'd, which a WebGL game is exactly the expensive case for.
+  if(el){ const f = el.querySelector('iframe'); if(f) f.src = 'about:blank'; el.innerHTML = ''; }
 }
 function exitGamesPopup(){
   if(_gamesHistoryActive) history.back();
@@ -6322,7 +6328,7 @@ function renderGamesPopup(){
   if(!root) return;
   root.innerHTML = `
     <div class="stats-exit-bar"><button onclick="exitGamesPopup()">&larr; <span>Back</span></button></div>
-    <div class="games-empty">Coming soon</div>`;
+    <iframe class="games-frame" src="${MANGO_BROS_URL}" allow="autoplay; fullscreen" title="Mango Bros"></iframe>`;
 }
 
 // ═══════════════════════════════════════════════════════════
