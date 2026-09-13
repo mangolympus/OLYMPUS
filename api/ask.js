@@ -6,12 +6,22 @@
 // endpoint has no per-feature logic, it's a plain pass-through to Google's Gemini API with
 // the API key kept server-side (never shipped to the browser).
 //
-// Required env var (Vercel → Settings → Environment Variables):
+// Required env vars (Vercel → Settings → Environment Variables):
 //   GEMINI_API_KEY — from Google AI Studio: https://aistudio.google.com/apikey
+//   SESSION_SECRET — same one auth.js/sync.js use, for verifying the caller's token
+//
+// Auth: every request needs `Authorization: Bearer <token>` from a prior /api/auth call —
+// same as api/sync.js. This was MISSING entirely until now, which mattered a lot more here
+// than it would on a data-only endpoint: every call costs real money against the account
+// owner's Gemini API key, and MAX_PROMPT_CHARS below only ever bounded the SIZE of one
+// request, never the NUMBER of them — with no login required at all, anyone who found this
+// URL (trivially discoverable — it's called from this app's own public, unauthenticated-to-
+// view index.html) could script unlimited requests against it indefinitely.
 //
 // Request:  POST { prompt: string }
 // Success:  200  { text: string }
 // Failure:  4xx/5xx  { error: string }
+//   401 { error: 'Not signed in' } if the Authorization header is missing/invalid/expired.
 //
 // Model pinned below as a plain constant — swap MODEL if Google retires/replaces it again or
 // if you want a different quality/speed/cost tradeoff. 'gemini-2.5-flash' (this file's
@@ -36,9 +46,48 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MO
 // realistic limit for any actual feature.
 const MAX_PROMPT_CHARS = 8000;
 
+import { createHmac, timingSafeEqual } from 'crypto';
+
+// Duplicated from auth.js/sync.js rather than imported — see auth.js's own comment for why
+// (a shared api/_lib/session.js file wasn't reliably bundled by Vercel).
+function sign(payload) {
+  return createHmac('sha256', process.env.SESSION_SECRET).update(payload).digest('hex');
+}
+function safeEqual(a, b) {
+  const bufA = Buffer.from(a || '', 'utf8');
+  const bufB = Buffer.from(b || '', 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [encodedPayload, signature] = parts;
+  let payload;
+  try {
+    payload = Buffer.from(encodedPayload, 'base64url').toString('utf8');
+  } catch (e) {
+    return null;
+  }
+  if (!safeEqual(signature, sign(payload))) return null;
+  const [profile, expiresAtStr] = payload.split('.');
+  const expiresAt = Number(expiresAtStr);
+  if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return null;
+  if (profile !== 'umang' && profile !== 'chetna') return null;
+  return profile;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!verifyToken(token)) {
+    res.status(401).json({ error: 'Not signed in' });
     return;
   }
 
@@ -111,7 +160,20 @@ export default async function handler(req, res) {
 
   if (!geminiRes.ok) {
     // Gemini's error shape is { error: { message, status, code } }.
-    const msg = data?.error?.message || `Gemini ${geminiRes.status}`;
+    const rawMsg = data?.error?.message || `Gemini ${geminiRes.status}`;
+    // A retired/renamed model (status NOT_FOUND, or a message naming the model itself) is
+    // exactly what already happened once with gemini-2.5-flash — see MODEL above. Google's
+    // raw message for this ("models/gemini-3.6-flash is not found for API version v1beta...")
+    // is accurate but not something a student staring at the Statistics page should have to
+    // parse. Still logging the raw message server-side so a real fix (swap MODEL) has the
+    // exact detail to go on.
+    const isModelGone = data?.error?.status === 'NOT_FOUND' || /model/i.test(rawMsg) && /not found|not supported|deprecated|retired/i.test(rawMsg);
+    if (isModelGone) {
+      console.error(`ask.js: model '${MODEL}' appears unavailable — ${rawMsg}`);
+      res.status(502).json({ error: 'The AI model this app uses was updated by Google and needs a quick fix on the backend — try again shortly, or let Umang know if it keeps happening.' });
+      return;
+    }
+    const msg = rawMsg;
     const status = geminiRes.status >= 400 && geminiRes.status < 600 ? geminiRes.status : 502;
     res.status(status).json({ error: msg });
     return;
