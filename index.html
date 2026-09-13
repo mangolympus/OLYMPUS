@@ -1698,6 +1698,9 @@ const S = {
   local: null,
   view: 'home',
   viewingProfile: null,
+  // Statistics popup — which subject's deep dive is showing. null = all-papers Overview.
+  // Transient UI state only, never persisted or synced: Stats always opens on Overview.
+  statsPaper: null,
   workspacePaper: null,
   workspaceTab: 'chapters',
   practice: null,
@@ -5986,6 +5989,7 @@ function openStatsPopup(){
     window.addEventListener('popstate', onStatsBackButton);
   }
   S.statsPopupOpen = true;
+  S.statsPaper = null; // always open on the Overview, never a stale subject from last time
   document.body.classList.add('stats-mode');
   renderStatsPopup();
 }
@@ -11429,86 +11433,753 @@ function habitFormHtml(){
   </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════
+// STATISTICS SECTION (rebuilt)
+// Entry point is viewStats(), called by renderStatsPopup(). Two modes, switched by
+// S.statsPaper: null renders the all-papers Overview, a paper id renders that subject's
+// deep dive. The subject nav stays pinned above both so switching is one tap from
+// anywhere. Chart/animation classes used here (chart-animate + hbar-grow-right/trend-*)
+// are the app's existing global ones — note that .bar-grow is scoped to .money-view and
+// deliberately NOT used, since it silently does nothing outside that subtree.
+// ═══════════════════════════════════════════════════════════
 function viewStats(){
   const vp = S.viewingProfile;
   const prof = profileById(vp);
-  const logs = logsFor(vp);
-  const daysActive = activeDaysCount(vp);
+  if(S.statsPaper && !PAPERS.some(p=>p.id===S.statsPaper)) S.statsPaper = null;
+  const heading = S.statsPaper
+    ? `Statistics — ${prof.nick} · ${(PAPERS.find(p=>p.id===S.statsPaper)||{}).nick||''}`
+    : `Statistics — ${prof.nick}`;
+  return `
+  <div class="section-title">${heading}</div>
+  ${statsSubjectNav(vp)}
+  ${S.statsPaper ? statsSubjectView(vp, prof, S.statsPaper) : statsOverview(vp, prof)}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATISTICS ENGINE — data layer for the rebuilt Statistics section.
+//
+// Every function here is a pure read over S.shared (+ the lazily-merged archive via
+// logsFor()). Nothing mutates state, so these are all safe to call repeatedly from render
+// code. All names are `stats`-prefixed: index.html has one global script scope (see the
+// handoff's "Critical conventions"), so a bare name like `hoursByPaper` would be a real
+// collision risk against the ~650 existing top-level names.
+//
+// A note on what IS and ISN'T derivable, because it shaped every chart choice below:
+//   • logs  = {id, date, paperId, chapterId, category, itemLabel, hours} — the richest
+//     source. paperId + category + date together are what make effort-allocation and
+//     effort-mix analysis possible at all.
+//   • mockScores = {id, date, label, score} — has real dates, so mock performance can be
+//     plotted as a genuine time series rather than a single average.
+//   • lectures = {..., targetDate, status, completionDate} — completionDate means lecture
+//     pace/ETA is real measured throughput, not a guess. DT/IDT only.
+//   • chapters = {id, name, lecDone, rev1, rev2, practice, topics[]} — NO timestamps.
+//     This is why there is no "chapter completion over time" chart anywhere below: the data
+//     to draw one honestly does not exist. Chapter progress is only ever shown as a current
+//     snapshot (funnel / stage counts), never as a trend.
+// ═══════════════════════════════════════════════════════════
+
+// Logs within the last `days` study-days (null/0 ⇒ all time). Uses the same 5 AM study-day
+// boundary as everything else via todayStr().
+function statsLogsInRange(profileId, days){
+  const all = logsFor(profileId);
+  if(!days) return all;
+  const cutoff = new Date(todayStr()+'T00:00:00');
+  cutoff.setDate(cutoff.getDate()-(days-1));
+  return all.filter(l=>{
+    const d = new Date(l.date+'T00:00:00');
+    return Number.isFinite(d.getTime()) && d >= cutoff;
+  });
+}
+
+// Hours grouped by paper. Logs with no paperId (general sessions started without picking a
+// paper) are bucketed under a synthetic 'unassigned' row rather than silently dropped —
+// otherwise the shares below wouldn't add up to the real total and the chart would quietly
+// lie about where time went.
+function statsHoursByPaper(profileId, days){
+  const buckets = {};
+  PAPERS.forEach(p=>{ buckets[p.id] = 0; });
+  let unassigned = 0, total = 0;
+  statsLogsInRange(profileId, days).forEach(l=>{
+    const h = safeChartNum(l.hours);
+    total += h;
+    if(l.paperId && buckets.hasOwnProperty(l.paperId)) buckets[l.paperId] += h;
+    else unassigned += h;
+  });
+  const rows = PAPERS.map(p=>({
+    id: p.id, nick: p.nick, code: p.code, name: p.name,
+    hours: Number(buckets[p.id].toFixed(1)),
+    share: total > 0 ? Math.round(buckets[p.id]/total*100) : 0,
+  }));
+  return {rows, unassigned: Number(unassigned.toFixed(1)), total: Number(total.toFixed(1))};
+}
+
+// Hours grouped by activity type (lectures / chapters / rev1 / rev2 / practice). Answers
+// "am I actually revising, or just consuming lectures?" — a question the old stats page
+// couldn't touch even though the data was already being recorded on every timer session.
+function statsHoursByCategory(profileId, days, paperId){
+  const order = ['lectures','chapters','rev1','rev2','practice'];
+  const colors = {lectures:'var(--purple)', chapters:'var(--umang)', rev1:'var(--green)', rev2:'var(--amber)', practice:'var(--chetna)'};
+  const buckets = {}; order.forEach(k=>{ buckets[k]=0; });
+  let untagged = 0, total = 0;
+  statsLogsInRange(profileId, days).forEach(l=>{
+    if(paperId && l.paperId !== paperId) return;
+    const h = safeChartNum(l.hours);
+    total += h;
+    if(l.category && buckets.hasOwnProperty(l.category)) buckets[l.category] += h;
+    else untagged += h;
+  });
+  const rows = order.map(k=>({
+    id:k, label: TIMER_CATEGORY_LABELS[k] || k, color: colors[k],
+    hours: Number(buckets[k].toFixed(1)),
+    share: total>0 ? Math.round(buckets[k]/total*100) : 0,
+  }));
+  return {rows, untagged:Number(untagged.toFixed(1)), total:Number(total.toFixed(1))};
+}
+
+// Hours logged against one paper over the window.
+function statsPaperHours(profileId, paperId, days){
+  return Number(statsLogsInRange(profileId, days)
+    .filter(l=>l.paperId===paperId)
+    .reduce((s,l)=>s+safeChartNum(l.hours),0).toFixed(1));
+}
+
+// How often the daily target was actually met, over the last `days` calendar days.
+// Counts every day in the window including zero-hour days — "I hit target 9 of the last 30
+// days" is the honest read; counting only days that had a log would flatter the number.
+function statsTargetHitRate(profileId, days){
+  const target = Number(S.shared.targets && S.shared.targets[profileId]) || 4;
+  let hit = 0;
+  const d = new Date(todayStr()+'T00:00:00');
+  for(let i=0;i<days;i++){
+    const day = new Date(d.getTime() - i*86400000);
+    if(hoursOnDate(profileId, localDateStr(day)) >= target) hit++;
+  }
+  return {hit, total:days, pct: days>0 ? Math.round(hit/days*100) : 0, target};
+}
+
+// Average hours across days that actually had a session — a truer "when you sit down, how
+// long do you work" figure than dividing total hours by elapsed calendar days.
+function statsAvgPerActiveDay(profileId){
+  const active = activeDaysCount(profileId);
+  if(!active) return 0;
+  return Number((totalHours(profileId)/active).toFixed(1));
+}
+
+// Single best study day (total across all sessions that day, not the longest single session
+// — longestSession() already covers that separately).
+function statsBestDay(profileId){
+  const byDate = {};
+  logsFor(profileId).forEach(l=>{ byDate[l.date] = (byDate[l.date]||0) + safeChartNum(l.hours); });
+  let best = {date:null, hours:0};
+  Object.keys(byDate).forEach(dt=>{ if(byDate[dt] > best.hours) best = {date:dt, hours:byDate[dt]}; });
+  best.hours = Number(best.hours.toFixed(1));
+  return best;
+}
+
+// Last 7 days vs the 7 before that. `delta` drives the up/down/flat badge on the hero card.
+function statsMomentum(profileId){
+  const recent = hoursInRange(profileId, 7);
+  const cutoff = new Date(todayStr()+'T00:00:00'); cutoff.setDate(cutoff.getDate()-6);
+  const prevStart = new Date(cutoff.getTime() - 7*86400000);
+  let prev = 0;
+  for(let i=0;i<7;i++){
+    prev += hoursOnDate(profileId, localDateStr(new Date(prevStart.getTime()+i*86400000)));
+  }
+  const r = Number(recent.toFixed(1)), p = Number(prev.toFixed(1));
+  const delta = Number((r-p).toFixed(1));
+  const pct = p > 0 ? Math.round((r-p)/p*100) : (r>0 ? 100 : 0);
+  return {recent:r, prev:p, delta, pct, dir: delta>0.05 ? 'up' : (delta< -0.05 ? 'down' : 'flat')};
+}
+
+// Per-day hours series, oldest→newest, in the {label, hours} shape trendChartSVG expects.
+function statsDailySeries(profileId, days, paperId){
+  const out = [];
+  const end = new Date(todayStr()+'T00:00:00');
+  for(let i=days-1;i>=0;i--){
+    const day = new Date(end.getTime() - i*86400000);
+    const ds = localDateStr(day);
+    let h;
+    if(paperId){
+      h = logsFor(profileId).filter(l=>l.date===ds && l.paperId===paperId)
+        .reduce((s,l)=>s+safeChartNum(l.hours),0);
+    } else {
+      h = hoursOnDate(profileId, ds);
+    }
+    out.push({label:`${day.getMonth()+1}/${day.getDate()}`, hours:Number(h.toFixed(1))});
+  }
+  return out;
+}
+
+// Weekly hours for one paper — same bucketing as weeklyTrendData() but paper-scoped.
+function statsPaperWeeklyHours(profileId, paperId, weeks){
+  weeks = weeks || 8;
+  const now = new Date(todayStr()+'T00:00:00');
+  const logs = logsFor(profileId).filter(l=>l.paperId===paperId);
+  const out = [];
+  for(let w=weeks-1; w>=0; w--){
+    const end = new Date(now.getTime() - w*7*86400000);
+    const start = new Date(end.getTime() - 6*86400000);
+    let total = 0;
+    logs.forEach(l=>{
+      const d = new Date(l.date+'T00:00:00');
+      if(d>=start && d<=end) total += safeChartNum(l.hours);
+    });
+    out.push({label:`${start.getMonth()+1}/${start.getDate()}`, hours:Number(total.toFixed(1))});
+  }
+  return out;
+}
+
+// Mock scores in chronological order. Reused for both the per-paper history chart and the
+// all-papers overview trend; `hours` is the score (keeps the trendChartSVG contract).
+function statsMockSeries(profileId, paperId){
+  return mockScoresFor(profileId, paperId)
+    .filter(s=>s && s.date)
+    .slice()
+    .sort((a,b)=> a.date < b.date ? -1 : 1)
+    .map(s=>{
+      const d = new Date(s.date+'T00:00:00');
+      return {label:`${d.getMonth()+1}/${d.getDate()}`, hours:safeChartNum(s.score), raw:s};
+    });
+}
+function statsAllMockSeries(profileId){
+  const all = [];
+  PAPERS.forEach(p=>{
+    mockScoresFor(profileId, p.id).forEach(s=>{
+      if(s && s.date) all.push({date:s.date, score:safeChartNum(s.score), paper:p.nick, label:s.label});
+    });
+  });
+  all.sort((a,b)=> a.date < b.date ? -1 : 1);
+  return all.map(s=>{
+    const d = new Date(s.date+'T00:00:00');
+    return {label:`${d.getMonth()+1}/${d.getDate()}`, hours:s.score, raw:s};
+  });
+}
+
+// Chapter pipeline snapshot: how many chapters have cleared each stage. Deliberately a
+// snapshot, not a trend — chapters carry no completion timestamps (see the header note).
+function statsChapterFunnel(profileId, paperId){
+  const chs = chaptersFor(profileId, paperId) || [];
+  const t = chs.length;
+  const n = key => chs.filter(c=>c[key]).length;
+  const fullyDone = chs.filter(c=>c.lecDone && c.practice && c.rev1 && c.rev2).length;
+  const untouched = chs.filter(c=>!c.lecDone && !c.practice && !c.rev1 && !c.rev2).length;
+  return {
+    total: t,
+    stages: [
+      {id:'lecDone',  label:'Lectures done', count:n('lecDone'),  color:'var(--purple)'},
+      {id:'practice', label:'Practice done', count:n('practice'), color:'var(--chetna)'},
+      {id:'rev1',     label:'Revision 1',    count:n('rev1'),     color:'var(--green)'},
+      {id:'rev2',     label:'Revision 2',    count:n('rev2'),     color:'var(--amber)'},
+    ],
+    fullyDone, untouched,
+    inProgress: Math.max(0, t - fullyDone - untouched),
+  };
+}
+
+// Measured lecture throughput → remaining-time estimate. Rate comes from real completionDate
+// stamps over the last 28 days, so the ETA is observed pace rather than an assumption. Returns
+// eta:null when there's no recent completion history to extrapolate from — the UI shows
+// "not enough data" rather than inventing a finish date.
+function statsLecturePace(profileId, paperId){
+  if(!LECTURE_TRACKER_PAPERS.includes(paperId)) return null;
+  const lecs = lecturesFor(profileId, paperId) || [];
+  const total = lecs.length;
+  const done = lecs.filter(l=>l.status==='done').length;
+  const remaining = Math.max(0, total - done);
+  const today = todayStr();
+  const overdue = lecs.filter(l=>l.status==='pending' && l.targetDate && l.targetDate <= today).length;
+  const cutoff = new Date(today+'T00:00:00'); cutoff.setDate(cutoff.getDate()-27);
+  const recent = lecs.filter(l=>{
+    if(!l.completionDate) return false;
+    const d = new Date(l.completionDate+'T00:00:00');
+    return Number.isFinite(d.getTime()) && d >= cutoff;
+  }).length;
+  const perWeek = Number((recent/4).toFixed(1));
+  const weeksLeft = perWeek > 0 ? Math.ceil(remaining/perWeek) : null;
+  let eta = null;
+  if(weeksLeft !== null && remaining > 0){
+    const e = new Date(today+'T00:00:00');
+    e.setDate(e.getDate() + weeksLeft*7);
+    eta = localDateStr(e);
+  }
+  return {total, done, remaining, overdue, perWeek, weeksLeft, eta,
+          pct: total ? Math.round(done/total*100) : 0};
+}
+
+// Most recent date this paper was studied, plus how many days ago. Surfaces neglect that a
+// percentage alone hides — a paper can sit at 60% and still not have been opened in 3 weeks.
+function statsLastStudied(profileId, paperId){
+  const dates = logsFor(profileId).filter(l=>l.paperId===paperId).map(l=>l.date).sort();
+  if(!dates.length) return {date:null, daysAgo:null};
+  const last = dates[dates.length-1];
+  const diff = Math.round((new Date(todayStr()+'T00:00:00') - new Date(last+'T00:00:00'))/86400000);
+  return {date:last, daysAgo: Math.max(0, diff)};
+}
+
+// Required daily pace to reach 100% preparation by exam day, compared against the current
+// 30-day average. Percentage-points-per-day is a crude unit, but it's honest about what it
+// measures and it makes "am I on track" answerable at a glance.
+function statsProjection(profileId){
+  const days = daysUntilExam();
+  const prep = overallPrep(profileId).prepScore;
+  const gap = Math.max(0, 100 - prep);
+  const hrs30 = hoursInRange(profileId, 30);
+  const avgDaily = Number((hrs30/30).toFixed(1));
+  const target = Number(S.shared.targets && S.shared.targets[profileId]) || 4;
+  const requiredPerDay = (days && days > 0) ? Number((gap/days).toFixed(2)) : null;
+  return {daysLeft:days, prep, gap, avgDaily, target, requiredPerDay,
+          onTrack: avgDaily >= target};
+}
+
+// Effort-vs-progress balance. For each paper: share of total time invested vs current prep
+// score. A paper with a high prep score and a low time share is efficient/coasting; a low
+// prep score with a low time share is the actual risk. `flag` is what the UI colour-codes.
+function statsBalance(profileId){
+  const alloc = statsHoursByPaper(profileId, null);
+  const avgPrep = overallPrep(profileId).prepScore;
+  return alloc.rows.map(r=>{
+    const comp = paperComponents(profileId, r.id);
+    const delta = comp.prepScore - avgPrep;
+    let flag = 'ok';
+    if(comp.prepScore < avgPrep - 12) flag = 'behind';
+    else if(comp.prepScore > avgPrep + 12) flag = 'ahead';
+    const last = statsLastStudied(profileId, r.id);
+    return {...r, prep:comp.prepScore, delta, flag, lastStudied:last, comp};
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATISTICS — shared render primitives
+// Small composable pieces used by both the Overview and the per-subject views, so the two
+// stay visually identical and there's one place to change a bar/KPI/legend style.
+// ═══════════════════════════════════════════════════════════
+
+// One KPI tile. Wired to animateCountUps() via the data-countup attributes, which
+// renderStatsPopup() already runs over the whole subtree after every render.
+function statsKpi(value, label, opts){
+  opts = opts || {};
+  const dec = opts.decimals || 0;
+  const suffix = opts.suffix || '';
+  const sub = opts.sub ? `<div style="font-size:9px;color:var(--text-faint);margin-top:3px;letter-spacing:0">${opts.sub}</div>` : '';
+  const v = Number.isFinite(Number(value)) ? Number(value) : 0;
+  return `<div class="card stat-box">
+    <div class="v" data-countup="${v}" data-countup-decimals="${dec}" data-countup-suffix="${suffix}">${(0).toFixed(dec)}${suffix}</div>
+    <div class="l">${label}</div>${sub}
+  </div>`;
+}
+
+// Horizontal bar row — the workhorse for every "X out of Y" / "share of total" chart.
+// Width is expressed as a % of `max` so rows in the same group stay comparable.
+function statsHBar(label, value, max, color, rightText, opts){
+  opts = opts || {};
+  const pct = max > 0 ? Math.max(0, Math.min(100, (value/max)*100)) : 0;
+  const labelW = opts.labelWidth || '58px';
+  const sub = opts.sub ? `<div style="font-size:9.5px;color:var(--text-faint);margin-top:2px">${opts.sub}</div>` : '';
+  return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0">
+    <div style="width:${labelW};flex-shrink:0;font-size:11px;font-weight:800;color:${opts.labelColor||'var(--text-muted)'}">${label}</div>
+    <div style="flex:1;min-width:0">
+      <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.25)">
+        <div class="chart-animate hbar-grow-right" style="--target-w:${pct.toFixed(1)}%;height:100%;width:${pct.toFixed(1)}%;background:${color};border-radius:4px;box-shadow:0 0 6px color-mix(in srgb, ${color} 55%, transparent)"></div>
+      </div>
+      ${sub}
+    </div>
+    <div class="mono" style="width:${opts.valueWidth||'56px'};flex-shrink:0;text-align:right;font-size:11px;font-weight:800;color:${opts.valueColor||'var(--text)'}">${rightText}</div>
+  </div>`;
+}
+
+// Stacked proportion bar + legend — used for the activity-mix breakdown, where the point is
+// the relative split rather than any single absolute value.
+function statsStackedBar(rows, total){
+  if(!total || total <= 0){
+    return `<div style="font-size:11.5px;color:var(--text-faint);padding:6px 0">No categorised sessions in this window yet.</div>`;
+  }
+  const segs = rows.filter(r=>r.hours>0).map(r=>
+    `<div title="${r.label}" style="width:${(r.hours/total*100).toFixed(2)}%;background:${r.color}"></div>`).join('');
+  const legend = rows.filter(r=>r.hours>0).map(r=>
+    `<div style="display:flex;align-items:center;gap:6px;font-size:10.5px">
+      <span style="width:9px;height:9px;border-radius:3px;background:${r.color};flex-shrink:0"></span>
+      <span style="color:var(--text-muted);font-weight:600">${r.label}</span>
+      <span class="mono" style="color:var(--text-faint)">${r.hours}h · ${r.share}%</span>
+    </div>`).join('');
+  return `
+    <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);margin-bottom:12px;box-shadow:inset 0 1px 2px rgba(0,0,0,.25)">${segs}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:7px 12px">${legend}</div>`;
+}
+
+// Small inline delta badge (▲ / ▼ / ●) used on the momentum + comparison rows.
+function statsDeltaBadge(dir, text){
+  const map = {
+    up:   {icon:'▲', color:'var(--good)'},
+    down: {icon:'▼', color:'var(--bad)'},
+    flat: {icon:'●', color:'var(--text-faint)'},
+  };
+  const m = map[dir] || map.flat;
+  return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;color:${m.color};background:color-mix(in srgb, ${m.color} 12%, transparent);padding:3px 8px;border-radius:20px">${m.icon} ${text}</span>`;
+}
+
+// Subject selector. "Overview" plus one pill per paper; the active pill reuses the existing
+// .ptab styling so this matches the Workspace/Planner tab rows already in the app.
+function statsSubjectNav(profileId){
+  const cur = S.statsPaper;
+  const pill = (id, label, sub) => {
+    const active = cur === id;
+    return `<button class="ptab ${active?'active':''}" style="padding:7px 12px;display:inline-flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15" onclick="setStatsPaper(${id===null?'null':`'${id}'`})">
+      <span>${label}</span>
+      ${sub!==undefined ? `<span style="font-size:9px;font-weight:700;opacity:${active?'.85':'.6'}">${sub}</span>` : ''}
+    </button>`;
+  };
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+    ${pill(null, 'Overview')}
+    ${PAPERS.map(p=>pill(p.id, p.nick, paperComponents(profileId, p.id).prepScore+'%')).join('')}
+  </div>`;
+}
+function setStatsPaper(id){
+  S.statsPaper = id || null;
+  renderStatsPopup();
+  const sc = document.getElementById('stats-scroll');
+  if(sc) sc.scrollTop = 0;
+}
+
+// Component breakdown (the five inputs that average into prepScore). Shown identically on
+// the overview's per-paper ranking and on each subject page so the number is always
+// explainable rather than a black box.
+function statsCompBars(comp){
+  const rows = [
+    {label:'Lectures',   v:comp.lecPct,      color:'var(--purple)'},
+    {label:'Practice',   v:comp.practicePct, color:'var(--chetna)'},
+    {label:'Revision 1', v:comp.rev1Pct,     color:'var(--green)'},
+    {label:'Revision 2', v:comp.rev2Pct,     color:'var(--amber)'},
+    {label:'Mock avg',   v:comp.mockAvg,     color:'var(--umang)'},
+  ];
+  return rows.map(r=>statsHBar(r.label, r.v, 100, r.color, r.v+'%', {labelWidth:'72px', valueWidth:'38px'})).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATISTICS — OVERVIEW
+// Ordered deliberately: where you stand → is it moving → where the time goes → is that the
+// right place → what the outcome data (mocks) says → how it compares. Each block answers a
+// question the one above it raises.
+// ═══════════════════════════════════════════════════════════
+function statsOverview(vp, prof){
+  const overall   = overallPrep(vp);
+  const proj      = statsProjection(vp);
+  const mom       = statsMomentum(vp);
+  const hit30     = statsTargetHitRate(vp, 30);
+  const hit7      = statsTargetHitRate(vp, 7);
+  const best      = statsBestDay(vp);
+  const daysActive= activeDaysCount(vp);
   const daysSince = daysSinceFirstLog(vp);
-  const skipped = Math.max(0, daysSince-daysActive);
+  const skipped   = Math.max(0, daysSince - daysActive);
+  const logs      = logsFor(vp);
+  const alloc     = statsHoursByPaper(vp, null);
+  const alloc30   = statsHoursByPaper(vp, 30);
+  const mix       = statsHoursByCategory(vp, 30);
+  const balance   = statsBalance(vp);
+  const accent    = `var(--${prof.color})`;
+  const other     = otherProfileId(vp);
+  const otherProf = profileById(other);
+
   const lecturesDone = PAPERS.reduce((s,p)=>s+paperComponents(vp,p.id).done,0);
-  const avgMock = Math.round(PAPERS.reduce((s,p)=>s+paperComponents(vp,p.id).mockAvg,0)/PAPERS.length);
-  const overall = overallPrep(vp);
+  const allMocks = statsAllMockSeries(vp);
+  const mockAvgAll = allMocks.length ? Math.round(allMocks.reduce((s,m)=>s+m.hours,0)/allMocks.length) : 0;
+  const bestMock = allMocks.reduce((mx,m)=>Math.max(mx,m.hours), 0);
+  // Last 3 vs previous 3 mocks — a coarse but honest read on whether scores are moving.
+  let mockDir = 'flat', mockDeltaTxt = 'no trend yet';
+  if(allMocks.length >= 4){
+    const last3 = allMocks.slice(-3), prev3 = allMocks.slice(-6, -3);
+    if(prev3.length){
+      const a = last3.reduce((s,m)=>s+m.hours,0)/last3.length;
+      const b = prev3.reduce((s,m)=>s+m.hours,0)/prev3.length;
+      const d = Math.round(a-b);
+      mockDir = d>1 ? 'up' : (d < -1 ? 'down' : 'flat');
+      mockDeltaTxt = `${d>0?'+':''}${d} pts vs previous`;
+    }
+  }
+
+  const ranked = balance.slice().sort((a,b)=>b.prep-a.prep);
+  const weakest = ranked[ranked.length-1];
+  const strongest = ranked[0];
+
+  // Readiness verdict — deliberately blunt, and always tied to a number shown elsewhere on
+  // the page so it can be checked rather than just believed.
+  let verdict, verdictColor;
+  if(proj.prep >= 80){ verdict = 'Strong position — hold the pace and protect revision time.'; verdictColor='var(--good)'; }
+  else if(proj.prep >= 60){ verdict = 'On a workable track — the gap is in depth, not coverage.'; verdictColor='var(--good)'; }
+  else if(proj.prep >= 40){ verdict = 'Mid-build. Coverage is happening; revision and mocks are lagging.'; verdictColor='var(--warn)'; }
+  else { verdict = 'Early stage — prioritise finishing first-pass lectures over polishing.'; verdictColor='var(--warn)'; }
 
   return `
-  <div class="section-title">Statistics — ${prof.nick}</div>
-  <div class="card" style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
-    ${circleProgress(overall.prepScore, 76, 8, `var(--${prof.color})`, true)}
-    <div><div style="font-weight:800;font-size:14px">Overall preparation</div>
-      <div style="font-size:11.5px;color:var(--text-faint)">Averaged across all 6 papers</div></div>
-  </div>
-  <div class="stat-grid">
-    <div class="card stat-box"><div class="v" data-countup="${totalHours(vp)}" data-countup-decimals="1">0.0</div><div class="l">Total study hours</div></div>
-    <div class="card stat-box"><div class="v" data-countup="${lecturesDone}">0</div><div class="l">Lectures completed</div></div>
-    <div class="card stat-box"><div class="v" data-countup="${avgMock}" data-countup-suffix="%">0</div><div class="l">Avg mock score</div></div>
-    <div class="card stat-box"><div class="v" data-countup="${longestSession(vp)}" data-countup-decimals="1" data-countup-suffix="h">0.0</div><div class="l">Longest session</div></div>
-    <div class="card stat-box"><div class="v" data-countup="${streak(vp)}">0</div><div class="l">Current streak</div></div>
-    <div class="card stat-box"><div class="v" data-countup="${daysActive}">0</div><div class="l">Total study days</div></div>
-    <div class="card stat-box"><div class="v" data-countup="${skipped}">0</div><div class="l">Skipped days</div></div>
-    <div class="card stat-box"><div class="v" data-countup="${logs.length}">0</div><div class="l">Sessions logged</div></div>
+  <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg, color-mix(in srgb, ${accent} 10%, var(--surface)), var(--surface))">
+    <div style="display:flex;align-items:center;gap:16px">
+      ${circleProgress(overall.prepScore, 84, 9, accent, true)}
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:800;font-size:15px">Overall preparation</div>
+        <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:7px">Mean of lectures, practice, both revisions and mock average, across all 6 papers</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${statsDeltaBadge(mom.dir, `${mom.delta>0?'+':''}${mom.delta}h vs last week`)}
+          ${proj.daysLeft>0 ? `<span style="font-size:10.5px;font-weight:800;color:var(--text-muted);background:var(--surface2);padding:3px 8px;border-radius:20px">${proj.daysLeft}d to exam</span>` : ''}
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding-top:11px;border-top:1px solid var(--border);font-size:11.5px;color:${verdictColor};font-weight:700">${verdict}</div>
   </div>
 
-  <div class="section-title">Study Trend — last 4 weeks</div>
-  <div class="card">
-    ${trendChartSVG(weeklyTrendData(vp,4), 110, `var(--${prof.color})`, 'h')}
+  <div class="section-title">Headline Numbers</div>
+  <div class="stat-grid" style="margin-bottom:14px">
+    ${statsKpi(totalHours(vp), 'Total study hours', {decimals:1, suffix:'h'})}
+    ${statsKpi(hoursInRange(vp,30), 'Hours — last 30d', {decimals:1, suffix:'h'})}
+    ${statsKpi(statsAvgPerActiveDay(vp), 'Avg / active day', {decimals:1, suffix:'h'})}
+    ${statsKpi(streak(vp), 'Current streak', {suffix:'d'})}
+    ${statsKpi(hit30.pct, 'Target hit rate 30d', {suffix:'%', sub:`${hit30.hit}/${hit30.total} days ≥ ${hit30.target}h`})}
+    ${statsKpi(daysActive, 'Days studied', {sub:`${skipped} skipped of ${daysSince}`})}
+    ${statsKpi(lecturesDone, 'Lectures completed')}
+    ${statsKpi(logs.length, 'Sessions logged')}
+    ${statsKpi(best.hours, 'Best single day', {decimals:1, suffix:'h', sub: best.date || '—'})}
+    ${statsKpi(longestSession(vp), 'Longest session', {decimals:1, suffix:'h'})}
+  </div>
+
+  <div class="section-title">Momentum &amp; Pace</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="flex:1;min-width:120px">
+        <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">This week</div>
+        <div class="mono" style="font-size:21px;font-weight:800;color:${accent}">${mom.recent}h</div>
+        <div style="font-size:10.5px;color:var(--text-faint)">previous week ${mom.prev}h</div>
+      </div>
+      <div style="flex:1;min-width:120px">
+        <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Daily average (30d)</div>
+        <div class="mono" style="font-size:21px;font-weight:800;color:${proj.onTrack?'var(--good)':'var(--warn)'}">${proj.avgDaily}h</div>
+        <div style="font-size:10.5px;color:var(--text-faint)">target ${proj.target}h · ${proj.onTrack?'on track':'below target'}</div>
+      </div>
+      <div style="flex:1;min-width:120px">
+        <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Target hit — 7d</div>
+        <div class="mono" style="font-size:21px;font-weight:800;color:${hit7.pct>=70?'var(--good)':(hit7.pct>=40?'var(--warn)':'var(--bad)')}">${hit7.hit}/7</div>
+        <div style="font-size:10.5px;color:var(--text-faint)">${hit7.pct}% of days</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);padding-top:11px;border-top:1px solid var(--border)">
+      ${proj.daysLeft>0
+        ? `To close the remaining <b style="color:var(--text-muted)">${proj.gap}</b> preparation points in <b style="color:var(--text-muted)">${proj.daysLeft}</b> days you need roughly <b style="color:${accent}">${proj.requiredPerDay}</b> points/day. This is a coverage-pace guide, not a promise — it assumes effort converts to progress at the rate it has so far.`
+        : `Exam date has passed or isn't set — pace projection unavailable.`}
+    </div>
+  </div>
+
+  <div class="section-title">Study Hours — last 12 weeks</div>
+  <div class="card" style="margin-bottom:14px">
+    ${trendChartSVG(weeklyTrendData(vp,12), 128, accent, 'h')}
   </div>
 
   <div class="section-title">Daily Consistency — last 4 weeks</div>
-  <div class="card">${dailyConsistencyBars(vp)}</div>
+  <div class="card" style="margin-bottom:14px">${dailyConsistencyBars(vp)}</div>
 
-  <div class="section-title">Lecture Completion Trends</div>
+  <div class="section-title">Where the Time Actually Goes</div>
   <div class="card" style="margin-bottom:14px">
-    <div class="stat-grid" style="margin-bottom:14px">
-      <div class="card stat-box"><div class="v" data-countup="${lecturesCompletedInRange(vp,1)}">0</div><div class="l">Completed today</div></div>
-      <div class="card stat-box"><div class="v" data-countup="${lecturesCompletedInRange(vp,7)}">0</div><div class="l">This week</div></div>
-      <div class="card stat-box"><div class="v" data-countup="${lecturesCompletedThisMonth(vp)}">0</div><div class="l">This month</div></div>
-      <div class="card stat-box"><div class="v" data-countup="${lecturesCompletedInRange(vp,30)/30}" data-countup-decimals="1">0.0</div><div class="l">Avg/day (30d)</div></div>
-    </div>
-    <div style="display:flex;gap:18px;flex-wrap:wrap">
-      <div style="flex:1;min-width:140px">
-        <div style="font-size:10.5px;font-weight:700;color:var(--text-faint);margin-bottom:6px">Paper 4 — DT</div>
-        ${trendChartSVG(weeklyLectureTrendDataForPaper(vp,'dt',4), 80, `var(--purple)`, '')}
-      </div>
-      <div style="flex:1;min-width:140px">
-        <div style="font-size:10.5px;font-weight:700;color:var(--text-faint);margin-bottom:6px">Paper 5 — IDT</div>
-        ${trendChartSVG(weeklyLectureTrendDataForPaper(vp,'idt',4), 80, `var(--green)`, '')}
-      </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px">Hours logged per paper, all time. Percentages are share of total tracked time.</div>
+    ${alloc.total > 0 ? alloc.rows.slice().sort((a,b)=>b.hours-a.hours).map(r=>{
+      const maxH = Math.max(...alloc.rows.map(x=>x.hours), 1);
+      return statsHBar(r.nick, r.hours, maxH, `var(--${r.id==='fr'?'umang':r.id==='afm'?'purple':r.id==='audit'?'green':r.id==='dt'?'amber':r.id==='idt'?'chetna':'bronze'})`,
+        `${r.hours}h`, {sub:`${r.share}% of total`, labelWidth:'46px'});
+    }).join('') : `<div style="font-size:11.5px;color:var(--text-faint)">No study time logged against specific papers yet.</div>`}
+    ${alloc.unassigned > 0 ? `<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);font-size:10.5px;color:var(--text-faint)">
+      <b class="mono">${alloc.unassigned}h</b> logged in general sessions without a paper selected — not attributed above.</div>` : ''}
+  </div>
+
+  <div class="section-title">Effort vs Progress — balance check</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:11px">Each paper's preparation score against its share of your time. A low score with a low time share is the real risk; a high score on little time just means that paper comes easily.</div>
+    ${balance.map(r=>{
+      const flagColor = r.flag==='behind' ? 'var(--bad)' : (r.flag==='ahead' ? 'var(--good)' : 'var(--text-faint)');
+      const flagText  = r.flag==='behind' ? 'behind average' : (r.flag==='ahead' ? 'ahead' : 'on par');
+      const stale = r.lastStudied.daysAgo;
+      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
+          <div style="width:46px;font-size:11.5px;font-weight:800;color:${accent}">${r.nick}</div>
+          <div class="mono" style="font-size:12px;font-weight:800">${r.prep}%</div>
+          <div style="font-size:10px;font-weight:700;color:${flagColor}">${flagText}</div>
+          <div style="flex:1"></div>
+          <div style="font-size:10.5px;color:var(--text-faint)" class="mono">${r.hours}h · ${r.share}%</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden" title="Preparation">
+            <div class="chart-animate hbar-grow-right" style="--target-w:${r.prep}%;height:100%;width:${r.prep}%;background:${accent};border-radius:3px"></div>
+          </div>
+          <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden" title="Share of time">
+            <div class="chart-animate hbar-grow-right" style="--target-w:${r.share}%;height:100%;width:${r.share}%;background:var(--text-faint);border-radius:3px"></div>
+          </div>
+        </div>
+        <div style="font-size:9.5px;color:var(--text-faint);margin-top:4px">
+          ${stale===null ? 'never studied' : (stale===0 ? 'studied today' : `last studied ${stale}d ago`)}
+          &nbsp;·&nbsp; <span style="opacity:.7">solid = preparation, grey = time share</span>
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="padding-top:11px;font-size:11px;color:var(--text-faint)">
+      Strongest: <b style="color:var(--good)">${strongest.nick} ${strongest.prep}%</b> &nbsp;·&nbsp;
+      Weakest: <b style="color:var(--bad)">${weakest.nick} ${weakest.prep}%</b> &nbsp;·&nbsp;
+      Spread: <b class="mono" style="color:var(--text-muted)">${strongest.prep - weakest.prep} pts</b>
     </div>
   </div>
 
-  <div class="section-title">Chapter Completion — All Papers</div>
-  <div class="card">
-    ${PAPERS.map(p=>{
-      const chs = chaptersFor(vp, p.id);
-      const done = chs.filter(c=>c.lecDone && c.practice && c.rev1 && c.rev2).length;
-      const partial = chs.filter(c=>(c.lecDone||c.practice||c.rev1||c.rev2) && !(c.lecDone&&c.practice&&c.rev1&&c.rev2)).length;
-      const pct = chs.length ? Math.round((done/chs.length)*100) : 0;
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-        <div style="width:52px;font-size:11px;font-weight:800;color:var(--active-accent,var(--umang))">${p.nick}</div>
-        <div style="flex:1">
-          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-            <span>${done}/${chs.length} complete</span>
-            <span style="color:var(--text-faint)">${partial} in progress</span>
-          </div>
-          <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)">
-            <div style="height:100%;width:${pct}%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));box-shadow:0 0 6px color-mix(in srgb,var(--active-accent,var(--umang)) 60%,transparent)"></div>
-          </div>
+  <div class="section-title">Activity Mix — last 30 days</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:11px">How recent study time split across activity types. A mix dominated by lectures with little revision or practice is the classic first-pass trap.</div>
+    ${statsStackedBar(mix.rows, mix.total)}
+    ${mix.untagged > 0 ? `<div style="margin-top:10px;font-size:10.5px;color:var(--text-faint)"><b class="mono">${mix.untagged}h</b> logged without an activity type.</div>` : ''}
+  </div>
+
+  <div class="section-title">Mock Performance</div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="stat-grid" style="margin-bottom:14px">
+      ${statsKpi(mockAvgAll, 'Average score', {suffix:'%'})}
+      ${statsKpi(bestMock, 'Best score', {suffix:'%'})}
+      ${statsKpi(allMocks.length, 'Mocks taken')}
+      ${statsKpi(PAPERS.filter(p=>mockScoresFor(vp,p.id).length>0).length, 'Papers tested', {sub:`of ${PAPERS.length}`})}
+    </div>
+    ${allMocks.length >= 2
+      ? `<div style="margin-bottom:8px">${trendChartSVG(allMocks, 118, 'var(--green)', '%')}</div>
+         <div style="font-size:10.5px;color:var(--text-faint);display:flex;align-items:center;gap:8px">
+           ${statsDeltaBadge(mockDir, mockDeltaTxt)}
+           <span>every mock across all papers, oldest to newest</span>
+         </div>`
+      : `<div style="font-size:11.5px;color:var(--text-faint)">Log at least two mock scores to see a performance trend.</div>`}
+    ${allMocks.length ? `<div style="margin-top:13px;padding-top:11px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Average by paper</div>
+      ${PAPERS.map(p=>{
+        const sc = mockScoresFor(vp,p.id);
+        if(!sc.length) return '';
+        const avg = Math.round(sc.reduce((s,x)=>s+safeChartNum(x.score),0)/sc.length);
+        const col = avg>=60?'var(--good)':(avg>=40?'var(--amber)':'var(--bad)');
+        return statsHBar(p.nick, avg, 100, col, `${avg}%`, {sub:`${sc.length} mock${sc.length>1?'s':''}`, labelWidth:'46px', valueWidth:'40px'});
+      }).join('')}
+    </div>` : ''}
+  </div>
+
+  ${statsLecturePipelineBlock(vp, accent)}
+
+  <div class="section-title">Head to Head — ${prof.nick} vs ${otherProf.nick}</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:6px">Six normalised dimensions, both profiles overlaid. Comparison is context, not a scoreboard — different papers carry different workloads.</div>
+    ${radarSVG()}
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    ${statsCompareRows(vp, other, prof, otherProf)}
+  </div>
+  <div class="section-title">Weekly Hours — both profiles</div>
+  <div class="card" style="margin-bottom:14px">
+    ${dualTrendChartSVG(weeklyTrendData('umang',8), weeklyTrendData('chetna',8),
+      'var(--umang)', 'var(--chetna)', 140, 2)}
+  </div>
+
+  <div class="section-title">Per-Paper Readiness</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px">Ranked strongest to weakest. Tap any paper above for its full breakdown.</div>
+    ${ranked.map((r,i)=>{
+      const col = r.prep>=70?'var(--good)':(r.prep>=45?'var(--amber)':'var(--bad)');
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="setStatsPaper('${r.id}')">
+        <div style="width:17px;font-size:10.5px;font-weight:800;color:var(--text-faint)">${i+1}</div>
+        <div style="width:46px;font-size:11.5px;font-weight:800;color:${accent}">${r.nick}</div>
+        <div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden">
+          <div class="chart-animate hbar-grow-right" style="--target-w:${r.prep}%;height:100%;width:${r.prep}%;background:${col};border-radius:4px"></div>
         </div>
-        <div style="font-size:11px;font-weight:800;width:34px;text-align:right" data-countup="${pct}" data-countup-suffix="%">0%</div>
+        <div class="mono" style="width:38px;text-align:right;font-size:11.5px;font-weight:800;color:${col}">${r.prep}%</div>
+        <div style="color:var(--text-faint);font-size:13px">›</div>
       </div>`;
     }).join('')}
   </div>
 
+  ${statsAiCoachBlock(vp)}
+  `;
+}
+
+// Lecture pipeline — DT/IDT only, since they're the only papers with a real Lecture Tracker.
+// Rendered as its own block so the overview degrades cleanly if neither has lectures loaded.
+function statsLecturePipelineBlock(vp, accent){
+  const paces = LECTURE_TRACKER_PAPERS.map(pid=>({pid, paper:PAPERS.find(p=>p.id===pid), pace:statsLecturePace(vp,pid)}))
+    .filter(x=>x.pace && x.pace.total>0);
+  if(!paces.length) return '';
+  const totalOverdue = paces.reduce((s,x)=>s+x.pace.overdue,0);
+  return `
+  <div class="section-title">Lecture Pipeline</div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="stat-grid" style="margin-bottom:14px">
+      ${statsKpi(lecturesCompletedInRange(vp,7), 'Completed this week')}
+      ${statsKpi(lecturesCompletedThisMonth(vp), 'Completed this month')}
+      ${statsKpi(lecturesCompletedInRange(vp,30)/30, 'Avg per day (30d)', {decimals:1})}
+      ${statsKpi(totalOverdue, 'Past target date', {sub: totalOverdue>0?'needs rescheduling':'all on schedule'})}
+    </div>
+    ${paces.map(x=>{
+      const p = x.pace;
+      return `<div style="padding:11px 0;border-top:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px">
+          <div style="font-size:11.5px;font-weight:800;color:${accent}">${x.paper.code} — ${x.paper.nick}</div>
+          <div style="flex:1"></div>
+          <div class="mono" style="font-size:11px;font-weight:800">${p.done}/${p.total}</div>
+          <div class="mono" style="font-size:11px;color:var(--text-faint)">${p.pct}%</div>
+        </div>
+        <div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:7px">
+          <div class="chart-animate hbar-grow-right" style="--target-w:${p.pct}%;height:100%;width:${p.pct}%;background:linear-gradient(135deg,${accent},var(--active-accent-2,var(--umang-2)));border-radius:4px"></div>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--text-faint)">
+          <span><b class="mono" style="color:var(--text-muted)">${p.remaining}</b> remaining</span>
+          <span><b class="mono" style="color:var(--text-muted)">${p.perWeek}</b>/week recent pace</span>
+          ${p.overdue>0 ? `<span style="color:var(--bad)"><b class="mono">${p.overdue}</b> overdue</span>` : ''}
+          <span>${p.eta ? `finishes ~<b class="mono" style="color:var(--text-muted)">${p.eta}</b>` : (p.remaining===0 ? 'complete' : 'pace unknown — no recent completions')}</span>
+        </div>
+        <div style="margin-top:9px">${trendChartSVG(weeklyLectureTrendDataForPaper(vp, x.pid, 6), 74, x.pid==='dt'?'var(--purple)':'var(--green)', '')}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// Side-by-side metric rows for the two profiles. Each row shows both values on a shared
+// scale so the gap is visible without needing to read the numbers.
+function statsCompareRows(vp, other, prof, otherProf){
+  const a = overallPrep(vp), b = overallPrep(other);
+  const rows = [
+    {label:'Preparation',    av:a.prepScore,                 bv:b.prepScore,                 suffix:'%'},
+    {label:'Lectures',       av:a.lecPct,                    bv:b.lecPct,                    suffix:'%'},
+    {label:'Revision 1',     av:a.rev1Pct,                   bv:b.rev1Pct,                   suffix:'%'},
+    {label:'Revision 2',     av:a.rev2Pct,                   bv:b.rev2Pct,                   suffix:'%'},
+    {label:'Practice',       av:a.practicePct,               bv:b.practicePct,               suffix:'%'},
+    {label:'Mock average',   av:a.mockAvg,                   bv:b.mockAvg,                   suffix:'%'},
+    {label:'Hours — 30d',    av:Number(hoursInRange(vp,30).toFixed(1)),   bv:Number(hoursInRange(other,30).toFixed(1)),   suffix:'h', raw:true},
+    {label:'Current streak', av:streak(vp),                  bv:streak(other),               suffix:'d', raw:true},
+  ];
+  const colA = `var(--${prof.color})`, colB = `var(--${otherProf.color})`;
+  return `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:10.5px;font-weight:800">
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:${colA}"></span>${prof.nick}</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:${colB}"></span>${otherProf.nick}</span>
+    </div>
+    ${rows.map(r=>{
+      const max = r.raw ? Math.max(r.av, r.bv, 1) : 100;
+      const lead = r.av > r.bv ? 'a' : (r.bv > r.av ? 'b' : 'tie');
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:5px">
+          <span style="font-weight:700;color:var(--text-muted)">${r.label}</span>
+          <span class="mono" style="font-size:10.5px">
+            <b style="color:${colA};${lead==='a'?'':'opacity:.65'}">${r.av}${r.suffix}</b>
+            <span style="color:var(--text-faint)"> / </span>
+            <b style="color:${colB};${lead==='b'?'':'opacity:.65'}">${r.bv}${r.suffix}</b>
+          </span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+            <div class="chart-animate hbar-grow-right" style="--target-w:${Math.min(100,(r.av/max)*100).toFixed(1)}%;height:100%;width:${Math.min(100,(r.av/max)*100).toFixed(1)}%;background:${colA};border-radius:3px"></div>
+          </div>
+          <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+            <div class="chart-animate hbar-grow-right" style="--target-w:${Math.min(100,(r.bv/max)*100).toFixed(1)}%;height:100%;width:${Math.min(100,(r.bv/max)*100).toFixed(1)}%;background:${colB};border-radius:3px"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+// AI Coach — unchanged behaviour, extracted so both Overview and subject pages can host it
+// without duplicating the own-profile guard.
+function statsAiCoachBlock(vp){
+  return `
   <div class="section-title"><span>AI Coach</span><button class="ai-info-btn" onclick="showAiInfo('coach')" title="How to use AI Coach">ⓘ</button></div>
   <div class="card">
     ${vp === S.local.myProfile ? `
@@ -11516,6 +12187,237 @@ function viewStats(){
       <button class="btn btn-accent" onclick="generateAiInsights()" ${S.aiLoading?'disabled':''}>${S.local.aiInsights?'Regenerate Insights':'Generate My Study Insights'}</button>
       <div style="margin-top:14px">${aiInsightsBlock()}</div>
     ` : `<div style="color:var(--text-faint);font-size:12px">Switch to your own profile to generate your personal AI insights.</div>`}
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATISTICS — SINGLE SUBJECT
+// Everything the overview says about all six papers, said properly about one. Structure
+// mirrors the overview (standing → components → pipeline → outcomes → time → comparison) so
+// switching between subjects never means relearning the layout.
+// ═══════════════════════════════════════════════════════════
+function statsSubjectView(vp, prof, paperId){
+  const paper  = PAPERS.find(p=>p.id===paperId);
+  if(!paper) { S.statsPaper = null; return statsOverview(vp, prof); }
+  const comp   = paperComponents(vp, paperId);
+  const accent = `var(--${prof.color})`;
+  const other  = otherProfileId(vp);
+  const otherProf = profileById(other);
+  const otherComp = paperComponents(other, paperId);
+  const funnel = statsChapterFunnel(vp, paperId);
+  const pace   = statsLecturePace(vp, paperId);
+  const mocks  = statsMockSeries(vp, paperId);
+  const hoursAll = statsPaperHours(vp, paperId, null);
+  const hours30  = statsPaperHours(vp, paperId, 30);
+  const alloc    = statsHoursByPaper(vp, null);
+  const share    = alloc.total>0 ? Math.round(hoursAll/alloc.total*100) : 0;
+  const last     = statsLastStudied(vp, paperId);
+  const mix      = statsHoursByCategory(vp, null, paperId);
+  const sessions = logsFor(vp).filter(l=>l.paperId===paperId).length;
+  const chs      = chaptersFor(vp, paperId) || [];
+  const avgPrep  = overallPrep(vp).prepScore;
+  const rel      = comp.prepScore - avgPrep;
+
+  const mockAvg  = comp.mockAvg;
+  const bestMock = mocks.length ? Math.max(...mocks.map(m=>m.hours)) : 0;
+  const lastMock = mocks.length ? mocks[mocks.length-1].hours : null;
+
+  // Weakest component drives the "focus next" line — it's the single most actionable thing
+  // this page can say, and it's derived, not hardcoded.
+  const compList = [
+    {k:'lectures',   label:'first-pass lectures', v:comp.lecPct},
+    {k:'practice',   label:'practice questions',  v:comp.practicePct},
+    {k:'rev1',       label:'first revision',      v:comp.rev1Pct},
+    {k:'rev2',       label:'second revision',     v:comp.rev2Pct},
+    {k:'mock',       label:'mock tests',          v:comp.mockAvg},
+  ].sort((a,b)=>a.v-b.v);
+  const focus = compList[0];
+
+  return `
+  <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg, color-mix(in srgb, ${accent} 10%, var(--surface)), var(--surface))">
+    <div style="display:flex;align-items:center;gap:16px">
+      ${circleProgress(comp.prepScore, 78, 9, accent, true)}
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:800;font-size:14px">${paper.code} — ${paper.nick}</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-bottom:7px">${escChat(paper.name)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${statsDeltaBadge(rel>3?'up':(rel< -3?'down':'flat'), `${rel>0?'+':''}${rel} pts vs your average`)}
+          ${last.daysAgo===null
+            ? `<span style="font-size:10.5px;font-weight:800;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);padding:3px 8px;border-radius:20px">never studied</span>`
+            : (last.daysAgo>=7 ? `<span style="font-size:10.5px;font-weight:800;color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent);padding:3px 8px;border-radius:20px">${last.daysAgo}d since last session</span>` : '')}
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding-top:11px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-muted)">
+      Weakest component is <b style="color:${accent}">${focus.label}</b> at <b class="mono">${focus.v}%</b> — the highest-leverage place to spend the next session on this paper.
+    </div>
+  </div>
+
+  <div class="section-title">Key Numbers — ${paper.nick}</div>
+  <div class="stat-grid" style="margin-bottom:14px">
+    ${statsKpi(hoursAll, 'Hours invested', {decimals:1, suffix:'h', sub:`${share}% of all study time`})}
+    ${statsKpi(hours30, 'Hours — last 30d', {decimals:1, suffix:'h'})}
+    ${statsKpi(sessions, 'Sessions logged')}
+    ${statsKpi(funnel.total, 'Chapters tracked', {sub:`${funnel.fullyDone} fully complete`})}
+    ${statsKpi(mockAvg, 'Mock average', {suffix:'%', sub: mocks.length?`${mocks.length} taken`:'none yet'})}
+    ${statsKpi(bestMock, 'Best mock', {suffix:'%'})}
+  </div>
+
+  <div class="section-title">Preparation Breakdown</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px">The five inputs averaged into this paper's ${comp.prepScore}% score.</div>
+    ${statsCompBars(comp)}
+  </div>
+
+  <div class="section-title">Chapter Pipeline</div>
+  <div class="card" style="margin-bottom:14px">
+    ${funnel.total ? `
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:96px;text-align:center;padding:10px;background:color-mix(in srgb,var(--good) 8%,var(--surface));border-radius:var(--radius-sm)">
+          <div class="mono" style="font-size:19px;font-weight:800;color:var(--good)" data-countup="${funnel.fullyDone}">0</div>
+          <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em">All 4 stages</div>
+        </div>
+        <div style="flex:1;min-width:96px;text-align:center;padding:10px;background:color-mix(in srgb,var(--amber) 8%,var(--surface));border-radius:var(--radius-sm)">
+          <div class="mono" style="font-size:19px;font-weight:800;color:var(--amber)" data-countup="${funnel.inProgress}">0</div>
+          <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em">In progress</div>
+        </div>
+        <div style="flex:1;min-width:96px;text-align:center;padding:10px;background:color-mix(in srgb,var(--bad) 8%,var(--surface));border-radius:var(--radius-sm)">
+          <div class="mono" style="font-size:19px;font-weight:800;color:var(--bad)" data-countup="${funnel.untouched}">0</div>
+          <div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em">Untouched</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Chapters clearing each stage</div>
+      ${funnel.stages.map(s=>statsHBar(s.label, s.count, funnel.total, s.color,
+          `${s.count}/${funnel.total}`, {labelWidth:'86px', valueWidth:'48px'})).join('')}
+    ` : `<div style="font-size:11.5px;color:var(--text-faint)">No chapters tracked for this paper yet.</div>`}
+  </div>
+
+  ${funnel.total ? `
+  <div class="section-title">Chapter Detail</div>
+  <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">
+    <div style="display:flex;gap:8px;padding:9px 13px;border-bottom:1px solid var(--border);font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em">
+      <div style="flex:1">Chapter</div>
+      <div style="width:106px;display:flex;gap:6px;justify-content:flex-end">
+        <span style="width:20px;text-align:center">Lec</span>
+        <span style="width:20px;text-align:center">Prc</span>
+        <span style="width:20px;text-align:center">R1</span>
+        <span style="width:20px;text-align:center">R2</span>
+      </div>
+    </div>
+    ${chs.map(c=>{
+      const dot = (on,col)=>`<span style="width:20px;display:flex;justify-content:center"><span style="width:11px;height:11px;border-radius:50%;background:${on?col:'var(--surface2)'};border:1.5px solid ${on?col:'var(--border)'};box-shadow:${on?`0 0 5px color-mix(in srgb, ${col} 60%, transparent)`:'none'}"></span></span>`;
+      const doneCount = [c.lecDone,c.practice,c.rev1,c.rev2].filter(Boolean).length;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0;font-size:11.5px;${doneCount===4?'color:var(--text-faint)':''}">
+          ${escChat(c.name)}
+          ${doneCount===4?'<span style="color:var(--good);margin-left:5px">✓</span>':''}
+        </div>
+        <div style="width:106px;display:flex;gap:6px;justify-content:flex-end">
+          ${dot(c.lecDone,'var(--purple)')}${dot(c.practice,'var(--chetna)')}${dot(c.rev1,'var(--green)')}${dot(c.rev2,'var(--amber)')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>` : ''}
+
+  ${pace && pace.total>0 ? `
+  <div class="section-title">Lecture Tracker</div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="stat-grid" style="margin-bottom:14px">
+      ${statsKpi(pace.done, 'Lectures done', {sub:`of ${pace.total}`})}
+      ${statsKpi(pace.remaining, 'Remaining')}
+      ${statsKpi(pace.perWeek, 'Pace / week', {decimals:1, sub:'measured over 28d'})}
+      ${statsKpi(pace.overdue, 'Past target date', {sub: pace.overdue>0?'needs rescheduling':'on schedule'})}
+    </div>
+    <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:8px">
+      <div class="chart-animate hbar-grow-right" style="--target-w:${pace.pct}%;height:100%;width:${pace.pct}%;background:linear-gradient(135deg,${accent},var(--active-accent-2,var(--umang-2)));border-radius:4px"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:12px">
+      ${pace.remaining===0
+        ? 'All tracked lectures complete.'
+        : (pace.eta
+            ? `At the recent pace of <b class="mono" style="color:var(--text-muted)">${pace.perWeek}/week</b>, the remaining <b class="mono" style="color:var(--text-muted)">${pace.remaining}</b> finish around <b class="mono" style="color:${accent}">${pace.eta}</b> (~${pace.weeksLeft} weeks).`
+            : `No lectures completed in the last 28 days, so there's no measured pace to project a finish date from.`)}
+    </div>
+    <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Completions per week — last 8 weeks</div>
+    ${trendChartSVG(weeklyLectureTrendDataForPaper(vp, paperId, 8), 96, accent, '')}
+  </div>` : ''}
+
+  <div class="section-title">Mock History</div>
+  <div class="card" style="margin-bottom:14px">
+    ${mocks.length >= 2
+      ? `${trendChartSVG(mocks, 118, 'var(--green)', '%')}
+         <div style="margin-top:12px;padding-top:11px;border-top:1px solid var(--border)">
+           ${mocks.slice().reverse().map(m=>{
+             const col = m.hours>=60?'var(--good)':(m.hours>=40?'var(--amber)':'var(--bad)');
+             return `<div style="display:flex;align-items:center;gap:9px;padding:6px 0;font-size:11px">
+               <span class="mono" style="color:var(--text-faint);width:46px">${m.raw.date.slice(5)}</span>
+               <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escChat(m.raw.label||'Mock')}</span>
+               <span class="mono" style="font-weight:800;color:${col}">${m.hours}%</span>
+             </div>`;
+           }).join('')}
+         </div>`
+      : (mocks.length === 1
+          ? `<div style="font-size:11.5px;color:var(--text-muted)">One mock recorded: <b class="mono">${mocks[0].hours}%</b> on ${mocks[0].raw.date}. A second gives you a trend.</div>`
+          : `<div style="font-size:11.5px;color:var(--text-faint)">No mocks logged for this paper yet — mock average currently counts as 0 in the ${comp.prepScore}% preparation score above.</div>`)}
+    ${lastMock!==null && mocks.length>=2 ? `<div style="margin-top:10px;font-size:10.5px;color:var(--text-faint)">Latest <b class="mono" style="color:var(--text-muted)">${lastMock}%</b> · best <b class="mono" style="color:var(--text-muted)">${bestMock}%</b> · average <b class="mono" style="color:var(--text-muted)">${mockAvg}%</b></div>` : ''}
+  </div>
+
+  <div class="section-title">Time Invested — ${paper.nick}</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Weekly hours — last 8 weeks</div>
+    ${trendChartSVG(statsPaperWeeklyHours(vp, paperId, 8), 112, accent, 'h')}
+    ${mix.total > 0 ? `
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px">Activity mix on this paper</div>
+        ${statsStackedBar(mix.rows, mix.total)}
+      </div>` : ''}
+  </div>
+
+  <div class="section-title">${prof.nick} vs ${otherProf.nick} — ${paper.nick}</div>
+  <div class="card" style="margin-bottom:14px">
+    ${(()=>{
+      const colA = `var(--${prof.color})`, colB = `var(--${otherProf.color})`;
+      const rows = [
+        {label:'Preparation', av:comp.prepScore,   bv:otherComp.prepScore,   suffix:'%'},
+        {label:'Lectures',    av:comp.lecPct,      bv:otherComp.lecPct,      suffix:'%'},
+        {label:'Practice',    av:comp.practicePct, bv:otherComp.practicePct, suffix:'%'},
+        {label:'Revision 1',  av:comp.rev1Pct,     bv:otherComp.rev1Pct,     suffix:'%'},
+        {label:'Revision 2',  av:comp.rev2Pct,     bv:otherComp.rev2Pct,     suffix:'%'},
+        {label:'Mock average',av:comp.mockAvg,     bv:otherComp.mockAvg,     suffix:'%'},
+        {label:'Hours',       av:hoursAll,         bv:statsPaperHours(other,paperId,null), suffix:'h', raw:true},
+      ];
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:10.5px;font-weight:800">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:${colA}"></span>${prof.nick}</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:${colB}"></span>${otherProf.nick}</span>
+      </div>
+      ${rows.map(r=>{
+        const max = r.raw ? Math.max(r.av, r.bv, 1) : 100;
+        const lead = r.av > r.bv ? 'a' : (r.bv > r.av ? 'b' : 'tie');
+        return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:5px">
+            <span style="font-weight:700;color:var(--text-muted)">${r.label}</span>
+            <span class="mono">
+              <b style="color:${colA};${lead==='a'?'':'opacity:.65'}">${r.av}${r.suffix}</b>
+              <span style="color:var(--text-faint)"> / </span>
+              <b style="color:${colB};${lead==='b'?'':'opacity:.65'}">${r.bv}${r.suffix}</b>
+            </span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+              <div class="chart-animate hbar-grow-right" style="--target-w:${Math.min(100,(r.av/max)*100).toFixed(1)}%;height:100%;width:${Math.min(100,(r.av/max)*100).toFixed(1)}%;background:${colA};border-radius:3px"></div>
+            </div>
+            <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+              <div class="chart-animate hbar-grow-right" style="--target-w:${Math.min(100,(r.bv/max)*100).toFixed(1)}%;height:100%;width:${Math.min(100,(r.bv/max)*100).toFixed(1)}%;background:${colB};border-radius:3px"></div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}`;
+    })()}
+  </div>
+
+  <div class="card" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-accent" style="flex:1;min-width:140px" onclick="exitStatsPopup(); openWorkspaceFor('${vp}','${paperId}','chapters')">Open ${paper.nick} workspace</button>
+    <button class="btn" style="flex:1;min-width:120px" onclick="setStatsPaper(null)">← All papers</button>
   </div>
   `;
 }
