@@ -2692,7 +2692,7 @@ function buildDefaultShared(){
     PAPERS.forEach(pp=>{
       papers[p.id][pp.id] = blankPaperStats();
       chapters[p.id][pp.id] = defaultChaptersFor(pp.id);
-      lectures[p.id][pp.id] = pp.id==='idt' ? freshIdtLectures(p.id) : pp.id==='dt' ? freshDtLectures() : [];
+      lectures[p.id][pp.id] = pp.id==='idt' ? freshIdtLectures(p.id) : pp.id==='dt' ? freshDtLectures(p.id) : [];
       mockScores[p.id][pp.id] = [];
     });
   });
@@ -2755,14 +2755,18 @@ function freshIdtLectures(profileId){
     targetDate:null, remarks:'', status:'pending', completionDate:null
   }));
 }
-// Same schedule for both profiles — see DT_LECTURE_SCHEDULE above. Duration left blank
-// throughout (per instruction — "will add later"), and target dates come straight from the
-// uploaded sheet where it had them (roughly the first third of lectures; the rest are null,
-// same as how a lecture with no planned date normally looks in this app).
-function freshDtLectures(){
+// Lecture numbering/topics are the same shared schedule for both profiles (same course,
+// same faculty) — see DT_LECTURE_SCHEDULE above. The *target dates* baked into that
+// constant are NOT generic defaults though: they're Umang's own personal pacing plan from
+// his uploaded sheet. Only apply them when seeding Umang's own list; any other profile
+// starts with targetDate:null, same as a freshly-added lecture normally looks, so they set
+// their own pace instead of silently inheriting his. (This was the bug behind Chetna seeing
+// his Aug 10 DT schedule show up as her own overdue Planner tasks — see the heal below for
+// cleaning up data that was already seeded wrong before this fix.)
+function freshDtLectures(profileId){
   return DT_LECTURE_SCHEDULE.map(row=>({
     id:uid(), num:row.l, section:row.s, topic:row.t, duration:'',
-    targetDate:row.dt||null, remarks:'', status:'pending', completionDate:null
+    targetDate:(profileId==='umang' ? (row.dt||null) : null), remarks:'', status:'pending', completionDate:null
   }));
 }
 function buildDefaultLocal(){
@@ -2903,7 +2907,26 @@ function migrateShared(data){
         const looksSeeded = list.some(l=> l.num==='1.1' && l.topic==='Basic 1');
         const hasRealProgress = list.some(l=> l.status!=='pending' || l.completionDate);
         if(!looksSeeded && !hasRealProgress){
-          data.lectures[p.id][pp.id] = freshDtLectures();
+          data.lectures[p.id][pp.id] = freshDtLectures(p.id);
+        }
+        // One-time heal: before the fix above, this re-seed always used Umang's baked-in
+        // target dates regardless of which profile it was seeding, so a non-Umang profile
+        // (Chetna) already synced here may still be carrying his dates from before today —
+        // and each one silently became a real overdue Planner task via the backfill below,
+        // then kept getting rolled forward daily by rolloverOverdueTasks(). Only strips a
+        // date that still exactly matches what the shared schedule would have set for that
+        // lecture number — if the profile owner deliberately changed a date themselves
+        // in the meantime, it won't match anymore, so this leaves it alone.
+        if(p.id!=='umang'){
+          const foreignDateFor = {};
+          DT_LECTURE_SCHEDULE.forEach(row=>{ if(row.dt) foreignDateFor[row.l] = row.dt; });
+          data.lectures[p.id][pp.id].forEach(l=>{
+            if(l.targetDate && foreignDateFor[l.num]===l.targetDate){
+              l.targetDate = null;
+              data.tasks[p.id] = data.tasks[p.id].filter(t=>
+                !(t.linkType==='lecture' && t.paperId==='dt' && t.refId===l.id && !t.done));
+            }
+          });
         }
       }
       if(!data.mockScores[p.id][pp.id]) data.mockScores[p.id][pp.id] = [];
