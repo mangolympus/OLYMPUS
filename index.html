@@ -6272,10 +6272,10 @@ function renderTargetsPopup(){
     const d = new Date(t.date+'T00:00:00');
     const dateBadge = d.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
     return `<div class="target-row">
-      <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('Update this target from the Lecture Completion settings.')":`togglePlannerTarget('${profileId}','${t.id}');renderTargetsPopup()`}"></div>
+      <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`togglePlannerTarget('${profileId}','${t.id}');renderTargetsPopup()`}"></div>
       <span style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:var(--surface2);color:var(--text-muted)">${dateBadge}</span>
       <div style="flex:1;min-width:0;${t.isDone?'text-decoration:line-through;opacity:.55':''}">${escChat(t.text)}${isAuto?` <span style="font-size:9px">📘</span>`:''}</div>
-      <button class="icon-btn" style="width:22px;height:22px;flex-shrink:0" onclick="${isAuto?"showToast('Update this target from the Lecture Completion settings.')":`deletePlannerTarget('${profileId}','${t.id}');renderTargetsPopup()`}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button class="icon-btn" style="width:22px;height:22px;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`deletePlannerTarget('${profileId}','${t.id}');renderTargetsPopup()`}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>`;
   };
   root.innerHTML = `
@@ -8974,7 +8974,7 @@ function pendingTargetsWidgetHtml(profileId, isMe){
         const dateBadge = d.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
         const overdue = t.date < todayStr();
         return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
-          <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('Update this target from the Lecture Completion settings.')":`togglePlannerTarget('${profileId}','${t.id}')`}"></div>
+          <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`togglePlannerTarget('${profileId}','${t.id}')`}"></div>
           <div style="flex:1;min-width:0">
             <div style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escChat(t.text)}${isAuto?` <span style="font-size:9px">📘</span>`:''}</div>
           </div>
@@ -10111,9 +10111,10 @@ function wsLectures(profileId, paperId, editable){
   ${editable?`<div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <div style="flex:1;min-width:160px">
       <div style="font-size:11px;font-weight:700">📘 Lecture completion target</div>
-      <div style="font-size:10px;color:var(--text-faint)">Finish all ${paperById(paperId).code} lectures by this date — auto-tracked in Planner &amp; Home</div>
+      <div style="font-size:10px;color:var(--text-faint)">Finish all ${paperById(paperId).code} lectures by this date — auto-tracked in Planner &amp; Home. Clearing the date here removes it from both.</div>
     </div>
     <input type="date" value="${completionTarget}" onchange="setLectureCompletionTarget('${profileId}','${paperId}',this.value)" style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:12px;background:var(--surface2);color:var(--text)">
+    ${completionTarget?`<button class="icon-btn" title="Clear target" onclick="setLectureCompletionTarget('${profileId}','${paperId}','')" style="width:30px;height:30px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`:''}
   </div>`:''}
   <div class="stat-grid" style="margin-bottom:14px">
     <div class="card stat-box"><div class="v">${doneCount}/${lecs.length}</div><div class="l">Lectures completed</div></div>
@@ -11190,9 +11191,9 @@ function plannerDayActionsHtml(profileId, iso){
       ${targets.map(t=>{
         const isAuto = String(t.id).startsWith('auto-target-');
         return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-          <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('Update this target from the Lecture Completion settings.')":`togglePlannerTarget('${profileId}','${t.id}')`}">${t.isDone?'✓':''}</div>
+          <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`togglePlannerTarget('${profileId}','${t.id}')`}">${t.isDone?'✓':''}</div>
           <div style="flex:1;${t.isDone?'text-decoration:line-through;opacity:.55':''}">${escChat(t.text)}${isAuto?` <span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:700;color:var(--amber);background:var(--amber-tint);padding:1px 6px;border-radius:8px;margin-left:4px">📘 Lecture</span>`:''}</div>
-          <button class="icon-btn" style="width:22px;height:22px;flex-shrink:0" onclick="${isAuto?"showToast('Update this target from the Lecture Completion settings.')":`deletePlannerTarget('${profileId}','${t.id}')`}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          <button class="icon-btn" style="width:22px;height:22px;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`deletePlannerTarget('${profileId}','${t.id}')`}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>`;
       }).join('')}
     </div>`:`<div style="font-size:11px;color:var(--text-faint);margin-top:8px">No targets set for this day.</div>`}
