@@ -13553,7 +13553,11 @@ function syncBadgeHtml(){
   if(!S.appSession || !isHosted()) return '';
   const icons = {idle:'☁️', syncing:'⟳', ok:'✓', error:'!'};
   const labels = {idle:'Drive', syncing:'Saving…', ok:'Saved', error:'Sync error'};
-  return `<span class="sync-badge ${S.syncStatus}" title="${S.syncError||'Drive sync '+S.syncStatus}">${icons[S.syncStatus]} ${labels[S.syncStatus]}</span>`;
+  // The title attribute below is a hover tooltip — unreachable on a touchscreen, which was
+  // the actual problem reported: the badge said "Sync error" with no way to see WHY on a
+  // phone. Tapping it while in error state now shows the real message via toast instead.
+  const tap = S.syncStatus==='error' ? `onclick="showToast(${escChat(JSON.stringify(S.syncError||'No further detail available.'))})" style="cursor:pointer"` : '';
+  return `<span class="sync-badge ${S.syncStatus}" title="${S.syncError||'Drive sync '+S.syncStatus}" ${tap}>${icons[S.syncStatus]} ${labels[S.syncStatus]}</span>`;
 }
 
 // ═══════════════════════════════════════════════════════════
