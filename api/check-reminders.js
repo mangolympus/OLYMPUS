@@ -15,11 +15,12 @@
 // auth check below — Vercel sends it automatically as a Bearer token on cron-triggered
 // requests once the env var exists).
 //
-// Covers the same four reminder types as computeNotifications() client-side (daily target,
-// overdue lectures, revision awaiting, exam countdown) so a device that never opens the PWA
-// still gets pushed the same things an open tab would show as in-app banners — see
-// buildReminderReasons() below. notifPrefs (the per-type on/off toggles) lives in S.local,
-// which never syncs to Drive, so this job has no way to see it and always checks all four.
+// Covers the same five reminder types as computeNotifications() client-side (daily target,
+// overdue lectures, revision awaiting, exam countdown, incomplete habits) so a device that
+// never opens the PWA still gets pushed the same things an open tab would show as in-app
+// banners — see buildReminderReasons() below. notifPrefs (the per-type on/off toggles) lives
+// in S.local, which never syncs to Drive, so this job has no way to see it and always checks
+// the first four; habit reminders are the exception (see the habitReminder check below).
 import crypto from 'crypto';
 import webpush from 'web-push';
 
@@ -105,6 +106,30 @@ function daysUntilExam(data, todayStr) {
   const exam = new Date(data.examDate + 'T00:00:00Z');
   return Math.round((exam - today) / msPerDay);
 }
+// Added alongside the habit tracker (formerly a placeholder page, now "Challenges" on Home).
+// Mirrors isHabitDoneOn()/activeHabitsFor() in index.html: 'auto-target' habits are
+// live-derived from logged hours vs the daily target (same effectiveTodayTarget() port
+// above), everything else reads the manually-toggled habitLog entry.
+function activeHabits(data, profileId) {
+  return ((data.habits && data.habits[profileId]) || []).filter((h) => h.active !== false);
+}
+function isHabitDoneToday(data, profileId, habit, todayStr) {
+  if (habit.type === 'auto-target') {
+    return hoursOnDate(data, profileId, todayStr) >= effectiveTodayTarget(data, profileId, todayStr);
+  }
+  const day = data.habitLog && data.habitLog[profileId] && data.habitLog[profileId][todayStr];
+  return !!(day && day[habit.id] && day[habit.id].completed);
+}
+function habitsIncompleteReasons(data, profileId, todayStr) {
+  const habits = activeHabits(data, profileId);
+  if (!habits.length) return [];
+  const undone = habits.filter((h) => !isHabitDoneToday(data, profileId, h, todayStr));
+  if (!undone.length) return [];
+  return [{
+    title: `${undone.length} habit${undone.length > 1 ? 's' : ''} not checked off today`,
+    body: undone.slice(0, 3).map((h) => h.name).join(', ') + (undone.length > 3 ? '…' : ''),
+  }];
+}
 // Builds the full list of reasons a profile should be reminded today — same conditions as
 // computeNotifications() client-side, so a device that never opens the PWA still gets
 // pushed the same things an open tab would show as in-app banners.
@@ -145,6 +170,11 @@ function buildReminderReasons(data, profileId, todayIST) {
       body: 'Final stretch — prioritise revision and mocks.',
     });
   }
+  // Unlike the four reasons above (whose in-app-banner toggles live client-side only and
+  // never reach this job), habit reminders are a pushPrefs entry, which DOES sync to Drive —
+  // so this is the one reason here that can actually honour an off switch.
+  const habitPrefOff = data.pushPrefs && data.pushPrefs[profileId] && data.pushPrefs[profileId].habitReminder === false;
+  if (!habitPrefOff) reasons.push(...habitsIncompleteReasons(data, profileId, todayIST));
   return reasons;
 }
 
