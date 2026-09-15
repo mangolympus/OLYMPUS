@@ -462,6 +462,8 @@ body.habits-mode #habits-root{display:flex}
 .habit-row:last-child{border-bottom:none}
 .habit-check{width:24px;height:24px;border-radius:7px;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;transition:background .12s ease,border-color .12s ease}
 .habit-check.done{background:var(--active-accent, var(--umang));border-color:var(--active-accent, var(--umang));color:#fff}
+.habit-check.auto{cursor:default;border-style:dashed}
+.habit-check.auto:active{transform:none}
 
 /* DIARY PAGE — full-screen overlay, same convention as habits/stats/chat above. */
 body.diary-mode header,
@@ -3128,6 +3130,16 @@ function activeHabitsFor(profileId){ return habitsFor(profileId).filter(h=>h.act
 function archivedHabitsFor(profileId){ return habitsFor(profileId).filter(h=>h.active===false); }
 function habitById(profileId, habitId){ return habitsFor(profileId).find(h=>h.id===habitId); }
 function isHabitDoneOn(profileId, dateStr, habitId){
+  const h = habitById(profileId, habitId);
+  if(h && h.type==='auto-target'){
+    // Live-derived, not stored — always reflects the true current data, including if hours
+    // for a past day get backfilled later. Today's target can be raised via
+    // effectiveTodayTarget()'s per-day override; past days have no such record, so this
+    // falls back to the current Settings minimum as a reasonable approximation (same
+    // known-simplification spirit as habitDailyScore()'s eligibility comment above).
+    const target = dateStr===todayStr() ? effectiveTodayTarget(profileId) : (S.shared.targets[profileId]||4);
+    return hoursOnDate(profileId, dateStr) >= target;
+  }
   const day = S.shared.habitLog && S.shared.habitLog[profileId] && S.shared.habitLog[profileId][dateStr];
   return !!(day && day[habitId] && day[habitId].completed);
 }
@@ -3144,23 +3156,55 @@ function habitDailyScore(profileId, dateStr){
   return Math.round((done/eligible.length)*100);
 }
 function toggleHabitDone(profileId, habitId, dateStr){
+  const h = habitById(profileId, habitId);
+  if(h && h.type==='auto-target'){
+    showToast('This one tracks itself from your logged study hours — nothing to tap.');
+    return;
+  }
   dateStr = dateStr || todayStr();
   if(!S.shared.habitLog) S.shared.habitLog = {};
   if(!S.shared.habitLog[profileId]) S.shared.habitLog[profileId] = {};
   if(!S.shared.habitLog[profileId][dateStr]) S.shared.habitLog[profileId][dateStr] = {};
   const day = S.shared.habitLog[profileId][dateStr];
   const wasDone = !!(day[habitId] && day[habitId].completed);
-  day[habitId] = { completed: !wasDone };
+  const nowDone = !wasDone;
+  // completedAt records the real check-in time (not just the date) so a 'time' habit can
+  // tell on-time from late — see isHabitLate() below. Only meaningful for today; a past day
+  // being toggled (e.g. backfilling) still stamps "now", which is honest about when the
+  // record was actually made even if the study day itself was earlier.
+  day[habitId] = { completed: nowDone, completedAt: nowDone ? nowISO() : null };
   saveShared();
   checkAchievementBadges(profileId); // habit badges live in the same ACHIEVEMENT_RULES list — see below
   renderHabitsPopup(); // this page is its own overlay root (#habits-root), like Stats — renderApp() wouldn't touch it
 }
+// For a 'time' habit, true/false once it's been completed today (or the given date), null if
+// not applicable (wrong type, no target set, or not completed at all — "not late" would
+// wrongly imply "on time"). "Late" itself never blocks completion or breaks the streak — it's
+// purely an honesty tag, by design (see the habit-row rendering below).
+function isHabitLate(profileId, dateStr, habitId){
+  const h = habitById(profileId, habitId);
+  if(!h || h.type!=='time' || !h.targetValue) return null;
+  const day = S.shared.habitLog && S.shared.habitLog[profileId] && S.shared.habitLog[profileId][dateStr];
+  const entry = day && day[habitId];
+  if(!entry || !entry.completed || !entry.completedAt) return null;
+  const dt = new Date(entry.completedAt);
+  const doneHM = String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+  return doneHM > h.targetValue; // zero-padded 'HH:MM' strings compare correctly as plain strings
+}
 // Mirrors streak(profileId) exactly (same 5 AM boundary via todayStr(), same backward-walk),
 // just scoped to one habit's completion dates instead of study-log dates.
 function habitStreak(profileId, habitId){
-  const log = (S.shared.habitLog && S.shared.habitLog[profileId]) || {};
-  const dates = new Set(Object.keys(log).filter(d=> log[d][habitId] && log[d][habitId].completed));
+  const h = habitById(profileId, habitId);
+  const createdDate = h && h.createdAt ? h.createdAt.slice(0,10) : null;
   let n=0; let d = new Date(todayStr()+'T00:00:00');
+  if(h && h.type==='auto-target'){
+    while((!createdDate || localDateStr(d)>=createdDate) && isHabitDoneOn(profileId, localDateStr(d), habitId)){
+      n++; d.setDate(d.getDate()-1);
+    }
+    return n;
+  }
+  const log = (S.shared.habitLog && S.shared.habitLog[profileId]) || {};
+  const dates = new Set(Object.keys(log).filter(dd=> log[dd][habitId] && log[dd][habitId].completed));
   while(dates.has(localDateStr(d))){ n++; d.setDate(d.getDate()-1); }
   return n;
 }
@@ -11390,11 +11434,15 @@ function viewHabits(){
     active.map((h,i)=>{
       const done = isHabitDoneOn(me, today, h.id);
       const st = habitStreak(me, h.id);
+      const isAuto = h.type==='auto-target';
+      const late = isHabitLate(me, today, h.id);
+      const autoSub = isAuto ? `<div style="font-size:10.5px;color:var(--text-faint)">${hoursOnDate(me,today).toFixed(1)}h / ${effectiveTodayTarget(me)}h logged today</div>` : '';
       return `<div class="habit-row">
-        <div class="habit-check ${done?'done':''}" onclick="toggleHabitDone('${me}','${h.id}')">${done?'✓':''}</div>
+        <div class="habit-check ${done?'done':''} ${isAuto?'auto':''}" ${isAuto?'':`onclick="toggleHabitDone('${me}','${h.id}')"`} ${isAuto?'title="Tracks itself — see today\'s hours"':''}>${done?'✓':''}</div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:13px">${h.icon?escChat(h.icon)+' ':''}${escChat(h.name)}${h.type==='time'&&h.targetValue?` <span style="color:var(--text-faint);font-weight:400;font-size:11px">by ${escChat(h.targetValue)}</span>`:''}</div>
-          ${st>0?`<div style="font-size:10.5px;color:var(--amber)">🔥 ${st}-day streak</div>`:''}
+          ${autoSub}
+          ${st>0?`<div style="font-size:10.5px;color:var(--amber)">🔥 ${st}-day streak${late?' · <span style="color:var(--text-faint)">🕐 late today</span>':''}</div>`:(late?`<div style="font-size:10.5px;color:var(--text-faint)">🕐 late today</div>`:'')}
         </div>
         <div style="display:flex;gap:2px;flex-shrink:0">
           <button class="btn btn-sm" ${i===0?'disabled':''} onclick="reorderHabit('${me}','${h.id}',-1);renderHabitsPopup()" aria-label="Move up">↑</button>
@@ -11478,11 +11526,13 @@ function habitFormHtml(){
     <div style="font-weight:700;font-size:13px;margin-bottom:10px">${d.id?'Edit Habit':'New Habit'}</div>
     <input type="text" placeholder="Habit name (e.g. Wake up early)" value="${escChat(d.name||'')}" oninput="updateHabitFormField('name', this.value)" style="${inputStyle}">
     <input type="text" placeholder="Emoji (optional)" value="${escChat(d.icon||'')}" oninput="updateHabitFormField('icon', this.value)" maxlength="4" style="${inputStyle}">
-    <div style="display:flex;gap:6px;margin-bottom:8px">
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
       <button class="btn btn-sm ${(d.type||'boolean')==='boolean'?'btn-accent':''}" onclick="updateHabitFormField('type','boolean');renderHabitsPopup()">✓ Simple check-off</button>
       <button class="btn btn-sm ${d.type==='time'?'btn-accent':''}" onclick="updateHabitFormField('type','time');renderHabitsPopup()">⏰ By a set time</button>
+      <button class="btn btn-sm ${d.type==='auto-target'?'btn-accent':''}" onclick="updateHabitFormField('type','auto-target');renderHabitsPopup()">📊 Auto — daily study target</button>
     </div>
     ${d.type==='time' ? `<input type="time" value="${escChat(d.targetValue||'')}" oninput="updateHabitFormField('targetValue', this.value)" style="${inputStyle}">` : ''}
+    ${d.type==='auto-target' ? `<div class="settings-row-sub" style="padding:0 0 8px">Ticks itself once today's logged hours reach your daily target — nothing to tap. Change the target itself from Home.</div>` : ''}
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn-accent" style="flex:1" onclick="saveHabitForm()">Save</button>
       <button class="btn" style="flex:1" onclick="closeHabitEditForm()">Cancel</button>
@@ -12555,6 +12605,7 @@ function viewSettings(){
     ${pushPrefToggleRow('nudge', '👋 Timer — partner nudged you')}
     ${pushPrefToggleRow('targetHit', '🎯 Partner hit their daily target')}
     ${pushPrefToggleRow('newMessage', '💬 New chat message')}
+    ${pushPrefToggleRow('habitReminder', '✅ Habit reminders (evening + time-linked)')}
     ` : ''}
   </div>
   <div class="card settings-group" style="margin-top:12px">
