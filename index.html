@@ -215,6 +215,8 @@ header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom
 .section-title{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);
   margin:26px 0 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .section-title:first-child{margin-top:0}
+.home-date-header{font-size:13.5px;font-weight:700;color:var(--text-muted);margin:0 0 12px}
+.home-date-header:first-child{margin-top:0}
 .section-title>span:first-child,.section-title{position:relative}
 .section-title::before{content:'';display:inline-block;width:3px;height:11px;border-radius:2px;margin-right:8px;
   background:linear-gradient(var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));flex-shrink:0}
@@ -489,6 +491,10 @@ body.diary-mode #diary-root{display:flex}
   font-family:inherit;font-size:14.5px;line-height:1.7;padding:18px 16px;-webkit-overflow-scrolling:touch}
 #diary-textarea::placeholder{color:var(--text-faint)}
 .diary-save-hint{flex:0 0 auto;padding:6px 16px 10px;font-size:10px;color:var(--text-faint);text-align:right}
+.diary-mood-row{flex:0 0 auto;display:flex;gap:8px;padding:10px 16px 4px}
+.diary-mood-btn{width:38px;height:38px;border-radius:50%;border:2px solid transparent;background:var(--surface2);font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .12s ease,border-color .12s ease,transform .12s ease}
+.diary-mood-btn.selected{opacity:1;border-color:var(--active-accent,var(--umang));transform:scale(1.08)}
+.diary-mood-btn:active{transform:scale(.92)}
 
 /* TARGETS OVERVIEW — full-screen overlay, same convention as Diary/Habits above. */
 body.targets-mode header,
@@ -2737,11 +2743,12 @@ function buildDefaultShared(){
   // lectures by" date, separate from each individual lecture's own targetDate (which already
   // existed) — see syncLectureTargets() for how the two relate.
   const diary = {}; PROFILES.forEach(p=> diary[p.id] = {});
+  const diaryMood = {}; PROFILES.forEach(p=> diaryMood[p.id] = {});
   const plannerTargets = {}; PROFILES.forEach(p=> plannerTargets[p.id] = []);
   const lectureCompletionTarget = {}; PROFILES.forEach(p=> lectureCompletionTarget[p.id] = {});
   return { examDate:'2027-05-02', papers, logs, targets, chapters, lectures, mockScores, notes, tasks, questions:[], qStats:{}, chat,
     profileInfo, timerState, dailyTargetOverride, prefs, celebratedMilestones, pushSubscriptions, pushState, pushPrefs, habits, habitLog,
-    money:{}, adminAnnouncement:'', dailyQuote:{date:'', text:''}, diary, plannerTargets, lectureCompletionTarget };
+    money:{}, adminAnnouncement:'', dailyQuote:{date:'', text:''}, diary, diaryMood, plannerTargets, lectureCompletionTarget };
 }
 // Umang and Chetna each have their own real Indirect Tax lecture schedule (different lecturers,
 // different numbering) — kept as two separate source lists rather than one shared default.
@@ -2842,10 +2849,12 @@ function migrateShared(data){
   if(data.adminAnnouncement===undefined) data.adminAnnouncement = '';
   if(!data.dailyQuote) data.dailyQuote = {date:'', text:''};
   if(!data.diary) data.diary = {};
+  if(!data.diaryMood) data.diaryMood = {};
   if(!data.plannerTargets) data.plannerTargets = {};
   if(!data.lectureCompletionTarget) data.lectureCompletionTarget = {};
   PROFILES.forEach(p=>{
     if(!data.diary[p.id]) data.diary[p.id] = {};
+    if(!data.diaryMood[p.id]) data.diaryMood[p.id] = {};
     if(!data.plannerTargets[p.id]) data.plannerTargets[p.id] = [];
     if(!data.lectureCompletionTarget[p.id]) data.lectureCompletionTarget[p.id] = {};
   });
@@ -6149,7 +6158,35 @@ function showToast(msg){
 // own state flag). A week-strip picker plus one big textarea per selected day, auto-saved
 // with a short debounce so normal typing doesn't trigger a sync on every keystroke.
 // S.shared.diary[profileId][date] holds the freeform text; date keys are 'YYYY-MM-DD'.
+// Mood is deliberately a SEPARATE object (S.shared.diaryMood[profileId][date] = one of the
+// keys below) rather than folded into the diary entry itself — diary[profileId][date] has
+// always been a bare string, so turning it into {text, mood} would mean migrating every
+// existing entry ever written. A parallel per-date object costs nothing extra and matches
+// this app's existing convention for a related-but-distinct per-date attribute (see
+// dailyTargetOverride/lectureCompletionTarget, both separate from what they annotate). Mood
+// and text are fully independent — you can set one without the other.
 // ═══════════════════════════════════════════════════════════
+const DIARY_MOODS = [
+  {key:'great', emoji:'😊', label:'Great'},
+  {key:'good', emoji:'🙂', label:'Good'},
+  {key:'okay', emoji:'😐', label:'Okay'},
+  {key:'low', emoji:'😔', label:'Low'},
+  {key:'stressed', emoji:'😣', label:'Stressed'},
+];
+function diaryMoodInfo(key){ return DIARY_MOODS.find(m=>m.key===key) || null; }
+// Tapping the currently-selected mood again clears it — same toggle-off convention as most
+// single-select option rows elsewhere in the app, so "I don't want to log a mood today" is
+// always one tap away rather than needing a separate clear control.
+function setDiaryMood(dateStr, moodKey){
+  const profileId = S.local.myProfile;
+  if(!S.shared.diaryMood) S.shared.diaryMood = {};
+  if(!S.shared.diaryMood[profileId]) S.shared.diaryMood[profileId] = {};
+  const cur = S.shared.diaryMood[profileId][dateStr];
+  if(cur===moodKey) delete S.shared.diaryMood[profileId][dateStr];
+  else S.shared.diaryMood[profileId][dateStr] = moodKey;
+  driveSyncSaveNow();
+  renderDiaryPage();
+}
 let _diaryHistoryActive = false;
 let _diarySaveTimer = null;
 function openDiary(dateStr){
@@ -6207,6 +6244,7 @@ function diaryWeekStripHtml(){
   const dowLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const profileId = S.local.myProfile;
   const entries = (S.shared.diary && S.shared.diary[profileId]) || {};
+  const moods = (S.shared.diaryMood && S.shared.diaryMood[profileId]) || {};
   const today = todayStr();
   return `
   <div class="diary-week-strip">
@@ -6218,8 +6256,12 @@ function diaryWeekStripHtml(){
         if(d===today) cls.push('today');
         if(d===S.diarySelectedDate) cls.push('selected');
         if(entries[d] && entries[d].trim()) cls.push('has-entry');
+        const mood = diaryMoodInfo(moods[d]);
+        // A set mood replaces the plain day number with its emoji — the dot from has-entry
+        // still shows underneath via CSS for days with text but no mood, so neither signal
+        // gets lost when only one of the two is set.
         return `<button class="${cls.join(' ')}" onclick="selectDiaryDate('${d}')">
-          <span class="dow">${dowLabels[i]}</span><span class="dnum">${dayNum}</span>
+          <span class="dow">${dowLabels[i]}</span><span class="dnum">${mood?mood.emoji:dayNum}</span>
         </button>`;
       }).join('')}
     </div>
@@ -6232,6 +6274,7 @@ function renderDiaryPage(){
   const profileId = S.local.myProfile;
   const entries = (S.shared.diary && S.shared.diary[profileId]) || {};
   const text = entries[S.diarySelectedDate] || '';
+  const selectedMood = (S.shared.diaryMood && S.shared.diaryMood[profileId] && S.shared.diaryMood[profileId][S.diarySelectedDate]) || null;
   const dateLabel = new Date(S.diarySelectedDate+'T00:00:00').toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
   root.innerHTML = `
     <div class="stats-exit-bar">
@@ -6239,6 +6282,9 @@ function renderDiaryPage(){
     </div>
     ${diaryWeekStripHtml()}
     <div style="padding:12px 16px 0;font-size:11.5px;font-weight:700;color:var(--text-muted)">${dateLabel}</div>
+    <div class="diary-mood-row">
+      ${DIARY_MOODS.map(m=>`<button class="diary-mood-btn ${selectedMood===m.key?'selected':''}" onclick="setDiaryMood('${S.diarySelectedDate}','${m.key}')" title="${m.label}">${m.emoji}</button>`).join('')}
+    </div>
     <textarea id="diary-textarea" placeholder="Write about your day…" oninput="onDiaryInput(this.value)">${escChat(text)}</textarea>
     <div class="diary-save-hint" id="diary-save-hint">Saved</div>`;
   const ta = document.getElementById('diary-textarea');
@@ -8920,6 +8966,18 @@ function featuresGridHtml(){
 // (triggered from initAfterLogin(), see there); this just renders whatever's currently in
 // S.shared.dailyQuote, including the loading state on the very first render of a new day
 // before either device has fetched yet.
+// Today's date, spelled out ("September 17, 2026, Thursday") — built manually rather than
+// via a single toLocaleDateString() call with all four options at once, since locale
+// defaults order weekday/month differently (usually "Thursday, September 17, 2026") and
+// this needs the exact month-day-year-weekday order requested regardless of locale.
+// Uses todayStr() (the app's 5 AM study-day boundary), not the raw calendar date, so this
+// stays consistent with what "today" already means everywhere else on this page (today's
+// hours, target, streak) rather than flipping over at midnight while those don't.
+function homeDateHeaderHtml(){
+  const d = new Date(todayStr()+'T00:00:00');
+  const label = `${d.toLocaleDateString('en-IN',{month:'long'})} ${d.getDate()}, ${d.getFullYear()}, ${d.toLocaleDateString('en-IN',{weekday:'long'})}`;
+  return `<div class="home-date-header">${label}</div>`;
+}
 function dailyQuoteBoxHtml(){
   const q = S.shared.dailyQuote;
   const hasToday = q && q.date===todayStr() && q.text;
@@ -8944,10 +9002,10 @@ function viewHome(){
   return `
   ${adminAnnouncementBannerHtml()}
   ${isMe ? renderNotifBanners(vp) : ''}
+  ${homeDateHeaderHtml()}
   ${dailyQuoteBoxHtml()}
   ${isMe ? timerHomeTeaser() : ''}
   ${isMe ? partnerHomeStatusCard() : ''}
-  ${vp === S.local.myProfile ? `<button class="btn" style="width:100%;margin-bottom:10px" onclick="openHabitsPopup()">${habitsButtonLabel()}</button>` : ''}
   <div class="section-title">Countdown</div>
   <div class="top-row">
     <div class="card countdown-card">
