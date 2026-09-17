@@ -215,8 +215,16 @@ header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom
 .section-title{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);
   margin:26px 0 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .section-title:first-child{margin-top:0}
-.home-date-header{font-size:13.5px;font-weight:700;color:var(--text-muted);margin:0 0 12px}
-.home-date-header:first-child{margin-top:0}
+.home-date-hero{display:flex;align-items:center;justify-content:center;gap:10px;text-align:center;
+  padding:14px 16px;margin:0 0 14px;border-radius:var(--radius-lg,16px);
+  background:var(--surface);border:1px solid var(--border);
+  box-shadow:var(--glow-accent)}
+.home-date-hero:first-child{margin-top:0}
+.home-date-text{font-size:19px;font-weight:800;letter-spacing:-.01em;line-height:1.3;
+  background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.home-date-weekday{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  margin-top:2px;background:none;color:var(--text-faint);-webkit-text-fill-color:var(--text-faint)}
 .section-title>span:first-child,.section-title{position:relative}
 .section-title::before{content:'';display:inline-block;width:3px;height:11px;border-radius:2px;margin-right:8px;
   background:linear-gradient(var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));flex-shrink:0}
@@ -8973,10 +8981,18 @@ function featuresGridHtml(){
 // Uses todayStr() (the app's 5 AM study-day boundary), not the raw calendar date, so this
 // stays consistent with what "today" already means everywhere else on this page (today's
 // hours, target, streak) rather than flipping over at midnight while those don't.
+// Styled as a proper hero banner (centered, gradient accent text, glowing card) rather than
+// a plain muted line — this is the very first thing on Home, deliberately given real visual
+// weight rather than reading like fine print.
 function homeDateHeaderHtml(){
   const d = new Date(todayStr()+'T00:00:00');
-  const label = `${d.toLocaleDateString('en-IN',{month:'long'})} ${d.getDate()}, ${d.getFullYear()}, ${d.toLocaleDateString('en-IN',{weekday:'long'})}`;
-  return `<div class="home-date-header">${label}</div>`;
+  const month = d.toLocaleDateString('en-IN',{month:'long'});
+  const day = d.getDate();
+  const year = d.getFullYear();
+  const weekday = d.toLocaleDateString('en-IN',{weekday:'long'});
+  return `<div class="home-date-hero">
+    <span class="home-date-text">${month} ${day}, ${year}<span class="home-date-weekday">${weekday}</span></span>
+  </div>`;
 }
 function dailyQuoteBoxHtml(){
   const q = S.shared.dailyQuote;
@@ -12926,7 +12942,7 @@ async function ensureDailyQuote(){
   if(_dailyQuoteFetching) return;
   _dailyQuoteFetching = true;
   try{
-    const text = await callClaudeAI('Generate a single, short, hard-hitting motivational quote for CA Final students in Hinglish. Return ONLY the quote, no quotes or intro text.');
+    const text = await callClaudeAI('Generate a single, short motivational quote for CA Final students in Hinglish, using fear-based urgency as the hook — the cost of wasted time, the exam date getting closer, the regret of not having tried hard enough. Keep it supportive, not harsh: name the fear honestly, then turn it into belief that they can still act on it today. No shaming, no hopelessness, no personal attacks. Return ONLY the quote, no quotes or intro text.');
     S.shared.dailyQuote = {date: todayStr(), text: (text||'').trim()};
     saveShared(); // triggers the normal debounced driveSyncSave() internally — see saveShared()
     if(S.view==='home') renderApp();
