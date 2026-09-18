@@ -475,7 +475,11 @@ body.habits-mode #habits-root{display:flex}
 .habit-check.auto{cursor:default;border-style:dashed}
 .habit-check.auto:active{transform:none}
 
-/* DIARY PAGE — full-screen overlay, same convention as habits/stats/chat above. */
+/* DIARY PAGE — full-screen overlay, same convention as habits/stats/chat above. Rebuilt as
+   a "What happened → How did I perform → What's next" daily performance diary: automatic
+   summary + timeline pulled from Olympus's own data, a compact Planned-vs-Actual view, a
+   short structured Reflection (mood/energy/focus sliders + 4 prompts), and a Tomorrow panel
+   that can push straight back into the Planner. See the JS DIARY section for the data model. */
 body.diary-mode header,
 body.diary-mode .bottomnav,
 body.diary-mode .fab{display:none!important}
@@ -485,24 +489,46 @@ body.diary-mode #diary-root{display:flex}
 #diary-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 #diary-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
 #diary-root .stats-exit-bar button:active{background:var(--surface2)}
+#diary-root .stats-exit-bar .btn{font-size:11px}
+#diary-root .stats-scroll{flex:1 1 auto;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .diary-week-strip{flex:0 0 auto;display:flex;align-items:center;gap:2px;padding:10px 8px;background:var(--surface);border-bottom:1px solid var(--border)}
 .diary-week-strip .wk-arrow{flex:0 0 auto;width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .diary-week-strip .wk-days{flex:1 1 auto;display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.diary-day-bubble{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;border-radius:12px;cursor:pointer;background:transparent;border:none;color:var(--text-muted)}
+.diary-day-bubble{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0 6px;border-radius:12px;cursor:pointer;background:transparent;border:none;color:var(--text-muted)}
 .diary-day-bubble .dow{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.7}
 .diary-day-bubble .dnum{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700}
 .diary-day-bubble.today .dnum{box-shadow:inset 0 0 0 1.5px var(--active-accent,var(--umang))}
 .diary-day-bubble.selected{color:var(--text)}
 .diary-day-bubble.selected .dnum{background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));color:#fff;box-shadow:var(--glow-accent)}
-.diary-day-bubble.has-entry .dnum::after{content:'';display:block}
-#diary-textarea{flex:1 1 auto;width:100%;border:none;outline:none;resize:none;background:transparent;color:var(--text);
-  font-family:inherit;font-size:14.5px;line-height:1.7;padding:18px 16px;-webkit-overflow-scrolling:touch}
-#diary-textarea::placeholder{color:var(--text-faint)}
-.diary-save-hint{flex:0 0 auto;padding:6px 16px 10px;font-size:10px;color:var(--text-faint);text-align:right}
-.diary-mood-row{flex:0 0 auto;display:flex;gap:8px;padding:10px 16px 4px}
-.diary-mood-btn{width:38px;height:38px;border-radius:50%;border:2px solid transparent;background:var(--surface2);font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.55;transition:opacity .12s ease,border-color .12s ease,transform .12s ease}
-.diary-mood-btn.selected{opacity:1;border-color:var(--active-accent,var(--umang));transform:scale(1.08)}
-.diary-mood-btn:active{transform:scale(.92)}
+/* Lightweight per-day indicators (Feature 7): a study dot (green, filled once hours are
+   logged) and a diary dot (hollow → amber "partial" once any reflection content exists →
+   accent "closed" once Close Day has been completed for that date). Two fixed dots rather
+   than one so a glance at the week strip answers "did I study" and "did I reflect"
+   independently — a day can have one without the other. */
+.diary-day-dots{display:flex;gap:3px;height:5px;align-items:center}
+.diary-dot{width:5px;height:5px;border-radius:50%;background:var(--border)}
+.diary-dot.study.on{background:var(--good);box-shadow:0 0 4px color-mix(in srgb, var(--good) 70%, transparent)}
+.diary-dot.diary.partial{background:var(--amber)}
+.diary-dot.diary.closed{background:var(--active-accent,var(--umang));box-shadow:0 0 4px color-mix(in srgb, var(--active-accent,var(--umang)) 70%, transparent)}
+.diary-save-hint{flex:0 0 auto;padding:2px 2px 10px;font-size:10px;color:var(--text-faint);text-align:right}
+/* Reflection sliders — a real range input (best touch/drag behaviour) styled as a track,
+   paired with a big live emoji + label above it driven by oninput for instant feedback, and
+   committed to state on 'change' (i.e. once, on release) rather than on every drag tick. */
+.diary-slider-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.diary-slider-block{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--surface2);border-radius:12px;padding:10px 8px}
+.diary-slider-head{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em}
+.diary-slider-emoji{font-size:22px;line-height:1.2}
+.diary-slider-label{font-size:9.5px;font-weight:700;color:var(--text-muted);min-height:12px}
+.diary-slider{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:3px;background:linear-gradient(90deg,var(--border),var(--border));outline:none;margin:6px 0 2px;accent-color:var(--active-accent,var(--umang))}
+.diary-slider:disabled{opacity:.55}
+.diary-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));box-shadow:var(--shadow-sm),var(--glow-accent);cursor:pointer;border:2px solid var(--surface)}
+.diary-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));box-shadow:var(--shadow-sm),var(--glow-accent);cursor:pointer;border:2px solid var(--surface)}
+/* Close Day wizard — Summary → Reflection → Carry-forward → Done, one step visible at a
+   time so the whole thing stays a sub-2-minute flow instead of one long scroll. */
+.diary-closeday-progress{display:flex;gap:6px;justify-content:center;margin-bottom:8px}
+.diary-closeday-dot{width:22px;height:4px;border-radius:3px;background:var(--border)}
+.diary-closeday-dot.done{background:var(--good)}
+.diary-closeday-dot.active{background:var(--active-accent,var(--umang));box-shadow:0 0 5px color-mix(in srgb, var(--active-accent,var(--umang)) 60%, transparent)}
 
 /* TARGETS OVERVIEW — full-screen overlay, same convention as Diary/Habits above. */
 body.targets-mode header,
@@ -2752,11 +2778,15 @@ function buildDefaultShared(){
   // existed) — see syncLectureTargets() for how the two relate.
   const diary = {}; PROFILES.forEach(p=> diary[p.id] = {});
   const diaryMood = {}; PROFILES.forEach(p=> diaryMood[p.id] = {});
+  // diaryReflections: structured Energy/Focus/Mood + reflection-prompt data for the Diary
+  // rebuild — see blankDiaryReflection() and the migrateShared() note above it. Kept as its
+  // own object rather than folded into `diary`, same reasoning as diaryMood already above.
+  const diaryReflections = {}; PROFILES.forEach(p=> diaryReflections[p.id] = {});
   const plannerTargets = {}; PROFILES.forEach(p=> plannerTargets[p.id] = []);
   const lectureCompletionTarget = {}; PROFILES.forEach(p=> lectureCompletionTarget[p.id] = {});
   return { examDate:'2027-05-02', papers, logs, targets, chapters, lectures, mockScores, notes, tasks, questions:[], qStats:{}, chat,
     profileInfo, timerState, dailyTargetOverride, prefs, celebratedMilestones, pushSubscriptions, pushState, pushPrefs, habits, habitLog,
-    money:{}, adminAnnouncement:'', dailyQuote:{date:'', text:''}, diary, diaryMood, plannerTargets, lectureCompletionTarget };
+    money:{}, adminAnnouncement:'', dailyQuote:{date:'', text:''}, diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget };
 }
 // Umang and Chetna each have their own real Indirect Tax lecture schedule (different lecturers,
 // different numbering) — kept as two separate source lists rather than one shared default.
@@ -2788,7 +2818,7 @@ function freshDtLectures(profileId){
 }
 function buildDefaultLocal(){
   return { myProfile:null, palette:null, dark:true, skipIntro:false,
-    notifPrefs:{lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true},
+    notifPrefs:{lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, diary:true},
     celebratedMilestones:{}, allowedEmails:[], dismissedNotifs:{},
     bgTheme:'snow', lastArchiveSweepDate:null, lastTaskRolloverDate:null, pushedNotifDate:null, pushedNotifKeys:{} };
 }
@@ -2858,11 +2888,17 @@ function migrateShared(data){
   if(!data.dailyQuote) data.dailyQuote = {date:'', text:''};
   if(!data.diary) data.diary = {};
   if(!data.diaryMood) data.diaryMood = {};
+  // diaryReflections is NEW and purely additive (structured Energy/Focus/Mood + 4 reflection
+  // prompts + Close Day state — see blankDiaryReflection() in the Diary section below). It
+  // sits alongside the old diary/diaryMood objects rather than replacing them, so the
+  // pre-existing freeform text and mood history already on Drive is never touched.
+  if(!data.diaryReflections) data.diaryReflections = {};
   if(!data.plannerTargets) data.plannerTargets = {};
   if(!data.lectureCompletionTarget) data.lectureCompletionTarget = {};
   PROFILES.forEach(p=>{
     if(!data.diary[p.id]) data.diary[p.id] = {};
     if(!data.diaryMood[p.id]) data.diaryMood[p.id] = {};
+    if(!data.diaryReflections[p.id]) data.diaryReflections[p.id] = {};
     if(!data.plannerTargets[p.id]) data.plannerTargets[p.id] = [];
     if(!data.lectureCompletionTarget[p.id]) data.lectureCompletionTarget[p.id] = {};
   });
@@ -3008,7 +3044,8 @@ async function loadLocal(){
     const res = await storageGet('olympusLocal', false);
     if(res && res.value){
       const parsed = JSON.parse(res.value);
-      if(!parsed.notifPrefs) parsed.notifPrefs = {lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true};
+      if(!parsed.notifPrefs) parsed.notifPrefs = {lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, diary:true};
+      if(parsed.notifPrefs.diary===undefined) parsed.notifPrefs.diary = true;
       if(parsed.notifPrefs.countdownNag===undefined) parsed.notifPrefs.countdownNag = true;
       // dark was saved (default false) back when it was pure dead code — applyTheme() ignored
       // it and always forced dark mode regardless. Now that it's real, a stored false from
@@ -6163,40 +6200,508 @@ function showToast(msg){
 
 // ═══════════════════════════════════════════════════════════
 // DIARY — full-screen overlay, same pattern as Stats/Habits above (own history checkpoint,
-// own state flag). A week-strip picker plus one big textarea per selected day, auto-saved
-// with a short debounce so normal typing doesn't trigger a sync on every keystroke.
-// S.shared.diary[profileId][date] holds the freeform text; date keys are 'YYYY-MM-DD'.
-// Mood is deliberately a SEPARATE object (S.shared.diaryMood[profileId][date] = one of the
-// keys below) rather than folded into the diary entry itself — diary[profileId][date] has
-// always been a bare string, so turning it into {text, mood} would mean migrating every
-// existing entry ever written. A parallel per-date object costs nothing extra and matches
-// this app's existing convention for a related-but-distinct per-date attribute (see
-// dailyTargetOverride/lectureCompletionTarget, both separate from what they annotate). Mood
-// and text are fully independent — you can set one without the other.
+// own state flag). Rebuilt from the ground up as a CA Final Daily Performance Diary:
+//   What happened today → How did I perform → What should I do tomorrow?
+// Every section below is either pulled automatically from data Olympus already has
+// (Timer/Planner/Syllabus/Revision — see each card's comment for its exact source) or is
+// the minimal manual input the spec asked for (mood/energy/focus + 4 short prompts).
+//
+// DATA MODEL
+// S.shared.diary[profileId][date]        — legacy free-text note (pre-existing; kept as-is,
+//                                            untouched schema, now labelled "Notes" in the UI
+//                                            so no synced history is at risk from this rebuild).
+// S.shared.diaryMood[profileId][date]     — legacy single-emoji mood (pre-existing; the data
+//                                            stays on Drive for continuity but the UI no
+//                                            longer reads/writes it — superseded by the new
+//                                            1–5 mood slider in diaryReflections below).
+// S.shared.diaryReflections[profileId][date] — NEW, additive. See blankDiaryReflection().
 // ═══════════════════════════════════════════════════════════
-const DIARY_MOODS = [
-  {key:'great', emoji:'😊', label:'Great'},
-  {key:'good', emoji:'🙂', label:'Good'},
-  {key:'okay', emoji:'😐', label:'Okay'},
-  {key:'low', emoji:'😔', label:'Low'},
-  {key:'stressed', emoji:'😣', label:'Stressed'},
-];
-function diaryMoodInfo(key){ return DIARY_MOODS.find(m=>m.key===key) || null; }
-// Tapping the currently-selected mood again clears it — same toggle-off convention as most
-// single-select option rows elsewhere in the app, so "I don't want to log a mood today" is
-// always one tap away rather than needing a separate clear control.
-function setDiaryMood(dateStr, moodKey){
-  const profileId = S.local.myProfile;
-  if(!S.shared.diaryMood) S.shared.diaryMood = {};
-  if(!S.shared.diaryMood[profileId]) S.shared.diaryMood[profileId] = {};
-  const cur = S.shared.diaryMood[profileId][dateStr];
-  if(cur===moodKey) delete S.shared.diaryMood[profileId][dateStr];
-  else S.shared.diaryMood[profileId][dateStr] = moodKey;
-  driveSyncSaveNow();
+function blankDiaryReflection(){
+  return {
+    energy:null, focus:null, mood:null,      // 1–5 each, null = not set yet
+    wentWell:'', wentWrong:'', why:'', improvement:'',
+    carriedTaskId:null,   // Planner task id created from "improvement" via Add to Tomorrow's
+                           // Plan — re-clicking updates that same task instead of duplicating.
+    closedAt:null,        // epoch ms once Close Day is completed for this date; also drives
+                           // the "diary" indicator dot in the week strip (see diaryDayStatus).
+  };
+}
+// Read-only accessor — never mutates state just from viewing a day (browsing the week strip
+// shouldn't silently create empty entries for every date you glance at).
+function getDiaryReflection(profileId, dateStr){
+  const byDate = S.shared.diaryReflections && S.shared.diaryReflections[profileId];
+  return (byDate && byDate[dateStr]) || blankDiaryReflection();
+}
+// Write accessor — creates the entry on first actual edit.
+function ensureDiaryReflection(profileId, dateStr){
+  if(!S.shared.diaryReflections) S.shared.diaryReflections = {};
+  if(!S.shared.diaryReflections[profileId]) S.shared.diaryReflections[profileId] = {};
+  if(!S.shared.diaryReflections[profileId][dateStr]) S.shared.diaryReflections[profileId][dateStr] = blankDiaryReflection();
+  return S.shared.diaryReflections[profileId][dateStr];
+}
+// Today's effective target already has its own per-day override (effectiveTodayTarget);
+// past/future days fall back to the Settings minimum since there's no historical override record.
+function effectiveTargetForDate(profileId, dateStr){
+  return dateStr===todayStr() ? effectiveTodayTarget(profileId) : (S.shared.targets[profileId]||4);
+}
+// Every Planner task due on this exact date (regardless of done state) — see Planner &
+// Calendar section above for why a task's `date` is its DUE date, and how rolloverOverdueTasks()
+// keeps pending tasks moving forward rather than sitting on a stale past date.
+function tasksDueOn(profileId, dateStr){ return manualTasksFor(profileId).filter(t=>t.date===dateStr); }
+// "Missed" for a given day: tasks currently still sitting at that date and not done (only
+// possible for today/future, since a past date's pending tasks get auto-rolled forward), PLUS
+// — for a past date — any task that ORIGINATED there (t.rolledFrom===dateStr) and is still
+// not done today. rolledFrom is set once and kept through repeated rollovers (see
+// rolloverOverdueTasks), so it's a reliable trace of "first went overdue on this day."
+function tasksMissedOn(profileId, dateStr){
+  const dueNotDone = tasksDueOn(profileId, dateStr).filter(t=>!t.done);
+  const rolledFromHere = dateStr < todayStr() ? manualTasksFor(profileId).filter(t=>!t.done && t.rolledFrom===dateStr) : [];
+  const seen = new Set(dueNotDone.map(t=>t.id));
+  return dueNotDone.concat(rolledFromHere.filter(t=>!seen.has(t.id)));
+}
+// Study Timeline entries for a day — every logged session (Timer sessions AND manual "Log
+// Study Time" entries), chronological. Timer sessions carry startTime/endTime/category/
+// itemLabel (see blankTimerState + timerStop); manual entries don't, and sort to the top via
+// the '' fallback since there's no time to order them by.
+function diaryTimelineEntries(profileId, dateStr){
+  return logsFor(profileId).filter(l=>l.date===dateStr)
+    .slice().sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||''));
+}
+// Whether the specific lecture/chapter-flag a session was logged against is CURRENTLY done —
+// used for the timeline row's status badge. null when the session isn't linked to a specific
+// item (a general/manual log), in which case the row shows a neutral "Logged" badge instead.
+function diaryItemDoneNow(profileId, l){
+  if(!l.category || !l.paperId || !l.itemId) return null;
+  if(l.category==='lectures'){
+    const lec = lecturesFor(profileId, l.paperId).find(x=>x.id===l.itemId);
+    return lec ? lec.status==='done' : null;
+  }
+  const c = chapterById(profileId, l.paperId, l.itemId);
+  const flag = CATEGORY_FLAG[l.category];
+  return (c && flag) ? !!c[flag] : null;
+}
+function workspaceTabForCategory(cat){
+  if(cat==='lectures') return 'lectures';
+  if(cat==='practice') return 'practice';
+  return 'chapters'; // chapters, rev1, rev2, or unset
+}
+// ── Automatic Daily Summary — Feature 1. Every number here comes straight from existing
+// Olympus state; nothing is asked of the user. ─────────────────────────────────────────
+function diarySummaryData(profileId, dateStr){
+  const hours = hoursOnDate(profileId, dateStr);
+  const target = effectiveTargetForDate(profileId, dateStr);
+  const targetPct = target>0 ? Math.round(Math.min(100, hours/target*100)) : 0;
+  const sessions = diaryTimelineEntries(profileId, dateStr);
+  const papersTouched = Array.from(new Set(sessions.filter(l=>l.paperId).map(l=>l.paperId)))
+    .map(id=>paperById(id)).filter(Boolean);
+  const lecturesCompleted = [];
+  PAPERS.forEach(p=>{ (lecturesFor(profileId,p.id)||[]).forEach(l=>{ if(l.completionDate===dateStr) lecturesCompleted.push({paper:p, lec:l}); }); });
+  // Exact lecture completions come from l.completionDate (a real timestamp). Chapter-level
+  // rev1/rev2/practice flags have no such stamp, so revision "worked on" is inferred from
+  // Timer sessions logged that day under the Revision 1/2 category — honest ("worked on"),
+  // not overclaimed as "completed".
+  const revisionSessions = sessions.filter(l=>l.category==='rev1'||l.category==='rev2');
+  const tasksDue = tasksDueOn(profileId, dateStr);
+  const tasksCompleted = tasksDue.filter(t=>t.done);
+  const tasksMissed = tasksMissedOn(profileId, dateStr);
+  const mocks = [];
+  PAPERS.forEach(p=>{ (mockScoresFor(profileId,p.id)||[]).forEach(m=>{ if(m.date===dateStr) mocks.push({paper:p, m}); }); });
+  const habitScore = habitDailyScore(profileId, dateStr); // null (no habits existed yet) or 0-100
+  return {hours, target, targetPct, sessionsCount:sessions.length, papersTouched, lecturesCompleted,
+    revisionSessions, tasksCompleted, tasksMissed, mocks, habitScore};
+}
+function diarySummaryCardHtml(profileId, dateStr){
+  const d = diarySummaryData(profileId, dateStr);
+  const nothingYet = !d.papersTouched.length && !d.lecturesCompleted.length && !d.revisionSessions.length && !d.mocks.length && !d.tasksCompleted.length && !d.sessionsCount;
+  return `
+  <div class="section-title">Daily Summary</div>
+  <div class="stat-grid" style="margin-bottom:14px">
+    ${statsKpi(d.hours, 'Hours studied', {decimals:1, suffix:'h'})}
+    ${statsKpi(d.targetPct, 'Of target', {suffix:'%'})}
+    ${statsKpi(d.sessionsCount, 'Sessions')}
+    ${statsKpi(d.tasksCompleted.length, 'Tasks done')}
+  </div>
+  <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:7px">
+    ${d.papersTouched.length?`<div style="font-size:12px">📚 <b>Papers touched:</b> ${d.papersTouched.map(p=>p.nick).join(', ')}</div>`:''}
+    ${d.lecturesCompleted.length?`<div style="font-size:12px">✓ <b>Lectures completed:</b> ${d.lecturesCompleted.map(x=>`${x.paper.nick} L${x.lec.num}`).join(', ')}</div>`:''}
+    ${d.revisionSessions.length?`<div style="font-size:12px">🔁 <b>Revision worked on:</b> ${d.revisionSessions.map(l=>{const p=paperById(l.paperId); return `${p?p.nick:''}${l.itemLabel?' · '+escChat(l.itemLabel):''}`;}).join(', ')}</div>`:''}
+    ${d.mocks.length?`<div style="font-size:12px">📝 <b>Practice/Mock:</b> ${d.mocks.map(x=>`${x.paper.nick} — ${x.m.score}%`).join(', ')}</div>`:''}
+    ${d.tasksMissed.length?`<div style="font-size:12px;color:var(--bad)">⚠ <b>Missed:</b> ${d.tasksMissed.length} task${d.tasksMissed.length>1?'s':''}</div>`:''}
+    ${d.habitScore!==null?`<div style="font-size:12px">🔥 <b>Habits:</b> ${d.habitScore}%</div>`:''}
+    ${nothingYet?`<div style="font-size:12px;color:var(--text-faint)">Nothing logged this day yet.</div>`:''}
+  </div>`;
+}
+// ── Study Timeline — Feature 2. Chronological, click-through to the source item. ────────
+function diaryTimelineRowHtml(profileId, l){
+  const paper = l.paperId ? paperById(l.paperId) : null;
+  const catLabel = TIMER_CATEGORY_LABELS[l.category] || '';
+  const timeLabel = l.startTime ? fmtMsgTime(l.startTime) : '—';
+  const doneNow = diaryItemDoneNow(profileId, l);
+  const statusBadge = doneNow===true ? `<span style="color:var(--good);font-weight:700">✓ Completed</span>`
+    : doneNow===false ? `<span style="color:var(--text-faint)">In progress</span>`
+    : `<span style="color:var(--text-faint)">Logged</span>`;
+  const clickable = !!l.paperId;
+  return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;${clickable?'cursor:pointer':''}" ${clickable?`onclick="openDiaryTimelineItem('${l.id}')"`:''}>
+    <div style="width:50px;flex-shrink:0;color:var(--text-faint);font-variant-numeric:tabular-nums">${timeLabel}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700">${paper?paper.code+' · '+paper.nick:'General'}${catLabel?' · '+catLabel:''}</div>
+      ${l.itemLabel?`<div style="font-size:10.5px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escChat(l.itemLabel)}</div>`:''}
+      <div style="font-size:10px;margin-top:2px">${statusBadge}</div>
+    </div>
+    <div style="font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0">${formatHoursAsHM(l.hours)}</div>
+  </div>`;
+}
+function diaryTimelineCardHtml(profileId, dateStr){
+  const sessions = diaryTimelineEntries(profileId, dateStr);
+  const isArchivedDate = dateStr < archiveCutoffStr();
+  const showArchiveLoader = isArchivedDate && !S._archiveChecked && sessions.length===0;
+  return `
+  <div class="section-title">Study Timeline</div>
+  <div class="card" style="padding:${sessions.length?'0 14px':'20px'};margin-bottom:14px">
+    ${sessions.length ? sessions.map(l=>diaryTimelineRowHtml(profileId,l)).join('')
+      : showArchiveLoader
+        ? `<div class="placeholder-note">📦 This date is more than 30 days old — history that far back lives in the archive.<br><button class="btn btn-sm" style="margin-top:8px" onclick="loadArchiveForDiary()">Load archived history</button></div>`
+        : emptyState('🕐','No study sessions logged this day.')}
+  </div>`;
+}
+function openDiaryTimelineItem(logId){
+  const profileId = S.viewingProfile;
+  const l = logsFor(profileId).find(x=>x.id===logId);
+  if(!l || !l.paperId) return;
+  const tab = workspaceTabForCategory(l.category);
+  // Same close-popup-then-navigate pattern as Stats → "Open workspace" elsewhere in the app.
+  exitDiaryPopup();
+  openWorkspaceFor(profileId, l.paperId, tab);
+}
+async function loadArchiveForDiary(){
+  S._archiveChecked = true;
+  try{ await loadArchive(); }catch(e){ console.warn('Archive load failed:', e); }
   renderDiaryPage();
 }
+// ── Planned vs Actual — Feature 4. "By time" overall (target vs actual hours) plus a
+// per-paper breakdown: planned = Planner tasks due that day for that paper, actual = hours
+// actually logged against it. A paper with tasks due but zero hours logged is flagged GAP —
+// the clearest possible "planned but didn't happen" signal without inventing per-paper hour
+// estimates the app has no real data for. ───────────────────────────────────────────────
+function diaryPlannedVsActualCardHtml(profileId, dateStr){
+  const hours = hoursOnDate(profileId, dateStr);
+  const target = effectiveTargetForDate(profileId, dateStr);
+  const maxH = Math.max(target, hours, 1);
+  const byPaper = {};
+  tasksDueOn(profileId, dateStr).forEach(t=>{
+    if(!t.paperId) return;
+    if(!byPaper[t.paperId]) byPaper[t.paperId] = {planned:0, done:0, hours:0};
+    byPaper[t.paperId].planned++;
+    if(t.done) byPaper[t.paperId].done++;
+  });
+  diaryTimelineEntries(profileId, dateStr).forEach(l=>{
+    if(!l.paperId) return;
+    if(!byPaper[l.paperId]) byPaper[l.paperId] = {planned:0, done:0, hours:0};
+    byPaper[l.paperId].hours += Number(l.hours||0);
+  });
+  const paperIds = Object.keys(byPaper);
+  return `
+  <div class="section-title">Planned vs Actual</div>
+  <div class="card" style="margin-bottom:14px">
+    ${statsHBar('Target', target, maxH, 'var(--text-faint)', target.toFixed(1)+'h')}
+    ${statsHBar('Actual', hours, maxH, hours>=target?'var(--good)':'var(--amber)', hours.toFixed(1)+'h')}
+    ${paperIds.length?`<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:7px">
+      ${paperIds.map(pid=>{
+        const paper = paperById(pid); if(!paper) return '';
+        const row = byPaper[pid];
+        const gap = row.planned>0 && row.done<row.planned && row.hours===0;
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:11.5px">
+          <div style="width:44px;flex-shrink:0;font-weight:800">${paper.nick}</div>
+          <div style="flex:1;color:var(--text-muted)">${row.planned?`${row.done}/${row.planned} task${row.planned>1?'s':''} done`:'—'}</div>
+          <div style="width:46px;text-align:right;font-weight:700">${row.hours>0?row.hours.toFixed(1)+'h':'—'}</div>
+          ${gap?`<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;background:var(--bad-tint);color:var(--bad);flex-shrink:0">GAP</span>`:`<span style="width:34px;flex-shrink:0"></span>`}
+        </div>`;
+      }).join('')}
+    </div>`:`<div style="font-size:11px;color:var(--text-faint);margin-top:8px">No planned tasks or study logged for this day yet.</div>`}
+  </div>`;
+}
+// ── Reflection — Feature 3. Three 1–5 sliders (interactive emoji, live feedback on drag,
+// committed on release) plus four short prompts. Autosaved with the same debounce
+// convention as the legacy Notes field below it. ────────────────────────────────────────
+const DIARY_SLIDER_EMOJIS = {
+  energy: ['😴','🥱','🙂','💪','🚀'],
+  focus:  ['😵','😕','🙂','🎯','🧠'],
+  mood:   ['😞','😕','😐','🙂','😄'],
+};
+const DIARY_SLIDER_LABELS = {
+  energy: ['Drained','Low','Okay','Good','Energized'],
+  focus:  ['Scattered','Distracted','Okay','Focused','Locked in'],
+  mood:   ['Rough','Low','Okay','Good','Great'],
+};
+const DIARY_SLIDER_TITLES = {energy:'Energy', focus:'Focus', mood:'Mood'};
+function diarySliderHtml(field, value, readOnly){
+  const v = value || 3;
+  return `<div class="diary-slider-block">
+    <div class="diary-slider-head"><span>${DIARY_SLIDER_TITLES[field]}</span></div>
+    <span class="diary-slider-emoji" id="diary-slider-emoji-${field}">${DIARY_SLIDER_EMOJIS[field][v-1]}</span>
+    <input type="range" min="1" max="5" step="1" value="${v}" class="diary-slider" ${readOnly?'disabled':''}
+      oninput="updateDiarySliderVisual('${field}', this.value)" onchange="commitDiaryReflectionField('${field}', this.value)">
+    <div class="diary-slider-label" id="diary-slider-label-${field}">${DIARY_SLIDER_LABELS[field][v-1]}</div>
+  </div>`;
+}
+function updateDiarySliderVisual(field, value){
+  const v = parseInt(value,10);
+  const emojiEl = document.getElementById('diary-slider-emoji-'+field);
+  const labelEl = document.getElementById('diary-slider-label-'+field);
+  if(emojiEl) emojiEl.textContent = DIARY_SLIDER_EMOJIS[field][v-1];
+  if(labelEl) labelEl.textContent = DIARY_SLIDER_LABELS[field][v-1];
+}
+function commitDiaryReflectionField(field, value){
+  const profileId = S.local.myProfile, dateKey = S.diarySelectedDate;
+  const refl = ensureDiaryReflection(profileId, dateKey);
+  refl[field] = parseInt(value,10);
+  driveSyncSaveNow();
+}
+const DIARY_REFLECTION_PROMPTS = [
+  {field:'wentWell', label:'What went well?', placeholder:'Small wins count too…'},
+  {field:'wentWrong', label:'What went wrong?', placeholder:'Be honest, not harsh…'},
+  {field:'why', label:'Why?', placeholder:'What caused it?'},
+  {field:'improvement', label:'One improvement for tomorrow', placeholder:'Just one thing…'},
+];
+// One shared debounce (mirrors the legacy _diarySaveTimer convention) covering all four
+// prompt fields at once, so switching between fields while typing doesn't fire a save per
+// field — everything dirty gets flushed together, 500ms after the last keystroke.
+let _diaryReflectionSaveTimer = null;
+let _diaryReflectionDirty = {};
+function onDiaryReflectionInput(field, value){
+  _diaryReflectionDirty[field] = value;
+  const hint = document.getElementById('diary-save-hint');
+  if(hint) hint.textContent = 'Saving…';
+  if(_diaryReflectionSaveTimer) clearTimeout(_diaryReflectionSaveTimer);
+  _diaryReflectionSaveTimer = setTimeout(flushDiaryReflectionSave, 500);
+}
+function flushDiaryReflectionSave(){
+  if(_diaryReflectionSaveTimer){ clearTimeout(_diaryReflectionSaveTimer); _diaryReflectionSaveTimer = null; }
+  const fields = Object.keys(_diaryReflectionDirty);
+  if(!fields.length) return;
+  const profileId = S.local.myProfile, dateKey = S.diarySelectedDate;
+  const refl = ensureDiaryReflection(profileId, dateKey);
+  fields.forEach(f=>{ refl[f] = _diaryReflectionDirty[f]; });
+  _diaryReflectionDirty = {};
+  driveSyncSaveNow();
+  const hint = document.getElementById('diary-save-hint');
+  if(hint) hint.textContent = 'Saved';
+}
+// Diary → Planner (Feature 6 & 8's "carry-forward"): turns the "one improvement for
+// tomorrow" line into a real Planner task dated tomorrow. Re-clicking after already having
+// carried it forward UPDATES that same task (via carriedTaskId) instead of creating a
+// duplicate each time the text changes.
+function addImprovementToTomorrowPlan(){
+  const profileId = S.local.myProfile, dateStr = S.diarySelectedDate;
+  flushDiaryReflectionSave(); // commit whatever's currently typed before reading it
+  const refl = ensureDiaryReflection(profileId, dateStr);
+  const text = (refl.improvement||'').trim();
+  if(!text){ alert('Write something in "One improvement for tomorrow" first.'); return; }
+  const tmrw = diaryTomorrowDate(dateStr);
+  if(refl.carriedTaskId){
+    const existing = manualTasksFor(profileId).find(t=>t.id===refl.carriedTaskId);
+    if(existing){
+      existing.title = text; existing.date = tmrw; existing.done = false; delete existing.rolledFrom;
+      saveShared();
+      showToast("Updated in tomorrow's plan.");
+      renderDiaryPage();
+      return;
+    }
+  }
+  if(!S.shared.tasks[profileId]) S.shared.tasks[profileId] = [];
+  const task = {id:uid(), title:text, date:tmrw, done:false, linkType:null, priority:'high', notes:'Carried forward from Diary'};
+  S.shared.tasks[profileId].push(task);
+  refl.carriedTaskId = task.id;
+  saveShared();
+  showToast("Added to tomorrow's plan.");
+  renderDiaryPage();
+}
+function diaryReflectionCardHtml(profileId, dateStr){
+  const refl = getDiaryReflection(profileId, dateStr);
+  const legacyText = (S.shared.diary && S.shared.diary[profileId] && S.shared.diary[profileId][dateStr]) || '';
+  const readOnly = profileId !== S.local.myProfile;
+  return `
+  <div class="section-title">Reflection</div>
+  <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:14px">
+    <div class="diary-slider-row">
+      ${diarySliderHtml('energy', refl.energy, readOnly)}
+      ${diarySliderHtml('focus', refl.focus, readOnly)}
+      ${diarySliderHtml('mood', refl.mood, readOnly)}
+    </div>
+    ${DIARY_REFLECTION_PROMPTS.map(p=>`
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10.5px;font-weight:700;color:var(--text-faint)">${p.label}</label>
+        <textarea rows="2" placeholder="${p.placeholder}" ${readOnly?'readonly':''} oninput="onDiaryReflectionInput('${p.field}', this.value)" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:12.5px;resize:vertical">${escChat(refl[p.field]||'')}</textarea>
+        ${(p.field==='improvement' && !readOnly)?`<button class="btn btn-sm" style="align-self:flex-start;margin-top:2px" onclick="addImprovementToTomorrowPlan()">${refl.carriedTaskId?"↻ Update in Tomorrow's Plan":"+ Add to Tomorrow's Plan"}</button>`:''}
+      </div>`).join('')}
+    <div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--border);padding-top:12px">
+      <label style="font-size:10.5px;font-weight:700;color:var(--text-faint)">Notes</label>
+      <textarea id="diary-textarea" rows="3" placeholder="Anything else about today…" ${readOnly?'readonly':''} oninput="onDiaryInput(this.value)" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:12.5px;resize:vertical">${escChat(legacyText)}</textarea>
+    </div>
+  </div>`;
+}
+// Legacy free-text Notes field — same storage path (S.shared.diary) and same debounce
+// convention as the original Diary module, untouched, so a rebuild never risks previously
+// synced entries.
 let _diaryHistoryActive = false;
 let _diarySaveTimer = null;
+function onDiaryInput(value){
+  const hint = document.getElementById('diary-save-hint');
+  if(hint) hint.textContent = 'Saving…';
+  if(_diarySaveTimer) clearTimeout(_diarySaveTimer);
+  const profileId = S.local.myProfile, dateKey = S.diarySelectedDate;
+  _diarySaveTimer = setTimeout(()=>{
+    if(!S.shared.diary[profileId]) S.shared.diary[profileId] = {};
+    S.shared.diary[profileId][dateKey] = value;
+    driveSyncSaveNow();
+    const hint2 = document.getElementById('diary-save-hint');
+    if(hint2) hint2.textContent = 'Saved';
+  }, 500);
+}
+function flushDiarySave(){
+  if(!_diarySaveTimer) return;
+  clearTimeout(_diarySaveTimer);
+  _diarySaveTimer = null;
+  const ta = document.getElementById('diary-textarea');
+  if(!ta) return;
+  const profileId = S.local.myProfile, dateKey = S.diarySelectedDate;
+  if(!S.shared.diary[profileId]) S.shared.diary[profileId] = {};
+  S.shared.diary[profileId][dateKey] = ta.value;
+  driveSyncSaveNow();
+}
+// Commits both the legacy Notes field and the new Reflection prompts — called before
+// navigating away from the day currently being edited (switching dates, closing the popup,
+// or stepping through the Close Day wizard) so nothing mid-debounce is ever silently dropped.
+function flushDiaryAllSaves(){ flushDiarySave(); flushDiaryReflectionSave(); }
+// ── Tomorrow — Feature 5. "Tomorrow" is always relative to whichever date is selected (not
+// hardcoded to the real today), so browsing yesterday's entry usefully shows what's due
+// today, while Close Day on today's entry shows genuine tomorrow. Overdue / due-tomorrow /
+// revision / high-priority are shown as one de-duplicated list with badges rather than four
+// separate lists, so an item that's both a revision AND overdue doesn't appear twice. ───
+function diaryTomorrowDate(dateStr){ return addOneDay(dateStr); }
+function diaryOverdueTasks(profileId, dateStr){
+  const tmrw = diaryTomorrowDate(dateStr);
+  return manualTasksFor(profileId).filter(t=>!t.done && t.date < tmrw).sort((a,b)=>a.date.localeCompare(b.date));
+}
+function diaryDueTomorrowTasks(profileId, dateStr){
+  const tmrw = diaryTomorrowDate(dateStr);
+  return manualTasksFor(profileId).filter(t=>!t.done && t.date===tmrw)
+    .sort((a,b)=> (b.priority==='high'?1:0)-(a.priority==='high'?1:0) || a.title.localeCompare(b.title));
+}
+function bumpTaskToTomorrow(taskId){
+  const profileId = S.local.myProfile, dateStr = S.diarySelectedDate;
+  const t = manualTasksFor(profileId).find(x=>x.id===taskId); if(!t) return;
+  t.date = diaryTomorrowDate(dateStr);
+  delete t.rolledFrom; // moved on purpose now — the auto-shift note no longer applies
+  saveShared();
+  showToast("Moved to tomorrow's plan.");
+  renderDiaryPage();
+}
+function diaryTomorrowRowHtml(t, badgeHtml, tmrw, readOnly){
+  const isRev = t.linkCategory==='rev1'||t.linkCategory==='rev2';
+  const isHigh = t.priority==='high';
+  return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+    <div style="flex:1;min-width:0">
+      <div>${escChat(t.title)}</div>
+      <div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">
+        ${badgeHtml}
+        ${isRev?`<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;background:var(--purple-tint);color:var(--purple)">🔁 Revision</span>`:''}
+        ${isHigh?`<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;background:var(--bad-tint);color:var(--bad)">High priority</span>`:''}
+      </div>
+    </div>
+    ${(t.date!==tmrw && !readOnly)?`<button class="btn btn-sm" style="flex-shrink:0" onclick="bumpTaskToTomorrow('${t.id}')">→ Tomorrow</button>`:''}
+  </div>`;
+}
+function diaryTomorrowCardHtml(profileId, dateStr){
+  const readOnly = profileId !== S.local.myProfile;
+  const tmrw = diaryTomorrowDate(dateStr);
+  const overdue = diaryOverdueTasks(profileId, dateStr);
+  const dueTomorrow = diaryDueTomorrowTasks(profileId, dateStr);
+  const tmrwLabel = new Date(tmrw+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long', day:'numeric', month:'short'});
+  const overdueBadge = `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;background:var(--bad-tint);color:var(--bad)">Overdue</span>`;
+  const dueBadge = `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;background:var(--umang-tint);color:var(--active-accent,var(--umang))">Due tomorrow</span>`;
+  return `
+  <div class="section-title">Tomorrow — ${tmrwLabel}</div>
+  <div class="card" style="padding:${(overdue.length+dueTomorrow.length)?'0 14px':'20px'};margin-bottom:14px">
+    ${overdue.map(t=>diaryTomorrowRowHtml(t, overdueBadge, tmrw, readOnly)).join('')}
+    ${dueTomorrow.map(t=>diaryTomorrowRowHtml(t, dueBadge, tmrw, readOnly)).join('')}
+    ${(!overdue.length && !dueTomorrow.length)?emptyState('📋','Nothing lined up for tomorrow yet.'):''}
+  </div>`;
+}
+// ── Close Day — Feature 8. A focused Summary → Reflection → Carry-forward → Done wizard,
+// one step visible at a time, reusing the exact same card renderers as the normal browse
+// view (so there's only ever one implementation of each section) — meant to take under two
+// minutes end to end. ────────────────────────────────────────────────────────────────────
+const CLOSE_DAY_STEPS = ['Summary','Reflection','Carry Forward','Done'];
+function openCloseDayFlow(){
+  if(S.viewingProfile !== S.local.myProfile){ showToast("You can only close your own day."); return; }
+  S.diaryCloseDayActive = true;
+  S.diaryCloseDayStep = 0;
+  renderDiaryPage();
+}
+function closeDayBack(){
+  if(S.diaryCloseDayStep===0){ S.diaryCloseDayActive = false; renderDiaryPage(); return; }
+  flushDiaryAllSaves();
+  S.diaryCloseDayStep--;
+  renderDiaryPage();
+}
+function closeDayNext(){
+  flushDiaryAllSaves();
+  if(S.diaryCloseDayStep < 2){ S.diaryCloseDayStep++; renderDiaryPage(); }
+  else finishCloseDay();
+}
+function finishCloseDay(){
+  const profileId = S.local.myProfile, dateStr = S.diarySelectedDate;
+  flushDiaryAllSaves();
+  const refl = ensureDiaryReflection(profileId, dateStr);
+  refl.closedAt = Date.now();
+  driveSyncSaveNow();
+  S.diaryCloseDayStep = 3;
+  renderDiaryPage();
+}
+function exitCloseDayFlow(){
+  S.diaryCloseDayActive = false;
+  S.diaryCloseDayStep = 0;
+  renderDiaryPage();
+}
+function closeDayDoneHtml(){
+  return `<div class="card" style="text-align:center;padding:28px 16px">
+    <div style="font-size:38px;margin-bottom:8px">✅</div>
+    <div style="font-weight:800;font-size:14px;margin-bottom:4px">Day closed</div>
+    <div style="font-size:12px;color:var(--text-faint);margin-bottom:16px">Your reflection is saved. See you tomorrow!</div>
+    <button class="btn btn-accent" style="width:100%" onclick="exitCloseDayFlow()">Done</button>
+  </div>`;
+}
+function closeDayWizardHtml(profileId, dateStr){
+  const step = S.diaryCloseDayStep||0;
+  let body = '';
+  if(step===0) body = diarySummaryCardHtml(profileId,dateStr) + diaryTimelineCardHtml(profileId,dateStr);
+  else if(step===1) body = diaryReflectionCardHtml(profileId,dateStr);
+  else if(step===2) body = diaryTomorrowCardHtml(profileId,dateStr);
+  else body = closeDayDoneHtml();
+  return `
+  <div class="diary-closeday-progress">
+    ${CLOSE_DAY_STEPS.map((s,i)=>`<div class="diary-closeday-dot ${i===step?'active':''} ${i<step?'done':''}"></div>`).join('')}
+  </div>
+  <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);text-align:center;margin-bottom:10px">${CLOSE_DAY_STEPS[step]}</div>
+  ${body}
+  ${step<3?`<div style="display:flex;gap:8px;margin-top:2px">
+    <button class="btn" style="flex:1" onclick="closeDayBack()">${step===0?'Cancel':'Back'}</button>
+    <button class="btn btn-accent" style="flex:2" onclick="closeDayNext()">${step===2?'Finish':'Next'}</button>
+  </div>`:''}
+  `;
+}
+// ── Calendar/History — Feature 7. Same week-strip picker as before, now carrying two
+// lightweight per-day indicators instead of the old single mood-emoji swap. ─────────────
+function diaryDayStatus(profileId, dateStr){
+  const studied = hoursOnDate(profileId, dateStr) > 0;
+  const refl = getDiaryReflection(profileId, dateStr);
+  const legacyText = (S.shared.diary && S.shared.diary[profileId] && S.shared.diary[profileId][dateStr]) || '';
+  const hasContent = !!(refl.energy || refl.focus || refl.mood ||
+    (refl.wentWell&&refl.wentWell.trim()) || (refl.wentWrong&&refl.wentWrong.trim()) ||
+    (refl.why&&refl.why.trim()) || (refl.improvement&&refl.improvement.trim()) || legacyText.trim());
+  return {studied, diaryState: refl.closedAt ? 'closed' : (hasContent ? 'partial' : 'none')};
+}
 function openDiary(dateStr){
   if(!_diaryHistoryActive){
     try{ history.pushState({olympusDiary:true}, '', location.href); }catch(e){}
@@ -6206,16 +6711,19 @@ function openDiary(dateStr){
   S.diaryPopupOpen = true;
   S.diarySelectedDate = dateStr || todayStr();
   S.diaryWeekOffset = 0; // weeks are measured relative to the selected date, see diaryWeekDates()
+  S.diaryCloseDayActive = false;
+  S.diaryCloseDayStep = 0;
   document.body.classList.add('diary-mode');
   renderDiaryPage();
 }
 function closeDiaryPopup(){
-  flushDiarySave();
+  flushDiaryAllSaves();
   if(_diaryHistoryActive){
     window.removeEventListener('popstate', onDiaryBackButton);
     _diaryHistoryActive = false;
   }
   S.diaryPopupOpen = false;
+  S.diaryCloseDayActive = false;
   document.body.classList.remove('diary-mode');
   const el = document.getElementById('diary-root');
   if(el) el.innerHTML = '';
@@ -6225,7 +6733,6 @@ function exitDiaryPopup(){
   else closeDiaryPopup();
 }
 function onDiaryBackButton(){ _diaryHistoryActive = false; closeDiaryPopup(); }
-
 // The 7 dates (Mon–Sun) of the week containing S.diarySelectedDate, shifted by
 // S.diaryWeekOffset whole weeks via the < / > arrows.
 function diaryWeekDates(){
@@ -6242,17 +6749,17 @@ function shiftDiaryWeek(dir){
   renderDiaryPage();
 }
 function selectDiaryDate(dateStr){
-  flushDiarySave(); // don't lose an in-flight debounce when jumping to a different day
+  flushDiaryAllSaves(); // don't lose an in-flight debounce when jumping to a different day
   S.diarySelectedDate = dateStr;
   S.diaryWeekOffset = 0;
+  S.diaryCloseDayActive = false;
+  S.diaryCloseDayStep = 0;
   renderDiaryPage();
 }
 function diaryWeekStripHtml(){
   const dates = diaryWeekDates();
   const dowLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const profileId = S.local.myProfile;
-  const entries = (S.shared.diary && S.shared.diary[profileId]) || {};
-  const moods = (S.shared.diaryMood && S.shared.diaryMood[profileId]) || {};
+  const profileId = S.viewingProfile;
   const today = todayStr();
   return `
   <div class="diary-week-strip">
@@ -6263,13 +6770,14 @@ function diaryWeekStripHtml(){
         const cls = ['diary-day-bubble'];
         if(d===today) cls.push('today');
         if(d===S.diarySelectedDate) cls.push('selected');
-        if(entries[d] && entries[d].trim()) cls.push('has-entry');
-        const mood = diaryMoodInfo(moods[d]);
-        // A set mood replaces the plain day number with its emoji — the dot from has-entry
-        // still shows underneath via CSS for days with text but no mood, so neither signal
-        // gets lost when only one of the two is set.
+        const status = diaryDayStatus(profileId, d);
         return `<button class="${cls.join(' ')}" onclick="selectDiaryDate('${d}')">
-          <span class="dow">${dowLabels[i]}</span><span class="dnum">${mood?mood.emoji:dayNum}</span>
+          <span class="dow">${dowLabels[i]}</span>
+          <span class="dnum">${dayNum}</span>
+          <span class="diary-day-dots">
+            <span class="diary-dot study ${status.studied?'on':''}" title="Studied"></span>
+            <span class="diary-dot diary ${status.diaryState}" title="Diary"></span>
+          </span>
         </button>`;
       }).join('')}
     </div>
@@ -6279,51 +6787,31 @@ function diaryWeekStripHtml(){
 function renderDiaryPage(){
   const root = document.getElementById('diary-root');
   if(!root) return;
-  const profileId = S.local.myProfile;
-  const entries = (S.shared.diary && S.shared.diary[profileId]) || {};
-  const text = entries[S.diarySelectedDate] || '';
-  const selectedMood = (S.shared.diaryMood && S.shared.diaryMood[profileId] && S.shared.diaryMood[profileId][S.diarySelectedDate]) || null;
-  const dateLabel = new Date(S.diarySelectedDate+'T00:00:00').toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
+  const profileId = S.viewingProfile;
+  const isOwn = profileId === S.local.myProfile;
+  const dateStr = S.diarySelectedDate;
+  const dateLabel = new Date(dateStr+'T00:00:00').toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
+  const status = diaryDayStatus(profileId, dateStr);
   root.innerHTML = `
     <div class="stats-exit-bar">
-      <button onclick="exitDiaryPopup()">${CHAT_ICONS.back || '&larr;'} <span>Diary</span></button>
+      <button onclick="exitDiaryPopup()">${CHAT_ICONS.back || '&larr;'} <span>${isOwn?'Diary':profileById(profileId).nick+"'s Diary"}</span></button>
+      ${(isOwn && !S.diaryCloseDayActive)?`<button class="btn btn-sm" style="margin-left:auto" onclick="openCloseDayFlow()">${status.diaryState==='closed'?'✓ Closed':'Close Day'}</button>`:''}
+      ${(!isOwn && status.diaryState==='closed')?`<span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--good)">✓ Closed</span>`:''}
     </div>
     ${diaryWeekStripHtml()}
-    <div style="padding:12px 16px 0;font-size:11.5px;font-weight:700;color:var(--text-muted)">${dateLabel}</div>
-    <div class="diary-mood-row">
-      ${DIARY_MOODS.map(m=>`<button class="diary-mood-btn ${selectedMood===m.key?'selected':''}" onclick="setDiaryMood('${S.diarySelectedDate}','${m.key}')" title="${m.label}">${m.emoji}</button>`).join('')}
-    </div>
-    <textarea id="diary-textarea" placeholder="Write about your day…" oninput="onDiaryInput(this.value)">${escChat(text)}</textarea>
-    <div class="diary-save-hint" id="diary-save-hint">Saved</div>`;
-  const ta = document.getElementById('diary-textarea');
-  if(ta) ta.focus({preventScroll:true});
-}
-function onDiaryInput(value){
-  const hint = document.getElementById('diary-save-hint');
-  if(hint) hint.textContent = 'Saving…';
-  if(_diarySaveTimer) clearTimeout(_diarySaveTimer);
-  const profileId = S.local.myProfile, dateKey = S.diarySelectedDate;
-  _diarySaveTimer = setTimeout(()=>{
-    if(!S.shared.diary[profileId]) S.shared.diary[profileId] = {};
-    S.shared.diary[profileId][dateKey] = value;
-    driveSyncSaveNow();
-    const hint2 = document.getElementById('diary-save-hint');
-    if(hint2) hint2.textContent = 'Saved';
-  }, 500);
-}
-// Forces any pending debounced save to commit immediately — called before navigating away
-// from the entry currently being edited (switching days, or leaving the Diary entirely),
-// so a save mid-debounce is never silently dropped.
-function flushDiarySave(){
-  if(!_diarySaveTimer) return;
-  clearTimeout(_diarySaveTimer);
-  _diarySaveTimer = null;
-  const ta = document.getElementById('diary-textarea');
-  if(!ta) return;
-  const profileId = S.local.myProfile, dateKey = S.diarySelectedDate;
-  if(!S.shared.diary[profileId]) S.shared.diary[profileId] = {};
-  S.shared.diary[profileId][dateKey] = ta.value;
-  driveSyncSaveNow();
+    <div class="stats-scroll" id="diary-scroll">
+      ${(S.diaryCloseDayActive && isOwn) ? closeDayWizardHtml(profileId, dateStr) : `
+        <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);margin-bottom:10px">${dateLabel}${dateStr===todayStr()?' · <span style="color:var(--active-accent,var(--umang))">Today</span>':''}</div>
+        ${diarySummaryCardHtml(profileId,dateStr)}
+        ${diaryTimelineCardHtml(profileId,dateStr)}
+        ${diaryPlannedVsActualCardHtml(profileId,dateStr)}
+        ${diaryReflectionCardHtml(profileId,dateStr)}
+        ${diaryTomorrowCardHtml(profileId,dateStr)}
+        <div class="diary-save-hint" id="diary-save-hint">${isOwn?'Saved':''}</div>
+      `}
+    </div>`;
+  const scroll = document.getElementById('diary-scroll');
+  if(scroll){ animateCountUps(scroll); triggerChartAnimations(scroll); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8134,6 +8622,7 @@ const NOTIF_ICONS = {
   book:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>',
   flag:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 011-1h13l-3 5 3 5H6"/></svg>',
   megaphone:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>',
+  diary:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
 };
 function computeNotifications(profileId){
   const prefs = S.local.notifPrefs || {};
@@ -8165,6 +8654,27 @@ function computeNotifications(profileId){
   if(prefs.examCountdown){
     const d = daysUntilExam();
     if(d<=30 && d>=0) out.push({type:'warn', ic:'flag', title:`${d} days to the exam`, text:'Final stretch — prioritise revision and mocks.'});
+  }
+  if(prefs.diary){
+    // Filling the diary counts as done only once Close Day's actually been completed
+    // (diaryState 'closed') — see diaryDayStatus() above; 'partial' (some content typed but
+    // never closed out) still counts as not-done, same strictness as "required" implies.
+    // Today only nags in the evening/late-night tail (matching dailyTarget's own window
+    // above) — no point telling someone at 9 AM they haven't filled in a day that's barely
+    // started. Yesterday nags any time, since that day is genuinely over.
+    const hour = new Date().getHours();
+    const today = todayStr();
+    const yd = new Date(today+'T00:00:00'); yd.setDate(yd.getDate()-1);
+    const yesterday = localDateStr(yd);
+    const todayUnfilled = (hour>=18 || hour<5) && diaryDayStatus(profileId, today).diaryState!=='closed';
+    const yestUnfilled = diaryDayStatus(profileId, yesterday).diaryState!=='closed';
+    if(todayUnfilled && yestUnfilled){
+      out.push({type:'warn', ic:'diary', title:"Diary not filled for today or yesterday", text:'Close Day for both from the Diary tab — it only takes a minute.'});
+    } else if(todayUnfilled){
+      out.push({type:'warn', ic:'diary', title:"Today's diary isn't filled yet", text:'Close Day from the Diary tab before you sleep.'});
+    } else if(yestUnfilled){
+      out.push({type:'warn', ic:'diary', title:"Yesterday's diary was never filled", text:'Close Day for it from the Diary tab whenever you get a moment.'});
+    }
   }
   return out;
 }
@@ -12680,6 +13190,7 @@ function viewSettings(){
     ${pushPrefToggleRow('targetHit', '🎯 Partner hit their daily target')}
     ${pushPrefToggleRow('newMessage', '💬 New chat message')}
     ${pushPrefToggleRow('habitReminder', '✅ Habit reminders (evening + time-linked)')}
+    ${pushPrefToggleRow('diaryReminder', '📔 Diary reminder (~midnight, if not filled)')}
     ` : ''}
   </div>
   <div class="card settings-group" style="margin-top:12px">
@@ -12689,6 +13200,7 @@ function viewSettings(){
     ${notifToggleRow('dailyTarget', "🎯 Today's target reminder")}
     ${notifToggleRow('examCountdown', '⏳ Countdown — exam milestone banners')}
     ${notifToggleRow('countdownNag', '⏳ Countdown — paused 5+ min nag')}
+    ${notifToggleRow('diary', '📔 Diary not filled (today/yesterday)')}
   </div>
   ${me==='umang' ? `
   <div class="card settings-group" style="margin-top:12px">

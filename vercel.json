@@ -1,6 +1,7 @@
 {
   "crons": [
-    { "path": "/api/check-reminders", "schedule": "30 15 * * *" }
+    { "path": "/api/check-reminders", "schedule": "30 15 * * *" },
+    { "path": "/api/check-diary-reminder", "schedule": "30 18 * * *" }
   ],
   "headers": [
     {
