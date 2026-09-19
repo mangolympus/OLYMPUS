@@ -530,7 +530,12 @@ body.diary-mode #diary-root{display:flex}
 .diary-closeday-dot.done{background:var(--good)}
 .diary-closeday-dot.active{background:var(--active-accent,var(--umang));box-shadow:0 0 5px color-mix(in srgb, var(--active-accent,var(--umang)) 60%, transparent)}
 
-/* TARGETS OVERVIEW — full-screen overlay, same convention as Diary/Habits above. */
+/* TARGETS OVERVIEW — full-screen overlay, same convention as Diary/Habits above. Rebuilt as
+   a focused date/deadline-based MILESTONE tracker for CA Final prep — deliberately distinct
+   from the Planner (daily/weekly to-dos): a Target is "what must I hit by which date," with
+   progress always DERIVED from existing Syllabus/Revision/Practice data, never hand-entered
+   (except the one genuinely un-derivable case: a Custom milestone's manual progress). See the
+   JS TARGETS section for the full data model and status/pace math. */
 body.targets-mode header,
 body.targets-mode .bottomnav,
 body.targets-mode .fab{display:none!important}
@@ -540,7 +545,41 @@ body.targets-mode #targets-root{display:flex}
 #targets-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 #targets-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
 #targets-root .stats-exit-bar button:active{background:var(--surface2)}
+#targets-root .stats-exit-bar .btn{font-size:11px}
 #targets-root .stats-scroll{flex:1 1 auto;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+/* Status colors drive almost everything on this page — the bar, the badge, and the card's
+   left accent stripe all key off the same four values so a glance at the page (not even
+   reading numbers) tells you what needs attention. */
+.mt-card{position:relative;padding-left:17px!important;overflow:hidden;cursor:pointer}
+.mt-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--mt-color,var(--border))}
+.mt-card:active{background:var(--surface2)}
+.mt-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
+.mt-title{font-weight:800;font-size:13px;line-height:1.3}
+.mt-sub{font-size:10.5px;color:var(--text-faint);margin-top:2px}
+.mt-badge{flex-shrink:0;font-size:9px;font-weight:800;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;background:var(--mt-tint,var(--surface2));color:var(--mt-color,var(--text-muted))}
+.mt-bar{height:8px;background:var(--surface2);border-radius:5px;overflow:hidden;margin:8px 0 7px;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
+.mt-fill{height:100%;border-radius:5px;background:var(--mt-color,var(--active-accent,var(--umang)));box-shadow:0 0 7px color-mix(in srgb, var(--mt-color,var(--active-accent,var(--umang))) 60%, transparent);transition:width .5s cubic-bezier(.22,.8,.4,1)}
+.mt-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--text-muted)}
+.mt-meta b{color:var(--text);font-variant-numeric:tabular-nums}
+.mt-explain{font-size:11px;color:var(--mt-color,var(--text-muted));margin-top:6px;line-height:1.4}
+/* Section headers — reused verbatim across Needs Attention / Active / History */
+.mt-section-title{font-weight:800;font-size:11px;margin:2px 0 8px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between}
+/* Form (create/edit) — same inline input styling as the rest of the app's forms (Planner's
+   Add Task, etc.) rather than a bespoke component, so it feels native. */
+.mt-form-row{display:flex;flex-direction:column;gap:4px}
+.mt-form-row label{font-size:10px;color:var(--text-faint)}
+.mt-form-row input,.mt-form-row select,.mt-form-row textarea{border:1px solid var(--border);border-radius:6px;padding:8px 9px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:13px}
+.mt-form-row textarea{resize:vertical}
+.mt-unit-toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0}
+.mt-unit-toggle button{flex:1;padding:8px 10px;border:none;background:var(--surface2);color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer}
+.mt-unit-toggle button.active{background:var(--active-accent,var(--umang));color:#fff}
+/* Detail view pace bars — two thin bars (required vs current pace) stacked for a direct
+   visual comparison, colored by status like everything else on this page. */
+.mt-pace-row{display:flex;align-items:center;gap:8px;font-size:11px}
+.mt-pace-row .lbl{width:78px;flex-shrink:0;color:var(--text-muted)}
+.mt-pace-row .track{flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.mt-pace-row .fill{height:100%;border-radius:4px}
+.mt-pace-row .val{width:64px;text-align:right;flex-shrink:0;font-weight:700;font-variant-numeric:tabular-nums}
 .target-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12.5px}
 .target-row:last-child{border-bottom:none}
 
@@ -2773,9 +2812,11 @@ function buildDefaultShared(){
   // "plannerTargets" rather than "targets" because S.shared.targets already exists — it's the
   // per-profile daily study-HOUR minimum (see effectiveTodayTarget()) — and is a completely
   // different thing from these dated to-do-style targets; reusing the name would silently
-  // corrupt the daily-target system. lectureCompletionTarget is a NEW per-paper "finish all
-  // lectures by" date, separate from each individual lecture's own targetDate (which already
-  // existed) — see syncLectureTargets() for how the two relate.
+  // corrupt the daily-target system. lectureCompletionTarget was a per-paper "finish all
+  // lectures by" date, separate from each individual lecture's own targetDate. Both
+  // plannerTargets and lectureCompletionTarget are now superseded by milestoneTargets (see
+  // the TARGETS section) — kept here only so old synced data is never lost, per the note
+  // just below.
   const diary = {}; PROFILES.forEach(p=> diary[p.id] = {});
   const diaryMood = {}; PROFILES.forEach(p=> diaryMood[p.id] = {});
   // diaryReflections: structured Energy/Focus/Mood + reflection-prompt data for the Diary
@@ -2784,9 +2825,16 @@ function buildDefaultShared(){
   const diaryReflections = {}; PROFILES.forEach(p=> diaryReflections[p.id] = {});
   const plannerTargets = {}; PROFILES.forEach(p=> plannerTargets[p.id] = []);
   const lectureCompletionTarget = {}; PROFILES.forEach(p=> lectureCompletionTarget[p.id] = {});
+  // milestoneTargets: the rebuilt Targets page's data — deadline-based milestones with
+  // auto-derived progress. See the TARGETS section below for the full model. plannerTargets/
+  // lectureCompletionTarget above are the old, now-superseded simple date-checklist Targets;
+  // left in place (never deleted) purely so nothing already synced is lost, same as diary/
+  // diaryMood were kept during the Diary rebuild — nothing new reads or writes them.
+  const milestoneTargets = {}; PROFILES.forEach(p=> milestoneTargets[p.id] = []);
   return { examDate:'2027-05-02', papers, logs, targets, chapters, lectures, mockScores, notes, tasks, questions:[], qStats:{}, chat,
     profileInfo, timerState, dailyTargetOverride, prefs, celebratedMilestones, pushSubscriptions, pushState, pushPrefs, habits, habitLog,
-    money:{}, adminAnnouncement:'', dailyQuote:{date:'', text:''}, diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget };
+    money:{}, adminAnnouncement:'', dailyQuote:{date:'', text:''}, diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget,
+    milestoneTargets };
 }
 // Umang and Chetna each have their own real Indirect Tax lecture schedule (different lecturers,
 // different numbering) — kept as two separate source lists rather than one shared default.
@@ -2818,7 +2866,7 @@ function freshDtLectures(profileId){
 }
 function buildDefaultLocal(){
   return { myProfile:null, palette:null, dark:true, skipIntro:false,
-    notifPrefs:{lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, diary:true},
+    notifPrefs:{lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true},
     celebratedMilestones:{}, allowedEmails:[], dismissedNotifs:{},
     bgTheme:'snow', lastArchiveSweepDate:null, lastTaskRolloverDate:null, pushedNotifDate:null, pushedNotifKeys:{} };
 }
@@ -2895,12 +2943,17 @@ function migrateShared(data){
   if(!data.diaryReflections) data.diaryReflections = {};
   if(!data.plannerTargets) data.plannerTargets = {};
   if(!data.lectureCompletionTarget) data.lectureCompletionTarget = {};
+  // milestoneTargets: the rebuilt Targets page's data. Additive alongside the old
+  // plannerTargets/lectureCompletionTarget (see the buildDefaultShared() note above them) —
+  // nothing existing is touched.
+  if(!data.milestoneTargets) data.milestoneTargets = {};
   PROFILES.forEach(p=>{
     if(!data.diary[p.id]) data.diary[p.id] = {};
     if(!data.diaryMood[p.id]) data.diaryMood[p.id] = {};
     if(!data.diaryReflections[p.id]) data.diaryReflections[p.id] = {};
     if(!data.plannerTargets[p.id]) data.plannerTargets[p.id] = [];
     if(!data.lectureCompletionTarget[p.id]) data.lectureCompletionTarget[p.id] = {};
+    if(!data.milestoneTargets[p.id]) data.milestoneTargets[p.id] = [];
   });
   PROFILES.forEach(p=>{
     if(!data.profileInfo[p.id]) data.profileInfo[p.id] = {};
@@ -3044,9 +3097,10 @@ async function loadLocal(){
     const res = await storageGet('olympusLocal', false);
     if(res && res.value){
       const parsed = JSON.parse(res.value);
-      if(!parsed.notifPrefs) parsed.notifPrefs = {lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, diary:true};
-      if(parsed.notifPrefs.diary===undefined) parsed.notifPrefs.diary = true;
+      if(!parsed.notifPrefs) parsed.notifPrefs = {lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true};
       if(parsed.notifPrefs.countdownNag===undefined) parsed.notifPrefs.countdownNag = true;
+      if(parsed.notifPrefs.targets===undefined) parsed.notifPrefs.targets = true;
+      if(parsed.notifPrefs.diary===undefined) parsed.notifPrefs.diary = true;
       // dark was saved (default false) back when it was pure dead code — applyTheme() ignored
       // it and always forced dark mode regardless. Now that it's real, a stored false from
       // that era would wrongly read as "chose Day mode" on the very first load after this
@@ -6815,10 +6869,378 @@ function renderDiaryPage(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// TARGETS OVERVIEW — full-screen overlay, same pattern as Diary/Habits above. Shows every
-// target for this profile across all dates (the Planner's own target list, added earlier,
-// only ever shows one day at a time) grouped into Pending / Completed.
+// TARGETS — full-screen overlay, same pattern as Diary/Habits above. Rebuilt from scratch as
+// a date/deadline-based MILESTONE tracker, deliberately distinct from the Planner:
+//   Planner → what I need to do today/this week.
+//   Targets → what important milestone I must hit by a specific date.
+// Progress is always DERIVED from existing Syllabus/Revision/Practice data (paperComponents(),
+// chaptersFor(), lecturesFor()) — never a separate hand-maintained number — with one
+// deliberate exception: a "Custom milestone" has no linkable data source by definition, so it
+// alone gets a small manual-progress control (clearly marked, see mtCardHtml's editIcon).
+//
+// DATA MODEL — S.shared.milestoneTargets[profileId]: Target[]
+//   {id, title, paperId, type, unit, targetValue, startDate, deadline, priority,
+//    createdAt, updatedAt, completedAt, progressLog:[{date,value}], manualProgress,
+//    plannedTaskIds:[]}
+// type: one of TARGET_TYPES ids below. unit: 'count' | 'percent' (always 'percent' for
+// type 'overall'). progressLog is an auto-appended once-per-day snapshot cache used only for
+// the "recent pace" calculation — its values are 100% derived at snapshot time, never
+// hand-entered (see ensureTargetSnapshot) — the same kind of lightweight derived cache as
+// lecture.completionDate elsewhere in this app, not a duplicate progress-tracking system.
+//
+// The OLD Targets implementation (S.shared.plannerTargets / lectureCompletionTarget — a
+// simple date-tagged checklist) is fully retired from the UI below. Its stored data is left
+// untouched in the schema (never deleted) so nothing already synced is lost, matching how the
+// Diary rebuild handled its own legacy fields — it just isn't read or written by anything new.
 // ═══════════════════════════════════════════════════════════
+const TARGET_TYPES = [
+  {id:'lectures', label:'Lecture completion'},
+  {id:'chapters', label:'Chapter completion', flag:'lecDone'},
+  {id:'rev1', label:'Revision (1st)', flag:'rev1'},
+  {id:'rev2', label:'Revision (2nd)', flag:'rev2'},
+  {id:'practice', label:'Practice / Questions', flag:'practice'},
+  {id:'overall', label:'Percentage completion (overall paper)'},
+  {id:'custom', label:'Custom milestone'},
+];
+function targetTypeInfo(id){ return TARGET_TYPES.find(t=>t.id===id) || TARGET_TYPES[TARGET_TYPES.length-1]; }
+function milestoneTargetsFor(profileId){
+  if(!S.shared.milestoneTargets) S.shared.milestoneTargets = {};
+  if(!S.shared.milestoneTargets[profileId]) S.shared.milestoneTargets[profileId] = [];
+  return S.shared.milestoneTargets[profileId];
+}
+function targetById(profileId, targetId){ return milestoneTargetsFor(profileId).find(t=>t.id===targetId); }
+function daysBetweenDates(a, b){ return Math.round((new Date(b+'T00:00:00') - new Date(a+'T00:00:00'))/86400000); }
+
+// ── Progress — always derived from existing data ───────────────────────────────────────
+// {done, total} in the target's NATIVE count unit (lectures done/total, or chapters
+// with the relevant flag set/total chapters). For 'overall' this is a pseudo-count out of
+// 100 since paperComponents().prepScore is already a composite percentage.
+function targetTotalAndDone(profileId, target){
+  if(target.type==='overall'){
+    const comps = paperComponents(profileId, target.paperId);
+    return {done: comps.prepScore, total: 100};
+  }
+  if(target.type==='lectures'){
+    const comps = paperComponents(profileId, target.paperId); // handles the dt/idt granular-lecture vs chapter-flag branching itself
+    return {done: comps.done, total: comps.lecTotal};
+  }
+  if(target.type==='custom'){
+    return {done: target.manualProgress||0, total: target.targetValue||1};
+  }
+  const info = targetTypeInfo(target.type);
+  const chs = chaptersFor(profileId, target.paperId) || [];
+  return {done: chs.filter(c=>c[info.flag]).length, total: chs.length};
+}
+function targetCurrentValue(profileId, target){
+  if(target.type==='custom') return target.manualProgress||0;
+  const {done, total} = targetTotalAndDone(profileId, target);
+  return target.unit==='percent' ? (total>0 ? Math.round(done/total*100) : 0) : done;
+}
+// Ceiling for the progress bar / "x of y" display — the GOAL (targetValue) can be less than
+// this (e.g. "5 of 8 chapters"), so the two are shown separately rather than conflated.
+function targetCeilingValue(profileId, target){
+  if(target.unit==='percent') return 100;
+  const {total} = targetTotalAndDone(profileId, target);
+  return target.type==='custom' ? (target.targetValue||1) : total;
+}
+
+// ── Once-per-day progress snapshot — the only piece of history this feature stores, and
+// only because the underlying flags/lecture-completion data carry no timestamp of their own
+// for chapters/revision/practice (lectures do, via completionDate, but chapters don't).
+// Called during every render pass; a no-op after the first call on a given day. ──────────
+function ensureTargetSnapshot(profileId, target){
+  const today = todayStr();
+  if(!target.progressLog) target.progressLog = [];
+  const last = target.progressLog[target.progressLog.length-1];
+  if(last && last.date===today) return; // already snapshotted today
+  const value = targetCurrentValue(profileId, target);
+  target.progressLog.push({date: today, value});
+  // Keep this bounded — pace only ever looks at a trailing window, no reason to grow forever.
+  if(target.progressLog.length > 120) target.progressLog = target.progressLog.slice(-120);
+}
+// Recent pace (trailing 7 snapshot-days) when there's enough history, else the lifetime
+// average since the target's startDate — so a brand-new target still gets a sensible number
+// instead of "no data" on day one.
+function targetPace(profileId, target, currentValue){
+  const log = (target.progressLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const today = todayStr();
+  const windowDays = 7;
+  const recentLog = log.filter(s=> daysBetweenDates(s.date, today) <= windowDays);
+  if(recentLog.length >= 2){
+    const first = recentLog[0], last = recentLog[recentLog.length-1];
+    const days = Math.max(1, daysBetweenDates(first.date, last.date));
+    return (last.value - first.value) / days;
+  }
+  const start = log[0] || {date: target.startDate, value: 0};
+  const lifetimeDays = Math.max(1, daysBetweenDates(start.date, today));
+  return (currentValue - start.value) / lifetimeDays;
+}
+const TARGET_STATUS_META = {
+  ON_TRACK:  {label:'On Track',  color:'var(--good)',  tint:'var(--good-tint, var(--surface2))'},
+  AT_RISK:   {label:'At Risk',   color:'var(--amber)', tint:'var(--amber-tint)'},
+  CRITICAL:  {label:'Critical',  color:'var(--bad)',   tint:'var(--bad-tint)'},
+  OVERDUE:   {label:'Overdue',   color:'var(--bad)',   tint:'var(--bad-tint)'},
+  COMPLETED: {label:'Completed', color:'var(--good)',  tint:'var(--good-tint, var(--surface2))'},
+};
+// The single source of truth for a target's status + all the pace numbers the UI shows.
+// Never an arbitrary score — purely target value, current value, days remaining, and
+// measured pace, per the spec.
+function targetStatusData(profileId, target){
+  const currentValue = targetCurrentValue(profileId, target);
+  const goal = target.targetValue;
+  const today = todayStr();
+  const daysLeft = daysBetweenDates(today, target.deadline);
+  const remaining = Math.max(0, goal - currentValue);
+  const currentPace = targetPace(profileId, target, currentValue);
+  const requiredPace = daysLeft > 0 ? remaining / daysLeft : (remaining>0 ? Infinity : 0);
+  let status;
+  if(target.completedAt || currentValue >= goal){
+    status = 'COMPLETED';
+  } else if(daysLeft < 0){
+    status = 'OVERDUE';
+  } else if(currentPace <= 0){
+    status = daysLeft <= 3 ? 'CRITICAL' : (daysLeft <= 7 ? 'AT_RISK' : 'AT_RISK');
+  } else {
+    const ratio = currentPace / requiredPace;
+    if(daysLeft <= 3 && ratio < 1) status = 'CRITICAL';
+    else if(ratio < 0.85) status = 'AT_RISK';
+    else status = 'ON_TRACK';
+  }
+  return {currentValue, goal, daysLeft, remaining, currentPace, requiredPace, status,
+    meta: TARGET_STATUS_META[status]};
+}
+// Fires the shared celebrateMilestone() (confetti + toast) exactly once per target, the
+// instant it crosses from incomplete to complete — reuses S.shared.celebratedMilestones,
+// the same dedupe store checkMilestones() already uses elsewhere, under a 'target:' key.
+function checkTargetCompletion(profileId, target, statusData){
+  if(target.completedAt) return;
+  if(statusData.currentValue < statusData.goal) return;
+  target.completedAt = todayStr();
+  if(!S.shared.celebratedMilestones) S.shared.celebratedMilestones = {};
+  if(!S.shared.celebratedMilestones[profileId]) S.shared.celebratedMilestones[profileId] = {};
+  const seen = S.shared.celebratedMilestones[profileId];
+  const key = 'target:'+target.id;
+  if(!seen[key]){
+    seen[key] = true;
+    const early = daysBetweenDates(todayStr(), target.deadline);
+    const when = early>0 ? `${early} day${early>1?'s':''} early` : (early<0 ? `${-early} day${-early>1?'s':''} late` : 'right on schedule');
+    celebrateMilestone(`${target.title} — completed ${when}!`);
+  }
+}
+// Pass over every target once per render, refreshing snapshots and catching newly-completed
+// ones. Cheap (O(targets × chapters)) and idempotent, so calling it liberally is fine.
+function refreshAllTargets(profileId){
+  let changed = false;
+  milestoneTargetsFor(profileId).forEach(t=>{
+    const before = t.progressLog ? t.progressLog.length : 0;
+    ensureTargetSnapshot(profileId, t);
+    if((t.progressLog||[]).length !== before) changed = true;
+    const sd = targetStatusData(profileId, t);
+    const hadCompletedAt = !!t.completedAt;
+    checkTargetCompletion(profileId, t, sd);
+    if(!hadCompletedAt && t.completedAt) changed = true;
+  });
+  if(changed) saveShared();
+}
+
+// ── CRUD ─────────────────────────────────────────────────────────────────────────────────
+function createTarget(profileId, fields){
+  const t = {
+    id: uid(), title: fields.title, paperId: fields.paperId, type: fields.type,
+    unit: fields.type==='overall' ? 'percent' : fields.unit,
+    targetValue: fields.targetValue, startDate: fields.startDate, deadline: fields.deadline,
+    priority: fields.priority || 'med', createdAt: Date.now(), updatedAt: Date.now(),
+    completedAt: null, progressLog: [], manualProgress: fields.type==='custom' ? 0 : undefined,
+    plannedTaskIds: [],
+  };
+  milestoneTargetsFor(profileId).push(t);
+  ensureTargetSnapshot(profileId, t);
+  saveShared();
+  return t;
+}
+function updateTarget(profileId, targetId, patch){
+  const t = targetById(profileId, targetId); if(!t) return;
+  Object.assign(t, patch, {updatedAt: Date.now()});
+  saveShared();
+}
+function deleteTarget(profileId, targetId){
+  if(!confirm('Delete this target? This cannot be undone.')) return;
+  S.shared.milestoneTargets[profileId] = milestoneTargetsFor(profileId).filter(t=>t.id!==targetId);
+  saveShared();
+  S.targetsView = 'dashboard';
+  renderTargetsPopup();
+}
+function setManualProgress(profileId, targetId, value){
+  const t = targetById(profileId, targetId); if(!t || t.type!=='custom') return;
+  t.manualProgress = Math.max(0, Number(value)||0);
+  t.updatedAt = Date.now();
+  ensureTargetSnapshot(profileId, t);
+  const sd = targetStatusData(profileId, t);
+  checkTargetCompletion(profileId, t, sd);
+  saveShared();
+  renderTargetsPopup();
+}
+
+// ── Notifications — plugs into the app's existing Home banner + push-escalation system
+// (computeNotifications/renderNotifBanners/escalateNotifsToPush), gated by the same
+// per-device notifPrefs pattern as the other notification sources there. Dedup/no-repeat-spam
+// comes for free from that system's own dismissedNotifs + title-based key. ─────────────────
+function computeTargetNotifications(profileId){
+  const out = [];
+  milestoneTargetsFor(profileId).forEach(t=>{
+    if(t.completedAt) return;
+    const sd = targetStatusData(profileId, t);
+    if(sd.status==='ON_TRACK') return;
+    const unitLabel = t.unit==='percent' ? '%' : '';
+    const remainingLabel = `${Math.ceil(sd.remaining)}${unitLabel} remaining`;
+    if(sd.status==='OVERDUE'){
+      out.push({type:'warn', ic:'flag', title:`${t.title} — overdue`, text:`Deadline passed. ${remainingLabel} to reach ${t.targetValue}${unitLabel}.`});
+    } else if(sd.status==='CRITICAL'){
+      out.push({type:'warn', ic:'flag', title:`${t.title} — ${sd.daysLeft} day${sd.daysLeft===1?'':'s'} left, CRITICAL`, text:`${remainingLabel}. Current pace won't reach the deadline — focus here now.`});
+    } else if(sd.status==='AT_RISK'){
+      out.push({type:'warn', ic:'flag', title:`${t.title} — ${sd.daysLeft} day${sd.daysLeft===1?'':'s'} left, at risk`, text:`Current pace is below what's needed. ${remainingLabel}.`});
+    }
+  });
+  return out;
+}
+
+// ── "Plan This Target" — Feature 9, Targets → Planner. For flag-based types (lectures/
+// chapters/revision/practice), creates real linked Planner tasks for the next N not-yet-done
+// items needed to close the gap to the target — completing them in Planner flips the same
+// lecture/chapter flag this target already reads, so there is no separate progress record to
+// keep in sync. For 'overall'/'custom' there's no discrete item list, so a single reminder
+// task is created instead. Re-running never duplicates: previously created (still-open) task
+// ids are remembered on the target and skipped. ────────────────────────────────────────────
+function planThisTarget(profileId, targetId){
+  const t = targetById(profileId, targetId); if(!t) return;
+  const sd = targetStatusData(profileId, t);
+  if(sd.remaining<=0){ showToast('Nothing left to plan — this target is already met.'); return; }
+  if(!t.plannedTaskIds) t.plannedTaskIds = [];
+  // Drop references to tasks that no longer exist (deleted independently in Planner) so we
+  // don't under-count how much is already planned.
+  const existingOpen = t.plannedTaskIds.filter(id=>manualTasksFor(profileId).some(x=>x.id===id && !x.done));
+  const info = targetTypeInfo(t.type);
+  let created = 0;
+  if(t.type==='overall' || t.type==='custom'){
+    if(existingOpen.length===0){
+      const paper = t.paperId ? paperById(t.paperId) : null;
+      const title = t.type==='custom' ? `Work on target: ${t.title}` : `Push overall ${paper?paper.code:''} prep toward ${t.targetValue}%`;
+      const task = {id:uid(), title, date:todayStr(), done:false, linkType:null, priority:t.priority, notes:'Created from Targets — "Plan This Target".'};
+      S.shared.tasks[profileId].push(task);
+      t.plannedTaskIds = [task.id];
+      created = 1;
+    }
+  } else {
+    const flag = info.flag;
+    const linkCategory = t.type==='lectures' ? 'lectures' : t.type;
+    let pendingItems;
+    if(t.type==='lectures'){
+      pendingItems = lecturesFor(profileId, t.paperId).filter(l=>l.status!=='done')
+        .map(l=>({refId:l.id, label:`${paperById(t.paperId).code} — Lecture: L${l.num} ${l.topic||''}`.trim()}));
+    } else {
+      pendingItems = (chaptersFor(profileId, t.paperId)||[]).filter(c=>!c[flag])
+        .map(c=>({refId:c.id, label:`${paperById(t.paperId).code} — ${targetTypeInfo(t.type).label}: ${c.name}`}));
+    }
+    // How many more items are needed to close the gap, in COUNT terms (even for a % unit
+    // target, convert back to a count so we know how many discrete tasks to create).
+    const {done, total} = targetTotalAndDone(profileId, t);
+    const goalCount = t.unit==='percent' ? Math.ceil(t.targetValue/100*total) : t.targetValue;
+    const neededCount = Math.max(0, goalCount - done - existingOpen.length);
+    const toCreate = pendingItems.slice(0, neededCount);
+    const newIds = [];
+    toCreate.forEach((item, i)=>{
+      const d = new Date(); d.setDate(d.getDate()+i);
+      const task = {id:uid(), title:item.label, date:todayStr(d), done:false,
+        linkType: t.type==='lectures' ? 'lecture' : 'chapter', linkCategory, paperId:t.paperId, refId:item.refId,
+        priority:t.priority, notes:'Created from Targets — "Plan This Target".'};
+      S.shared.tasks[profileId].push(task);
+      newIds.push(task.id);
+    });
+    created = newIds.length;
+    t.plannedTaskIds = existingOpen.concat(newIds);
+  }
+  saveShared();
+  if(created>0) showToast(`Added ${created} task${created>1?'s':''} to the Planner.`);
+  else showToast('Already fully planned — check the Planner.');
+  renderTargetsPopup();
+}
+
+// ── Card renderer — shared by Needs Attention / Active / History / Home widget. `compact`
+// drops the explain line and pace detail for tight spaces (Home widget). ───────────────────
+function mtCardHtml(profileId, target, opts){
+  opts = opts || {};
+  const sd = targetStatusData(profileId, target);
+  const paper = target.paperId ? paperById(target.paperId) : null;
+  const unitLabel = target.unit==='percent' ? '%' : '';
+  const deadlineLabel = new Date(target.deadline+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+  const barPct = Math.min(100, Math.round(sd.currentValue/targetCeilingValue(profileId,target)*100));
+  const style = `--mt-color:${sd.meta.color};--mt-tint:${sd.meta.tint}`;
+  let explain = '';
+  if(!opts.compact && sd.status!=='COMPLETED'){
+    if(sd.status==='OVERDUE') explain = `Deadline passed ${-sd.daysLeft} day${-sd.daysLeft===1?'':'s'} ago, ${Math.ceil(sd.remaining)}${unitLabel} still remaining.`;
+    else explain = `You need about ${sd.requiredPace.toFixed(1)}${unitLabel}/day to reach this — recent pace is about ${Math.max(0,sd.currentPace).toFixed(1)}${unitLabel}/day.`;
+  } else if(sd.status==='COMPLETED'){
+    explain = `Completed ${target.completedAt===target.deadline?'on time':(target.completedAt<target.deadline?'early':'late')}.`;
+  }
+  return `<div class="card mt-card" style="${style};margin-bottom:10px" onclick="openTargetDetail('${target.id}')">
+    <div class="mt-head">
+      <div>
+        <div class="mt-title">${escChat(target.title)}</div>
+        <div class="mt-sub">${paper?paper.code+' · '+paper.nick:'General'}${target.priority==='high'?' · High priority':''}</div>
+      </div>
+      <span class="mt-badge">${sd.status==='OVERDUE'?'⚠ ':''}${sd.meta.label}</span>
+    </div>
+    <div class="mt-bar"><div class="mt-fill" style="width:${barPct}%"></div></div>
+    <div class="mt-meta">
+      <span><b>${sd.currentValue}${unitLabel}</b> / ${target.targetValue}${unitLabel}</span>
+      ${sd.status!=='COMPLETED'?`<span><b>${sd.daysLeft>=0?sd.daysLeft:0}</b> day${sd.daysLeft===1?'':'s'} left</span>`:`<span>by ${deadlineLabel}</span>`}
+      ${sd.status!=='COMPLETED'?`<span><b>${Math.ceil(sd.remaining)}${unitLabel}</b> remaining</span>`:''}
+    </div>
+    ${explain?`<div class="mt-explain">${explain}</div>`:''}
+  </div>`;
+}
+
+// ── Home dashboard widget — Feature: replaces the old "Pending Targets" checklist widget.
+// Surfaces only what needs attention (critical/at-risk/overdue/due-very-soon), soonest and
+// most urgent first — a full target list belongs on the Targets page itself, not Home. ─────
+function targetsNeedsAttentionWidgetHtml(profileId, isMe){
+  if(!isMe) return '';
+  refreshAllTargets(profileId);
+  const all = milestoneTargetsFor(profileId).filter(t=>!t.completedAt);
+  const urgent = all.map(t=>({t, sd:targetStatusData(profileId,t)}))
+    .filter(x=> x.sd.status==='OVERDUE' || x.sd.status==='CRITICAL' || x.sd.status==='AT_RISK' || x.sd.daysLeft<=2)
+    .sort((a,b)=>{
+      const rank = {OVERDUE:0, CRITICAL:1, AT_RISK:2, ON_TRACK:3};
+      return (rank[a.sd.status]-rank[b.sd.status]) || (a.sd.daysLeft-b.sd.daysLeft);
+    }).slice(0,4);
+  if(all.length===0) return ''; // nothing to show at all if no targets exist yet — page-level empty state covers onboarding
+  return `
+  <div class="section-title">Needs Attention</div>
+  <div style="margin-bottom:4px">
+    ${urgent.length ? urgent.map(x=>mtCardHtml(profileId, x.t, {compact:true})).join('')
+      : `<div class="card" style="padding:16px;text-align:center;font-size:12px;color:var(--text-faint)">All targets on track. 🎯</div>`}
+  </div>`;
+}
+
+// ── Planner integration — read-only "due this day" list (replaces the old per-day
+// checklist + its own Add Target button; creation now only happens on the Targets page
+// itself, which has the real form Targets needs). ──────────────────────────────────────────
+function plannerTargetsDueHtml(profileId, iso){
+  const due = milestoneTargetsFor(profileId).filter(t=>t.deadline===iso);
+  if(!due.length) return '';
+  return `<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
+    <div style="font-weight:800;font-size:11px;margin-bottom:8px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em">🎯 Targets due this day</div>
+    ${due.map(t=>{
+      const sd = targetStatusData(profileId, t);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" onclick="openTargetsPopup();openTargetDetail('${t.id}')">
+        <div style="flex:1;min-width:0">${escChat(t.title)}</div>
+        <span class="mt-badge" style="--mt-color:${sd.meta.color};--mt-tint:${sd.meta.tint}">${sd.meta.label}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ── Overlay open/close — same history-checkpoint pattern as Diary/Habits/Stats. ────────────
 let _targetsHistoryActive = false;
 function openTargetsPopup(){
   if(!_targetsHistoryActive){
@@ -6827,7 +7249,10 @@ function openTargetsPopup(){
     window.addEventListener('popstate', onTargetsBackButton);
   }
   S.targetsPopupOpen = true;
+  S.targetsView = 'dashboard';
+  S.targetDetailId = null;
   document.body.classList.add('targets-mode');
+  refreshAllTargets(S.local.myProfile);
   renderTargetsPopup();
 }
 function closeTargetsPopup(){
@@ -6839,59 +7264,217 @@ function closeTargetsPopup(){
   document.body.classList.remove('targets-mode');
   const el = document.getElementById('targets-root');
   if(el) el.innerHTML = '';
-  renderApp(); // refresh Home's Pending Targets widget behind the popup
+  renderApp(); // refresh Home's Needs Attention widget behind the popup
 }
 function exitTargetsPopup(){
+  if(S.targetsView !== 'dashboard'){ S.targetsView = 'dashboard'; S.targetDetailId = null; renderTargetsPopup(); return; }
   if(_targetsHistoryActive) history.back();
   else closeTargetsPopup();
 }
 function onTargetsBackButton(){ _targetsHistoryActive = false; closeTargetsPopup(); }
+
+// ── Dashboard (default view) ────────────────────────────────────────────────────────────
+function targetsDashboardHtml(profileId){
+  const all = milestoneTargetsFor(profileId);
+  const active = all.filter(t=>!t.completedAt);
+  const withStatus = active.map(t=>({t, sd:targetStatusData(profileId,t)}));
+  const needsAttention = withStatus.filter(x=>x.sd.status!=='ON_TRACK' || x.sd.daysLeft<=2)
+    .sort((a,b)=>{ const rank={OVERDUE:0,CRITICAL:1,AT_RISK:2,ON_TRACK:3}; return (rank[a.sd.status]-rank[b.sd.status]) || (a.sd.daysLeft-b.sd.daysLeft); });
+  const needsAttentionIds = new Set(needsAttention.map(x=>x.t.id));
+  const rest = withStatus.filter(x=>!needsAttentionIds.has(x.t.id)).sort((a,b)=>a.sd.daysLeft-b.sd.daysLeft);
+  const completedCount = all.length - active.length;
+  if(all.length===0){
+    return `<div class="card" style="padding:28px 16px;text-align:center">
+      <div style="font-size:34px;margin-bottom:8px">🎯</div>
+      <div style="font-weight:800;font-size:14px;margin-bottom:4px">No targets yet</div>
+      <div style="font-size:12px;color:var(--text-faint);margin-bottom:16px">Set a milestone you're committing to — like "80% DT lectures by 30 Sept" — and progress tracks itself.</div>
+      <button class="btn btn-accent" onclick="openTargetCreateForm()">+ Add Target</button>
+    </div>`;
+  }
+  return `
+  ${needsAttention.length ? `<div class="mt-section-title">Needs Attention</div>${needsAttention.map(x=>mtCardHtml(profileId,x.t)).join('')}` : ''}
+  <div class="mt-section-title" style="margin-top:${needsAttention.length?'14px':'2px'}">Active Targets</div>
+  ${rest.length ? rest.map(x=>mtCardHtml(profileId,x.t)).join('') : (needsAttention.length ? '' : emptyState('🎯','No active targets.'))}
+  ${completedCount>0?`<div style="text-align:center;margin-top:6px"><button class="btn btn-sm" onclick="openTargetHistory()">View History (${completedCount})</button></div>`:''}
+  `;
+}
+
+// ── Creation form ───────────────────────────────────────────────────────────────────────
+function openTargetCreateForm(){ S.targetsView = 'create'; renderTargetsPopup(); }
+function targetCreateFormHtml(profileId){
+  const defaultPaper = PAPERS[0].id;
+  return `
+  <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
+    <div class="mt-form-row"><label>Target name</label>
+      <input type="text" id="mtc-title" placeholder="e.g. Complete DT Lectures"></div>
+    <div style="display:flex;gap:8px">
+      <div class="mt-form-row" style="flex:1"><label>Paper</label>
+        <select id="mtc-paper">${PAPERS.map(p=>`<option value="${p.id}">${p.code} — ${p.nick}</option>`).join('')}</select></div>
+      <div class="mt-form-row" style="flex:1"><label>Type</label>
+        <select id="mtc-type" onchange="onTargetTypeChange()">${TARGET_TYPES.map(t=>`<option value="${t.id}">${t.label}</option>`).join('')}</select></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div class="mt-form-row" style="flex:1"><label>Target value</label>
+        <input type="number" id="mtc-value" min="0" placeholder="e.g. 80" value="80"></div>
+      <div class="mt-unit-toggle" id="mtc-unit-toggle">
+        <button type="button" class="active" onclick="setTargetUnitToggle('percent')" id="mtc-unit-percent">%</button>
+        <button type="button" onclick="setTargetUnitToggle('count')" id="mtc-unit-count">Count</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div class="mt-form-row" style="flex:1"><label>Start date</label>
+        <input type="date" id="mtc-start" value="${todayStr()}"></div>
+      <div class="mt-form-row" style="flex:1"><label>Deadline</label>
+        <input type="date" id="mtc-deadline" value="${todayStr(new Date(Date.now()+7*86400000))}"></div>
+    </div>
+    <div class="mt-form-row"><label>Priority</label>
+      <select id="mtc-priority">${PRIORITIES.map(p=>`<option value="${p.id}" ${p.id==='med'?'selected':''}>${p.label}</option>`).join('')}</select></div>
+    <button class="btn btn-accent" onclick="submitCreateTarget('${profileId}')">+ Add Target</button>
+  </div>`;
+}
+function onTargetTypeChange(){
+  const type = document.getElementById('mtc-type').value;
+  const toggle = document.getElementById('mtc-unit-toggle');
+  if(type==='overall'){
+    setTargetUnitToggle('percent');
+    toggle.style.opacity = '.5'; toggle.style.pointerEvents = 'none';
+  } else {
+    toggle.style.opacity = ''; toggle.style.pointerEvents = '';
+  }
+}
+function setTargetUnitToggle(unit){
+  document.getElementById('mtc-unit-percent').classList.toggle('active', unit==='percent');
+  document.getElementById('mtc-unit-count').classList.toggle('active', unit==='count');
+  document.getElementById('mtc-unit-toggle').dataset.unit = unit;
+}
+function submitCreateTarget(profileId){
+  const title = document.getElementById('mtc-title').value.trim();
+  const paperId = document.getElementById('mtc-paper').value;
+  const type = document.getElementById('mtc-type').value;
+  const targetValue = Number(document.getElementById('mtc-value').value);
+  const unit = document.getElementById('mtc-unit-toggle').dataset.unit || 'percent';
+  const startDate = document.getElementById('mtc-start').value || todayStr();
+  const deadline = document.getElementById('mtc-deadline').value;
+  const priority = document.getElementById('mtc-priority').value;
+  if(!title){ alert('Give this target a name.'); return; }
+  if(!targetValue || targetValue<=0){ alert('Enter a target value greater than 0.'); return; }
+  if(!deadline){ alert('Pick a deadline.'); return; }
+  if(deadline < startDate){ alert('Deadline must be after the start date.'); return; }
+  createTarget(profileId, {title, paperId, type, unit, targetValue, startDate, deadline, priority});
+  S.targetsView = 'dashboard';
+  renderTargetsPopup();
+}
+// Prefilled quick-create, reached from the Lectures workspace tab (superseding the old
+// standalone "Lecture Completion Target Date" control there — see wsLectures).
+function quickCreateTargetForPaper(profileId, paperId, type){
+  openTargetsPopup();
+  openTargetCreateForm();
+  setTimeout(()=>{
+    const paperSel = document.getElementById('mtc-paper'); if(paperSel) paperSel.value = paperId;
+    const typeSel = document.getElementById('mtc-type'); if(typeSel){ typeSel.value = type; onTargetTypeChange(); }
+    const titleEl = document.getElementById('mtc-title');
+    if(titleEl && !titleEl.value) titleEl.value = `Complete ${paperById(paperId).code} ${targetTypeInfo(type).label}`;
+  }, 0);
+}
+
+// ── Detail view ──────────────────────────────────────────────────────────────────────────
+function openTargetDetail(targetId){ S.targetDetailId = targetId; S.targetsView = 'detail'; renderTargetsPopup(); }
+function targetDetailHtml(profileId, targetId){
+  const t = targetById(profileId, targetId);
+  if(!t) return emptyState('🎯','This target no longer exists.');
+  const sd = targetStatusData(profileId, t);
+  const paper = t.paperId ? paperById(t.paperId) : null;
+  const unitLabel = t.unit==='percent' ? '%' : '';
+  const style = `--mt-color:${sd.meta.color};--mt-tint:${sd.meta.tint}`;
+  const paceMax = Math.max(sd.requiredPace===Infinity?0:sd.requiredPace, Math.max(0,sd.currentPace), 0.1);
+  const history = (t.progressLog||[]).slice(-14);
+  return `
+  <div class="card" style="${style};margin-bottom:14px">
+    <div class="mt-head">
+      <div>
+        <div class="mt-title" style="font-size:15px">${escChat(t.title)}</div>
+        <div class="mt-sub">${paper?paper.code+' · '+paper.nick:'General'} · ${targetTypeInfo(t.type).label}</div>
+      </div>
+      <span class="mt-badge">${sd.meta.label}</span>
+    </div>
+    <div class="mt-bar" style="height:10px"><div class="mt-fill" style="width:${Math.min(100,Math.round(sd.currentValue/targetCeilingValue(profileId,t)*100))}%"></div></div>
+    <div class="stat-grid" style="margin-top:12px">
+      ${statsKpi(sd.currentValue, 'Current', {suffix:unitLabel})}
+      ${statsKpi(t.targetValue, 'Goal', {suffix:unitLabel})}
+      ${statsKpi(Math.ceil(sd.remaining), 'Remaining', {suffix:unitLabel})}
+      ${statsKpi(Math.max(0,sd.daysLeft), 'Days left')}
+    </div>
+  </div>
+  ${sd.status!=='COMPLETED'?`
+  <div class="section-title">Pace</div>
+  <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">
+    <div class="mt-pace-row"><span class="lbl">Required</span><div class="track"><div class="fill" style="width:${Math.min(100,(sd.requiredPace===Infinity?100:sd.requiredPace)/paceMax*100)}%;background:var(--text-faint)"></div></div><span class="val">${sd.requiredPace===Infinity?'—':sd.requiredPace.toFixed(2)+unitLabel+'/day'}</span></div>
+    <div class="mt-pace-row"><span class="lbl">Current</span><div class="track"><div class="fill" style="width:${Math.min(100,Math.max(0,sd.currentPace)/paceMax*100)}%;background:${sd.meta.color}"></div></div><span class="val">${Math.max(0,sd.currentPace).toFixed(2)}${unitLabel}/day</span></div>
+    <div class="mt-explain" style="margin-top:4px">${sd.status==='OVERDUE'?`Deadline passed ${-sd.daysLeft} day${-sd.daysLeft===1?'':'s'} ago with ${Math.ceil(sd.remaining)}${unitLabel} still remaining.`:`You need approximately ${sd.requiredPace===Infinity?'an unreachable amount':sd.requiredPace.toFixed(1)+unitLabel} per day to reach this target. Your recent pace is approximately ${Math.max(0,sd.currentPace).toFixed(1)}${unitLabel} per day.`}</div>
+  </div>`:`
+  <div class="card" style="margin-bottom:14px;text-align:center;padding:18px">
+    <div style="font-size:28px;margin-bottom:4px">🎉</div>
+    <div style="font-weight:800;font-size:13px">Target Completed</div>
+    <div style="font-size:11px;color:var(--text-faint);margin-top:2px">Deadline: ${new Date(t.deadline+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} · Completed: ${new Date(t.completedAt+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
+  </div>`}
+  ${history.length>1?`
+  <div class="section-title">Progress History</div>
+  <div class="card" style="margin-bottom:14px">
+    ${history.map(h=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11.5px"><span style="color:var(--text-faint)">${new Date(h.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span><b>${h.value}${unitLabel}</b></div>`).join('')}
+  </div>`:''}
+  ${t.type==='custom' && sd.status!=='COMPLETED'?`
+  <div class="section-title">Update Progress</div>
+  <div class="card" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
+    <input type="number" id="mtd-manual" value="${t.manualProgress||0}" min="0" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 9px;background:var(--surface2);color:var(--text)">
+    <button class="btn btn-accent" onclick="setManualProgress('${profileId}','${t.id}', document.getElementById('mtd-manual').value)">Save</button>
+  </div>`:''}
+  ${sd.status!=='COMPLETED'?`<button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="planThisTarget('${profileId}','${t.id}')">📋 Plan This Target</button>`:''}
+  ${paper?`<button class="btn" style="width:100%;margin-bottom:8px" onclick="exitTargetsPopup();openWorkspaceFor('${profileId}','${paper.id}','${t.type==='lectures'?'lectures':'chapters'}')">Open ${paper.nick} in Syllabus</button>`:''}
+  <button class="btn" style="width:100%;color:var(--bad)" onclick="deleteTarget('${profileId}','${t.id}')">Delete Target</button>
+  `;
+}
+
+// ── History — completed targets, early/on-time/late. ────────────────────────────────────
+function openTargetHistory(){ S.targetsView = 'history'; renderTargetsPopup(); }
+function targetHistoryHtml(profileId){
+  const done = milestoneTargetsFor(profileId).filter(t=>t.completedAt).sort((a,b)=>b.completedAt.localeCompare(a.completedAt));
+  if(!done.length) return emptyState('🏁','No completed targets yet.');
+  return done.map(t=>{
+    const unitLabel = t.unit==='percent' ? '%' : '';
+    const early = daysBetweenDates(t.completedAt, t.deadline);
+    const when = early>0 ? `${early} day${early>1?'s':''} early` : (early<0 ? `${-early} day${-early>1?'s':''} late` : 'on time');
+    const paper = t.paperId ? paperById(t.paperId) : null;
+    return `<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="openTargetDetail('${t.id}')">
+      <div class="mt-head">
+        <div><div class="mt-title">${escChat(t.title)}</div><div class="mt-sub">${paper?paper.code+' · '+paper.nick:'General'}</div></div>
+        <span class="mt-badge" style="--mt-color:var(--good);--mt-tint:var(--good-tint,var(--surface2))">${when}</span>
+      </div>
+      <div class="mt-meta"><span>Goal <b>${t.targetValue}${unitLabel}</b></span><span>Deadline <b>${new Date(t.deadline+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</b></span><span>Done <b>${new Date(t.completedAt+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</b></span></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Root render ──────────────────────────────────────────────────────────────────────────
 function renderTargetsPopup(){
   const root = document.getElementById('targets-root');
   if(!root) return;
   const profileId = S.local.myProfile;
-  const all = (S.shared.plannerTargets && S.shared.plannerTargets[profileId]) || [];
-  const pending = all.filter(t=>!t.isDone).sort((a,b)=> a.date.localeCompare(b.date));
-  const done = all.filter(t=>t.isDone).sort((a,b)=> b.date.localeCompare(a.date));
-  const rowHtml = (t)=>{
-    const isAuto = String(t.id).startsWith('auto-target-');
-    const d = new Date(t.date+'T00:00:00');
-    const dateBadge = d.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-    return `<div class="target-row">
-      <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`togglePlannerTarget('${profileId}','${t.id}');renderTargetsPopup()`}"></div>
-      <span style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:var(--surface2);color:var(--text-muted)">${dateBadge}</span>
-      <div style="flex:1;min-width:0;${t.isDone?'text-decoration:line-through;opacity:.55':''}">${escChat(t.text)}${isAuto?` <span style="font-size:9px">📘</span>`:''}</div>
-      <button class="icon-btn" style="width:22px;height:22px;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`deletePlannerTarget('${profileId}','${t.id}');renderTargetsPopup()`}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    </div>`;
-  };
+  const view = S.targetsView || 'dashboard';
+  const titles = {dashboard:'Targets', create:'New Target', detail:'Target', history:'History'};
+  const backAction = view==='dashboard' ? 'exitTargetsPopup()' : 'exitTargetsPopup()';
   root.innerHTML = `
     <div class="stats-exit-bar">
-      <button onclick="exitTargetsPopup()">${CHAT_ICONS.back || '&larr;'} <span>Targets</span></button>
-      <button onclick="quickAddTarget()" style="color:var(--active-accent,var(--umang))">+ <span>Add Target</span></button>
+      <button onclick="${backAction}">${CHAT_ICONS.back || '&larr;'} <span>${titles[view]||'Targets'}</span></button>
+      ${view==='dashboard'?`<button onclick="openTargetCreateForm()" style="color:var(--active-accent,var(--umang))">+ <span>Add Target</span></button>`:''}
     </div>
-    <div class="stats-scroll">
-      <div style="font-weight:800;font-size:11px;margin-bottom:6px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em">Pending (${pending.length})</div>
-      <div class="card" style="padding:${pending.length?'0 14px':'20px'};margin-bottom:18px">
-        ${pending.length ? pending.map(rowHtml).join('') : `<div style="font-size:12px;color:var(--text-faint);text-align:center">No pending targets.</div>`}
-      </div>
-      <div style="font-weight:800;font-size:11px;margin-bottom:6px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em">Completed (${done.length})</div>
-      <div class="card" style="padding:${done.length?'0 14px':'20px'}">
-        ${done.length ? done.map(rowHtml).join('') : `<div style="font-size:12px;color:var(--text-faint);text-align:center">Nothing completed yet.</div>`}
-      </div>
+    <div class="stats-scroll" id="targets-scroll">
+      ${view==='create' ? targetCreateFormHtml(profileId)
+        : view==='detail' ? targetDetailHtml(profileId, S.targetDetailId)
+        : view==='history' ? targetHistoryHtml(profileId)
+        : targetsDashboardHtml(profileId)}
     </div>`;
-}
-// Quick-add from the Targets overview itself (not tied to a specific selected day the way
-// the Planner's own "Add Target" is) — defaults to today; for a future-dated target, use
-// the Planner's per-day Add Target instead, which asks for the day explicitly.
-function quickAddTarget(){
-  const text = prompt("What's the target?");
-  if(!text || !text.trim()) return;
-  const profileId = S.local.myProfile;
-  if(!S.shared.plannerTargets) S.shared.plannerTargets = {};
-  if(!S.shared.plannerTargets[profileId]) S.shared.plannerTargets[profileId] = [];
-  S.shared.plannerTargets[profileId].push({id:uid(), date:todayStr(), text:text.trim(), isDone:false});
-  driveSyncSaveNow();
-  renderTargetsPopup();
+  const scroll = document.getElementById('targets-scroll');
+  if(scroll) animateCountUps(scroll);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8655,6 +9238,9 @@ function computeNotifications(profileId){
     const d = daysUntilExam();
     if(d<=30 && d>=0) out.push({type:'warn', ic:'flag', title:`${d} days to the exam`, text:'Final stretch — prioritise revision and mocks.'});
   }
+  if(prefs.targets){
+    out.push(...computeTargetNotifications(profileId));
+  }
   if(prefs.diary){
     // Filling the diary counts as done only once Close Day's actually been completed
     // (diaryState 'closed') — see diaryDayStatus() above; 'partial' (some content typed but
@@ -9549,7 +10135,7 @@ function viewHome(){
     </div>
   </div>
 
-  ${pendingTargetsWidgetHtml(vp, isMe)}
+  ${targetsNeedsAttentionWidgetHtml(vp, isMe)}
 
   <div class="section-title"><span>Features</span></div>
   ${featuresGridHtml()}
@@ -9588,30 +10174,6 @@ function viewHome(){
 // Feature: "Pending Targets" dashboard widget — next 3-5 incomplete targets for this
 // profile, soonest first. Only shown for the viewer's own profile (a target list is
 // personal, same treatment as the habits button and AI daily plan above).
-function pendingTargetsWidgetHtml(profileId, isMe){
-  if(!isMe) return '';
-  const all = (S.shared.plannerTargets && S.shared.plannerTargets[profileId]) || [];
-  const pending = all.filter(t=>!t.isDone).sort((a,b)=> a.date.localeCompare(b.date)).slice(0,5);
-  return `
-  <div class="section-title">Pending Targets</div>
-  <div class="card" style="padding:${pending.length?'0':'20px'}">
-    ${pending.length===0 ? `<div style="font-size:12px;color:var(--text-faint);text-align:center">No pending targets. Set one in the Planner.</div>` :
-      pending.map(t=>{
-        const isAuto = String(t.id).startsWith('auto-target-');
-        const d = new Date(t.date+'T00:00:00');
-        const dateBadge = d.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-        const overdue = t.date < todayStr();
-        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
-          <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`togglePlannerTarget('${profileId}','${t.id}')`}"></div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escChat(t.text)}${isAuto?` <span style="font-size:9px">📘</span>`:''}</div>
-          </div>
-          <span style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:${overdue?'var(--bad-tint)':'var(--surface2)'};color:${overdue?'var(--bad)':'var(--text-muted)'}">${dateBadge}</span>
-        </div>`;
-      }).join('')
-    }
-  </div>`;
-}
 function sbRow(label, val){
   return `<div class="sb-row"><div class="sb-lbl">${label}</div><div class="sb-track"><div class="sb-fill" style="width:${val}%"></div></div><div class="sb-val">${val}%</div></div>`;
 }
@@ -10734,15 +11296,16 @@ function wsLectures(profileId, paperId, editable){
   const lecs = lecturesFor(profileId, paperId);
   const doneCount = lecs.filter(l=>l.status==='done').length;
   const hoursDone = lectureHoursDone(profileId,paperId), hoursTotal = lectureHoursTotal(profileId,paperId);
-  const completionTarget = (S.shared.lectureCompletionTarget && S.shared.lectureCompletionTarget[profileId] && S.shared.lectureCompletionTarget[profileId][paperId]) || '';
+  // Lecture-completion milestones now live in the Targets page (type 'lectures') rather than
+  // the old single per-paper date field this card used to hold — see the TARGETS section.
+  const existingTarget = milestoneTargetsFor(profileId).find(t=>t.paperId===paperId && t.type==='lectures' && !t.completedAt);
   return `
   ${editable?`<div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <div style="flex:1;min-width:160px">
       <div style="font-size:11px;font-weight:700">📘 Lecture completion target</div>
-      <div style="font-size:10px;color:var(--text-faint)">Finish all ${paperById(paperId).code} lectures by this date — auto-tracked in Planner &amp; Home. Clearing the date here removes it from both.</div>
+      <div style="font-size:10px;color:var(--text-faint)">${existingTarget?`Tracking toward ${existingTarget.targetValue}${existingTarget.unit==='percent'?'%':''} by ${new Date(existingTarget.deadline+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}.`:`Set a deadline for finishing ${paperById(paperId).code} lectures — tracked automatically in Targets, Home &amp; Planner.`}</div>
     </div>
-    <input type="date" value="${completionTarget}" onchange="setLectureCompletionTarget('${profileId}','${paperId}',this.value)" style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:12px;background:var(--surface2);color:var(--text)">
-    ${completionTarget?`<button class="icon-btn" title="Clear target" onclick="setLectureCompletionTarget('${profileId}','${paperId}','')" style="width:30px;height:30px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`:''}
+    <button class="btn btn-sm" onclick="${existingTarget?`openTargetsPopup();openTargetDetail('${existingTarget.id}')`:`quickCreateTargetForPaper('${profileId}','${paperId}','lectures')`}">${existingTarget?'View Target':'🎯 Set Target'}</button>
   </div>`:''}
   <div class="stat-grid" style="margin-bottom:14px">
     <div class="card stat-box"><div class="v">${doneCount}/${lecs.length}</div><div class="l">Lectures completed</div></div>
@@ -10856,47 +11419,9 @@ function toggleLectureStatus(profileId, paperId, lecId){
   const l = lecturesFor(profileId,paperId).find(x=>x.id===lecId); if(!l) return;
   l.status = l.status==='done' ? 'pending' : 'done';
   l.completionDate = l.status==='done' ? todayStr() : null;
-  syncLectureTargets(profileId); // completedLectures count feeds the auto-target's isDone
   saveShared(); renderApp();
   syncPlannerTaskFromSource('lecture', 'lectures', profileId, paperId, lecId, l.status==='done');
   checkMilestones(profileId, paperId, null);
-}
-function setLectureCompletionTarget(profileId, paperId, dateVal){
-  if(!S.shared.lectureCompletionTarget) S.shared.lectureCompletionTarget = {};
-  if(!S.shared.lectureCompletionTarget[profileId]) S.shared.lectureCompletionTarget[profileId] = {};
-  S.shared.lectureCompletionTarget[profileId][paperId] = dateVal || null;
-  syncLectureTargets(profileId);
-  driveSyncSaveNow(); renderApp();
-}
-// Feature 3 (Interlinking Lecture Targets with Planner Targets): keeps S.shared.plannerTargets
-// in sync with each paper's Lecture Completion Target Date (the control added above, in the
-// Lectures tab). Auto-generates/updates/removes an 'auto-target-<paperId>' entry per paper —
-// id is predictable by design so this is a plain upsert, never a duplicate. isDone is derived
-// from actual lecture progress, never set directly — see the UI guard in
-// plannerDayActionsHtml()/pendingTargetsWidgetHtml() that blocks manual completion/delete for
-// anything with this id prefix and shows a toast pointing back here instead.
-function syncLectureTargets(profileId){
-  if(!S.shared.plannerTargets) S.shared.plannerTargets = {};
-  if(!S.shared.plannerTargets[profileId]) S.shared.plannerTargets[profileId] = [];
-  const list = S.shared.plannerTargets[profileId];
-  const targetDates = (S.shared.lectureCompletionTarget && S.shared.lectureCompletionTarget[profileId]) || {};
-  LECTURE_TRACKER_PAPERS.forEach(paperId=>{
-    const autoId = 'auto-target-'+paperId;
-    const dateVal = targetDates[paperId];
-    const existingIdx = list.findIndex(t=>t.id===autoId);
-    if(!dateVal){
-      if(existingIdx!==-1) list.splice(existingIdx,1); // target date cleared — nothing left to track
-      return;
-    }
-    const lecs = lecturesFor(profileId, paperId);
-    const isDone = lecs.length>0 && lecs.every(l=>l.status==='done');
-    const text = `Complete ${paperById(paperId).code} Lectures`;
-    if(existingIdx!==-1){
-      Object.assign(list[existingIdx], {date:dateVal, text, isDone});
-    } else {
-      list.push({id:autoId, date:dateVal, text, isDone});
-    }
-  });
 }
 
 // ---- Revision notes tab ----
@@ -11610,7 +12135,6 @@ function toggleManualTask(profileId, taskId){
   if(t.linkType==='lecture'){
     const l = lecturesFor(profileId, t.paperId).find(x=>x.id===t.refId);
     if(l){ l.status = t.done?'done':'pending'; l.completionDate = t.done?todayStr():null; }
-    syncLectureTargets(profileId); // completedLectures count feeds the auto-target's isDone — see setLectureCompletionTarget()
   } else if(t.linkType==='chapter'){
     const c = chapterById(profileId, t.paperId, t.refId);
     if(c){ const flag = CATEGORY_FLAG[t.linkCategory]; if(flag) c[flag] = t.done; }
@@ -11635,7 +12159,6 @@ function setTaskStatus(profileId, taskId, status){
     if(t.linkType==='lecture'){
       const l = lecturesFor(profileId, t.paperId).find(x=>x.id===t.refId);
       if(l){ l.status='done'; l.completionDate = todayStr(); }
-      syncLectureTargets(profileId); // completedLectures count feeds the auto-target's isDone — see setLectureCompletionTarget()
       saveShared();
       checkMilestones(profileId, t.paperId, null);
     } else if(t.linkType==='chapter'){
@@ -11801,8 +12324,6 @@ function calDayDetail(profileId, iso, isMe){
 // Feature 2: Open Diary / Add Target action row, plus the target list for this specific
 // day — rendered as part of the selected day's detail card in the Planner's calendar.
 function plannerDayActionsHtml(profileId, iso){
-  const targets = (S.shared.plannerTargets && S.shared.plannerTargets[profileId] || []).filter(t=>t.date===iso);
-  targets.sort((a,b)=> (a.isDone-b.isDone) || a.text.localeCompare(b.text));
   return `
   <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
     <div class="planner-day-action-row" style="display:flex;gap:8px">
@@ -11810,50 +12331,14 @@ function plannerDayActionsHtml(profileId, iso){
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
         Open Diary
       </button>
-      <button class="btn btn-sm" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px" onclick="addTarget('${profileId}','${iso}')">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        Add Target
-      </button>
     </div>
-    ${targets.length?`<div style="margin-top:10px">
-      ${targets.map(t=>{
-        const isAuto = String(t.id).startsWith('auto-target-');
-        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-          <div class="task-check ${t.isDone?'on':''}" style="cursor:pointer;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`togglePlannerTarget('${profileId}','${t.id}')`}">${t.isDone?'✓':''}</div>
-          <div style="flex:1;${t.isDone?'text-decoration:line-through;opacity:.55':''}">${escChat(t.text)}${isAuto?` <span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:700;color:var(--amber);background:var(--amber-tint);padding:1px 6px;border-radius:8px;margin-left:4px">📘 Lecture</span>`:''}</div>
-          <button class="icon-btn" style="width:22px;height:22px;flex-shrink:0" onclick="${isAuto?"showToast('To remove this, open the Lectures page for this paper and clear the Lecture Completion Target date.')":`deletePlannerTarget('${profileId}','${t.id}')`}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-        </div>`;
-      }).join('')}
-    </div>`:`<div style="font-size:11px;color:var(--text-faint);margin-top:8px">No targets set for this day.</div>`}
+    ${plannerTargetsDueHtml(profileId, iso)}
   </div>`;
 }
-function addTarget(profileId, dateStr){
-  const text = prompt('What\'s the target for this day?');
-  if(!text || !text.trim()) return;
-  if(!S.shared.plannerTargets) S.shared.plannerTargets = {};
-  if(!S.shared.plannerTargets[profileId]) S.shared.plannerTargets[profileId] = [];
-  S.shared.plannerTargets[profileId].push({id:uid(), date:dateStr, text:text.trim(), isDone:false});
-  driveSyncSaveNow();
-  renderApp();
-}
-function togglePlannerTarget(profileId, targetId){
-  const list = S.shared.plannerTargets && S.shared.plannerTargets[profileId];
-  if(!list) return;
-  const t = list.find(x=>x.id===targetId);
-  if(!t) return;
-  t.isDone = !t.isDone;
-  driveSyncSaveNow();
-  renderApp();
-}
-function deletePlannerTarget(profileId, targetId){
-  const list = S.shared.plannerTargets && S.shared.plannerTargets[profileId];
-  if(!list) return;
-  const idx = list.findIndex(x=>x.id===targetId);
-  if(idx===-1) return;
-  list.splice(idx,1);
-  driveSyncSaveNow();
-  renderApp();
-}
+// Restored — this got accidentally deleted in the Targets rebuild (it was sitting in the
+// same block as the old plannerTargets functions that genuinely needed removing, but this
+// one doesn't belong to that system at all). Still called from the Calendar day-detail's
+// "Load archived history" button for a date more than 30 days back.
 async function loadArchiveForDate(profileId, iso){
   S._archiveChecked = true;
   try{ await loadArchive(); }catch(e){ console.warn('Archive load failed:', e); }
@@ -13198,9 +13683,10 @@ function viewSettings(){
     ${notifToggleRow('lectures', '📚 Lectures overdue')}
     ${notifToggleRow('revision', '🔁 Revision due (R1/R2)')}
     ${notifToggleRow('dailyTarget', "🎯 Today's target reminder")}
+    ${notifToggleRow('targets', '📅 Target deadline alerts')}
+    ${notifToggleRow('diary', '📔 Diary not filled (today/yesterday)')}
     ${notifToggleRow('examCountdown', '⏳ Countdown — exam milestone banners')}
     ${notifToggleRow('countdownNag', '⏳ Countdown — paused 5+ min nag')}
-    ${notifToggleRow('diary', '📔 Diary not filled (today/yesterday)')}
   </div>
   ${me==='umang' ? `
   <div class="card settings-group" style="margin-top:12px">
@@ -14225,7 +14711,7 @@ async function initAfterLogin(){
   maybeSweepArchive(); // fire-and-forget; gated to once/day/device internally, never blocks load
   ensureArchiveLoaded(); // fire-and-forget; makes archived (30+ day old) history visible app-wide once it lands
   maybeRolloverOverdueTasks(); // same convention — rolls overdue incomplete tasks onto today
-  PROFILES.forEach(p=> syncLectureTargets(p.id)); // keeps auto-linked lecture targets current on every load
+  PROFILES.forEach(p=> refreshAllTargets(p.id)); // snapshots progress + fires completion celebrations on every load
   ensureDailyQuote(); // fire-and-forget; gated to once/day (shared, not per-device) internally
   applyPendingTimerActionFromUrl();
   // The manual "who's studying" picker only makes sense in local file mode, where there's
