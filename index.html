@@ -307,6 +307,20 @@ header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom
 /* SETTINGS */
 .settings-group{margin-bottom:22px}
 .settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.settings-cat-list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:0 14px;margin-bottom:22px}
+.settings-cat-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.settings-cat-list>.settings-cat-row:last-child:not(.open){border-bottom:none}
+.settings-cat-row:active{opacity:.7}
+.settings-cat-row.open .settings-cat-icon{color:var(--active-accent,var(--umang));background:var(--umang-tint)}
+.settings-cat-icon{width:36px;height:36px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--active-accent,var(--umang))}
+.settings-cat-body{flex:1;min-width:0}
+.settings-cat-title{font-weight:700;font-size:13.5px}
+.settings-cat-sub{font-size:11px;color:var(--text-faint);margin-top:1px}
+.settings-cat-chevron{color:var(--text-faint);flex-shrink:0;font-size:18px}
+.settings-cat-panel{padding:4px 0 18px;border-bottom:1px solid var(--border);margin:0 -14px;padding-left:14px;padding-right:14px;background:color-mix(in srgb, var(--text) 2.5%, transparent)}
+.settings-cat-list>.settings-cat-panel:last-child{border-bottom:none}
+.settings-cat-panel .settings-group{margin-bottom:14px}
+.settings-cat-panel .settings-group:last-child{margin-bottom:0}
 .settings-row:last-child{border-bottom:none}
 .settings-row-lbl{font-size:13px;font-weight:500}
 .settings-row-sub{font-size:11px;color:var(--text-faint);margin-top:1px}
@@ -3036,16 +3050,15 @@ function migrateShared(data){
             }
           });
         }
-        // One-time heal: durations weren't known when DT_LECTURE_SCHEDULE was first written
-        // (every row's duration was blank), so anyone already seeded before this fix has
-        // empty durations baked in — freshDtLectures() above only fires for a genuinely
-        // unseeded list, so it won't reach already-existing entries. Only fills a duration
-        // that's currently blank, keyed by lecture number, so a manually-edited duration is
-        // never overwritten.
-        const durationFor = {};
-        DT_LECTURE_SCHEDULE.forEach(row=>{ if(row.d) durationFor[row.l] = row.d; });
+        // One-time heal: applies the confirmed DT pattern (every x.1 is 1:30, every x.2 is
+        // 1:00) directly to any DT lecture with a currently-blank duration — not just ones
+        // matching DT_LECTURE_SCHEDULE, since lectures added later through the "+ Add
+        // Lecture" form (e.g. 42.x onward) never had a duration typed in either and aren't
+        // part of that constant at all. Never touches a duration that's already set.
         data.lectures[p.id][pp.id].forEach(l=>{
-          if(!l.duration && durationFor[l.num]) l.duration = durationFor[l.num];
+          if(l.duration) return;
+          if(/\.1$/.test(l.num)) l.duration = '1:30';
+          else if(/\.2$/.test(l.num)) l.duration = '1:00';
         });
       }
 
@@ -6008,7 +6021,7 @@ function moneyPageHtml(){
     }
   }
 
-  async function init(){
+async function init(){
     $('money-storage-status-dot').style.background = 'var(--good)';
     $('money-storage-status-text').innerHTML = '<b style="color:var(--ink);">Synced via Olympus</b> — saved with your Olympus data and backed up to Google Drive.';
 
@@ -9912,11 +9925,7 @@ function timerHomeTeaser(){
   if(!me) return '';
   const ls = myLiveStatus();
   if(ls.status==='idle'){
-    return `<div class="card" style="cursor:pointer;display:flex;align-items:center;gap:10px" onclick="switchView('timer')">
-      <div style="width:36px;height:36px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">⏱️</div>
-      <div style="flex:1;font-size:12.5px"><b>Start a study session</b><div style="color:var(--text-faint);font-size:11px">Track focused time with the Study Timer</div></div>
-      <span style="color:var(--text-faint)">›</span>
-    </div>`;
+    return ''; // no idle prompt on Home anymore — the active-session card below still shows once one's running
   }
   const isBreak = ls.status==='break';
   const paper = ls.paperId ? paperById(ls.paperId) : null;
@@ -11423,8 +11432,16 @@ function addLecture(profileId, paperId){
   const section = document.getElementById('nl-section').value.trim();
   const num = document.getElementById('nl-num').value.trim();
   const topic = document.getElementById('nl-topic').value.trim();
-  const duration = document.getElementById('nl-duration').value.trim();
+  let duration = document.getElementById('nl-duration').value.trim();
   if(!num){ alert('Enter a lecture number.'); return; }
+  // DT lectures follow a known pattern (confirmed by the user): every x.1 lecture is 1:30,
+  // every x.2 is 1:00. Only fills this in when the field was left blank — never overrides a
+  // duration the user actually typed, and only for DT (the pattern hasn't been confirmed for
+  // any other paper, so it isn't assumed to hold there).
+  if(paperId==='dt' && !duration){
+    if(/\.1$/.test(num)) duration = '1:30';
+    else if(/\.2$/.test(num)) duration = '1:00';
+  }
   lecturesFor(profileId,paperId).push({id:uid(), num, section, topic, duration, targetDate:null, remarks:'', status:'pending', completionDate:null});
   // Paper 4 (DT) only, per Umang: new lecture definitions mirror to the other profile so
   // both DT schedules stay identical, regardless of which profile adds them. Only the
@@ -13641,25 +13658,56 @@ function statsSubjectView(vp, prof, paperId){
 // settings categories. Every control that existed before this reorganization is still here
 // — this changed grouping and added the items noted inline, not removed anything.
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// SETTINGS — a grouped landing screen + one sub-page per category, instead of every
+// individual toggle/field living on one long page. Same in-view drill-down convention as
+// Stats' S.statsPaper (null = overview, a key = that subject's page): S.settingsSection is
+// null/undefined for the landing grid, or one of the SETTINGS_SECTIONS keys below for that
+// category's page. No history.pushState needed (same reasoning as Stats) since this is a
+// normal bottom-nav view, not a popup overlay — the bottom nav itself is the "back out"
+// affordance, same as it already is for Stats' subject drill-down.
+// Every individual control below is unchanged from the old single-page layout — only WHERE
+// each block lives moved, not what it does or which function it calls.
+// ═══════════════════════════════════════════════════════════
+const SETTINGS_SECTIONS = [
+  {key:'profile', title:'Profile & Targets', sub:'Name, daily target, exam date', icon:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0116 0v2"/>', render:'settingsSectionProfile'},
+  {key:'account', title:'Account & Sync', sub:'Sign-in, sync status', icon:'<path d="M17.5 16a4 4 0 000-8 5.5 5.5 0 00-10.6-1.7A4.5 4.5 0 007.5 16h10z"/>', render:'settingsSectionAccount'},
+  {key:'notifications', title:'Notifications', sub:'Push alerts & in-app reminders', icon:'<path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>', render:'settingsSectionNotifications'},
+  {key:'appearance', title:'Appearance', sub:'Dark mode, background theme', icon:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor" stroke="none"/>', render:'settingsSectionAppearance'},
+  {key:'ai', title:'AI Personalization', sub:'Helps Coach, Chat & Doubt Solver tailor to you', icon:'<path d="M12 2l1.7 5.8L19 9l-5.3 1.2L12 16l-1.7-5.8L5 9l5.3-1.2z"/>', render:'settingsSectionAI'},
+  {key:'data', title:'Data & Backup', sub:'Export / import your progress', icon:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/>', render:'settingsSectionData'},
+  {key:'admin', title:'Admin Tools', sub:'Privacy & app announcements', icon:'<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>', render:'settingsSectionAdmin', umangOnly:true},
+  {key:'about', title:'About', sub:'Version, intro replay, install', icon:'<circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/>', render:'settingsSectionAbout'},
+];
+// Accordion, not a separate page: tapping a row expands that category's settings directly
+// beneath it (and collapses whichever was open before — only one open at a time), tapping
+// the same row again collapses it. Toggle only, renderApp() does the actual re-render.
+function toggleSettingsSection(key){
+  S.settingsSection = (S.settingsSection===key) ? null : key;
+  renderApp();
+}
 function viewSettings(){
+  const me = S.local.myProfile;
+  const rows = SETTINGS_SECTIONS.filter(s=>!s.umangOnly || me==='umang');
+  return `
+  <div class="settings-cat-list">
+    ${rows.map(s=>{
+      const open = S.settingsSection===s.key;
+      return `<div class="settings-cat-row ${open?'open':''}" onclick="toggleSettingsSection('${s.key}')">
+        <div class="settings-cat-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg></div>
+        <div class="settings-cat-body"><div class="settings-cat-title">${s.title}</div><div class="settings-cat-sub">${s.sub}</div></div>
+        <span class="settings-cat-chevron">${open?'⌄':'›'}</span>
+      </div>
+      ${open?`<div class="settings-cat-panel">${window[s.render]()}</div>`:''}`;
+    }).join('')}
+  </div>`;
+}
+function settingsSectionProfile(){
   const me = S.local.myProfile;
   const prof = profileById(me);
   const target = S.shared.targets[me]||4;
-  const info = (S.shared.profileInfo && S.shared.profileInfo[me]) || {};
   const prefs = (S.shared.prefs && S.shared.prefs[me]) || {countBreakTime:false, autoRevisionEnabled:true};
-  const pushSubscribed = !!(S.shared.pushSubscriptions && S.shared.pushSubscriptions[me]);
   return `
-  <div class="info-banner">
-    <b>How syncing works:</b> comparison data updates when both of you open this exact same shared link (not two separately downloaded copies). Use the sync icon (top-right, next to search) to pull the latest data on demand.
-  </div>
-
-  <div class="section-title">1. Appearance</div>
-  <div class="card settings-group">
-    ${darkModeSettingsRow()}
-    <div style="border-top:1px solid var(--border)">${bgThemeSettingsRow()}</div>
-  </div>
-
-  <div class="section-title">2. Profile</div>
   <div class="card settings-group">
     <div class="settings-row"><div><div class="settings-row-lbl">You are</div><div class="settings-row-sub">${prof?prof.name:'Not set'}</div></div>
       ${!isHosted() ? `<button class="btn" onclick="resetProfile()">Switch</button>` : ''}</div>
@@ -13669,11 +13717,15 @@ function viewSettings(){
       <input type="date" value="${S.shared.examDate}" onchange="setExamDate(this.value)"></div>
     ${prefToggleRow('countBreakTime', "Count break time toward today's total", prefs.countBreakTime)}
     ${prefToggleRow('autoRevisionEnabled', 'Auto-schedule R1/R2 revision reminders', prefs.autoRevisionEnabled)}
-  </div>
-  <div class="card settings-group" style="margin-top:12px">
-    <div style="padding:12px 14px 0"><div class="settings-row-lbl" style="margin-bottom:2px">Account &amp; Sync</div></div>
+  </div>`;
+}
+function settingsSectionAccount(){
+  const me = S.local.myProfile;
+  const prof = profileById(me);
+  return `
+  <div class="card settings-group">
     ${S.appSession && isHosted() ? `
-    <div style="padding:10px 14px 14px">
+    <div style="padding:14px">
       <div style="font-size:12px;color:var(--text-faint);margin-bottom:10px">
         Signed in as <b>${prof?prof.name:S.appSession.profile}</b><br>
         Sync: <b style="color:${S.syncStatus==='ok'?'var(--good)':S.syncStatus==='error'?'var(--bad)':'var(--text)'}">${S.syncStatus==='ok'?'Active ✓':S.syncStatus==='syncing'?'Syncing…':S.syncStatus==='error'?'Error — '+S.syncError:'Idle'}</b>
@@ -13682,20 +13734,21 @@ function viewSettings(){
       <button class="btn btn-sm" onclick="driveSyncSaveNow()" style="margin-right:8px">☁️ Sync Now</button>
       <button class="btn btn-sm" onclick="appLogout()">Sign Out</button>
       <div style="font-size:11px;color:var(--good);margin-top:8px">✓ Synced to the shared Drive folder — both profiles read/write the same file</div>
-
     </div>
     ` : isHosted() ? `
-    <div style="padding:10px 14px 14px">
+    <div style="padding:14px">
       <div style="font-size:12.5px;color:var(--text-faint)">You're signed out. Reload the app to sign back in.</div>
     </div>
     ` : `
-    <div style="padding:10px 14px 14px">
+    <div style="padding:14px">
       <div style="font-size:12.5px;color:var(--text-faint)">Sync is only available when the app is opened from a hosted URL, not a downloaded file.<br><br>Open the app at <b>mangolympus.vercel.app</b> to use this feature.</div>
     </div>
     `}
-  </div>
-
-  <div class="section-title">3. Notifications</div>
+  </div>`;
+}
+function settingsSectionNotifications(){
+  const pushSubscribed = !!(S.shared.pushSubscriptions && S.shared.pushSubscriptions[S.local.myProfile]);
+  return `
   <div class="card settings-group">
     ${pushSettingsRow()}
     ${pushSubscribed ? `
@@ -13717,30 +13770,19 @@ function viewSettings(){
     ${notifToggleRow('diary', '📔 Diary not filled (today/yesterday)')}
     ${notifToggleRow('examCountdown', '⏳ Countdown — exam milestone banners')}
     ${notifToggleRow('countdownNag', '⏳ Countdown — paused 5+ min nag')}
-  </div>
-  ${me==='umang' ? `
-  <div class="card settings-group" style="margin-top:12px">
-    <div style="padding:12px 14px 0"><div class="settings-row-lbl" style="margin-bottom:2px">App Announcement</div></div>
-    <div style="padding:8px 14px 14px">
-      <div class="settings-row-sub" style="padding:0 0 10px">Publishes a one-time banner both of you see at the very top of Home. Either of you dismissing it (or you clearing it here) removes it for both, on the next sync.</div>
-      <textarea id="admin-announcement-input" rows="2" placeholder="e.g. Servers will be down for maintenance tonight 9–10 PM" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:var(--surface2);color:var(--text);font-size:12.5px;font-family:inherit;resize:vertical">${escChat(S.shared.adminAnnouncement||'')}</textarea>
-      <div class="btn-row" style="margin-top:8px">
-        <button class="btn btn-accent" onclick="publishAdminAnnouncement()">Publish</button>
-        ${S.shared.adminAnnouncement ? `<button class="btn" onclick="clearAdminAnnouncementFromSettings()">Clear</button>` : ''}
-      </div>
-    </div>
-  </div>
-  ` : ''}
-
-  ${me==='umang' ? `
-  <div class="section-title">4. Privacy</div>
+  </div>`;
+}
+function settingsSectionAppearance(){
+  return `
   <div class="card settings-group">
-    <div class="settings-row"><div><div class="settings-row-lbl">Block my profile from Chetna</div><div class="settings-row-sub">Hides your activity, stats, and Chat from her. Nothing is deleted — turn it off to restore everything instantly.</div></div>
-      <div class="toggle ${prefs.blockProfile?'on':''}" onclick="togglePref('blockProfile')"></div></div>
-  </div>
-  ` : ''}
-
-  <div class="section-title">5. AI</div>
+    ${darkModeSettingsRow()}
+    <div style="border-top:1px solid var(--border)">${bgThemeSettingsRow()}</div>
+  </div>`;
+}
+function settingsSectionAI(){
+  const me = S.local.myProfile;
+  const info = (S.shared.profileInfo && S.shared.profileInfo[me]) || {};
+  return `
   <div class="settings-row-sub" style="margin-bottom:10px">Answer a few quick questions so the AI Coach, Daily Plan, Doubt Solver, Summary Generator, and Study Chat can tailor themselves to you. Everything here is optional.</div>
   <div class="card settings-group">
     <div class="settings-row"><div><div class="settings-row-lbl">Usual wake-up time</div></div>
@@ -13764,9 +13806,10 @@ function viewSettings(){
       <div class="settings-row-lbl" style="margin-bottom:6px">Anything else the AI should know?</div>
       <textarea id="profile-info-notes" rows="3" placeholder="e.g. I get distracted easily after lunch, I prefer Hindi explanations for tricky concepts…" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:var(--surface2);color:var(--text);font-size:12.5px;font-family:inherit;resize:vertical" onchange="setProfileInfo('notes', this.value)">${escChat(info.notes||'')}</textarea>
     </div>
-  </div>
-
-  <div class="section-title">6. Data</div>
+  </div>`;
+}
+function settingsSectionData(){
+  return `
   <div class="settings-row-sub" style="margin-bottom:10px">Export / Import Progress — for two separate devices with no live sync. Each export sends only that person's chapters, lectures, logs, mock scores, target and to-dos — nothing of the other profile's. Importing fills in only that same slot, leaving the other profile untouched.</div>
   ${PROFILES.map(p=>`
   <div class="card settings-group" style="margin-bottom:12px">
@@ -13781,9 +13824,31 @@ function viewSettings(){
       <input type="file" id="import-file-${p.id}" accept=".json" style="display:none" onchange="importProfileDataInto(event,'${p.id}')">
     </div>
     <div id="profile-io-status-${p.id}" style="font-size:11.5px;color:var(--text-faint)"></div>
-  </div>`).join('')}
-
-  <div class="section-title">About</div>
+  </div>`).join('')}`;
+}
+function settingsSectionAdmin(){
+  const me = S.local.myProfile;
+  if(me!=='umang') return ''; // route-level guard — this whole section is filtered out of the landing grid for Chetna already, but never rendered for her either, just in case
+  const prefs = (S.shared.prefs && S.shared.prefs[me]) || {};
+  return `
+  <div class="card settings-group">
+    <div class="settings-row"><div><div class="settings-row-lbl">Block my profile from Chetna</div><div class="settings-row-sub">Hides your activity, stats, and Chat from her. Nothing is deleted — turn it off to restore everything instantly.</div></div>
+      <div class="toggle ${prefs.blockProfile?'on':''}" onclick="togglePref('blockProfile')"></div></div>
+  </div>
+  <div class="card settings-group" style="margin-top:12px">
+    <div style="padding:12px 14px 0"><div class="settings-row-lbl" style="margin-bottom:2px">App Announcement</div></div>
+    <div style="padding:8px 14px 14px">
+      <div class="settings-row-sub" style="padding:0 0 10px">Publishes a one-time banner both of you see at the very top of Home. Either of you dismissing it (or you clearing it here) removes it for both, on the next sync.</div>
+      <textarea id="admin-announcement-input" rows="2" placeholder="e.g. Servers will be down for maintenance tonight 9–10 PM" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:var(--surface2);color:var(--text);font-size:12.5px;font-family:inherit;resize:vertical">${escChat(S.shared.adminAnnouncement||'')}</textarea>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn btn-accent" onclick="publishAdminAnnouncement()">Publish</button>
+        ${S.shared.adminAnnouncement ? `<button class="btn" onclick="clearAdminAnnouncementFromSettings()">Clear</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+function settingsSectionAbout(){
+  return `
   <div class="card settings-group" style="display:flex;align-items:center;gap:14px">
     <img src="${LOGO_DATA_URI}" alt="Olympus" style="width:56px;height:56px;border-radius:12px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(20,30,20,.3)">
     <div style="flex:1">
@@ -13793,8 +13858,11 @@ function viewSettings(){
       ${S.pwaInstallPrompt && !S.pwaInstalled ? `<button class="btn btn-sm btn-accent" onclick="installOlympusPwa()" style="margin-left:8px">📲 Install Olympus</button>` : ''}
     </div>
   </div>
-
-  `;
+  <div class="card settings-group" style="margin-top:12px">
+    <div style="padding:14px;font-size:12.5px;line-height:1.7;color:var(--text-muted)">
+      Olympus is a shared study tracker built for CA Final under the ICAI New Scheme, used together by Mangu and Chinnu. It covers all six papers end to end — chapters, lectures, revision (R1/R2), practice, and mock scores — alongside a Study Timer with live partner status, a Planner with auto-scheduled targets, a Diary with structured daily reflection, a daily Habit tracker, Chat, and a personal Money tracker. Everything syncs through one shared file, so progress, streaks, and Head-to-Head comparisons stay up to date for both of you at once.
+    </div>
+  </div>`;
 }
 function notifToggleRow(key, label){
   const on = !!(S.local.notifPrefs && S.local.notifPrefs[key]);
@@ -14327,12 +14395,11 @@ async function doSync(manual){
 
 // ═══════════════════════════════════════════════════════════
 // SPLASH / INTRO ANIMATION — always plays on open; tries sound first
-// Held back for now (Aug 2026, Umang's call) — showSplash() and everything below it is
-// untouched and ready to go. SHOW_INTRO_SPLASH is the only thing disabling it: both the
-// auto-play-on-open trigger (in initAfterLogin()) and the Settings "▶ Replay Intro" button
-// check it. Flip to true to restore both.
+// Was held back from Aug 2026 to Sep 2026 (Umang's call at the time) via this one flag —
+// re-enabled now. Both the auto-play-on-open trigger (in initAfterLogin()) and the Settings
+// "▶ Replay Intro" button check it, so flipping it back to false disables both again.
 // ═══════════════════════════════════════════════════════════
-const SHOW_INTRO_SPLASH = false;
+const SHOW_INTRO_SPLASH = true;
 function showSplash(onDone){
   const root = document.getElementById('splash-root');
   root.innerHTML = `
@@ -14342,6 +14409,15 @@ function showSplash(onDone){
     <div class="splash-tag" id="splash-tag">CA Final Study Performance</div>
   </div>`;
   window._splashDone = onDone;
+  const showTextReveal = ()=>{
+    const w = document.getElementById('splash-word'), t = document.getElementById('splash-tag');
+    if(w) w.classList.add('show');
+    if(t) t.classList.add('show');
+    setTimeout(dismissSplash, 1100);
+  };
+  // Defensive: if INTRO_VIDEO_URI is ever empty/cleared, skip straight to the word/tagline
+  // reveal instead of showing a dead black video box.
+  if(!INTRO_VIDEO_URI){ showTextReveal(); return; }
   const vid = document.getElementById('splash-video');
   vid.src = INTRO_VIDEO_URI;
   vid.muted = false;
@@ -14357,12 +14433,7 @@ function showSplash(onDone){
       if(retry && retry.catch) retry.catch(()=> dismissSplash());
     });
   }
-  vid.onended = ()=>{
-    const w = document.getElementById('splash-word'), t = document.getElementById('splash-tag');
-    if(w) w.classList.add('show');
-    if(t) t.classList.add('show');
-    setTimeout(dismissSplash, 1100);
-  };
+  vid.onended = showTextReveal;
   vid.onerror = ()=> dismissSplash();
   window._splashSafety = setTimeout(dismissSplash, 13000);
 }
