@@ -308,15 +308,15 @@ header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom
 .settings-group{margin-bottom:22px}
 .settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
 .settings-cat-list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:0 14px;margin-bottom:22px}
-.settings-cat-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.settings-cat-row{display:flex;align-items:center;gap:16px;padding:18px 0;border-bottom:1px solid var(--border);cursor:pointer}
 .settings-cat-list>.settings-cat-row:last-child:not(.open){border-bottom:none}
 .settings-cat-row:active{opacity:.7}
 .settings-cat-row.open .settings-cat-icon{color:var(--active-accent,var(--umang));background:var(--umang-tint)}
-.settings-cat-icon{width:36px;height:36px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--active-accent,var(--umang))}
+.settings-cat-icon{width:48px;height:48px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--active-accent,var(--umang))}
 .settings-cat-body{flex:1;min-width:0}
-.settings-cat-title{font-weight:700;font-size:13.5px}
-.settings-cat-sub{font-size:11px;color:var(--text-faint);margin-top:1px}
-.settings-cat-chevron{color:var(--text-faint);flex-shrink:0;font-size:18px}
+.settings-cat-title{font-weight:700;font-size:16px}
+.settings-cat-sub{font-size:12.5px;color:var(--text-faint);margin-top:2px}
+.settings-cat-chevron{color:var(--text-faint);flex-shrink:0;font-size:22px}
 .settings-cat-panel{padding:4px 0 18px;border-bottom:1px solid var(--border);margin:0 -14px;padding-left:14px;padding-right:14px;background:color-mix(in srgb, var(--text) 2.5%, transparent)}
 .settings-cat-list>.settings-cat-panel:last-child{border-bottom:none}
 .settings-cat-panel .settings-group{margin-bottom:14px}
@@ -13694,7 +13694,7 @@ function viewSettings(){
     ${rows.map(s=>{
       const open = S.settingsSection===s.key;
       return `<div class="settings-cat-row ${open?'open':''}" onclick="toggleSettingsSection('${s.key}')">
-        <div class="settings-cat-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg></div>
+        <div class="settings-cat-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg></div>
         <div class="settings-cat-body"><div class="settings-cat-title">${s.title}</div><div class="settings-cat-sub">${s.sub}</div></div>
         <span class="settings-cat-chevron">${open?'⌄':'›'}</span>
       </div>
@@ -13859,9 +13859,25 @@ function settingsSectionAbout(){
     </div>
   </div>
   <div class="card settings-group" style="margin-top:12px">
-    <div style="padding:14px;font-size:12.5px;line-height:1.7;color:var(--text-muted)">
-      Olympus is a shared study tracker built for CA Final under the ICAI New Scheme, used together by Mangu and Chinnu. It covers all six papers end to end — chapters, lectures, revision (R1/R2), practice, and mock scores — alongside a Study Timer with live partner status, a Planner with auto-scheduled targets, a Diary with structured daily reflection, a daily Habit tracker, Chat, and a personal Money tracker. Everything syncs through one shared file, so progress, streaks, and Head-to-Head comparisons stay up to date for both of you at once.
+    <div style="padding:16px 16px 4px">
+      <div style="font-weight:800;font-size:14.5px;margin-bottom:4px">A complete CA Final companion — built for two, not just one</div>
+      <div style="font-size:12.5px;line-height:1.7;color:var(--text-muted);margin-bottom:14px">Olympus is a shared study-performance tracker for CA Final under the ICAI New Scheme, built and used together by Mangu and Chinnu. Every session, chapter, and reflection either of you logs syncs instantly through one shared file — so this isn't two separate apps side by side, it's one shared source of truth for where you both actually stand.</div>
     </div>
+    ${aboutFeatureGroup('📚', 'Full Syllabus Tracking', 'All six papers — FR, AFM, Audit, DT, IDT, IBS — with chapters, lectures, two-stage revision (R1/R2), practice, and mock score tracking, right down to individual lecture durations and pacing.')}
+    ${aboutFeatureGroup('⏱️', 'Study Timer', 'Focused-session timing with live partner status, so you can see the moment the other person starts studying or takes a break — not just after the fact.')}
+    ${aboutFeatureGroup('📅', 'Planner & Milestone Targets', 'Auto-scheduled revision reminders, deadline-based targets with pace tracking, and a daily to-do list that stays in sync with your lecture schedule automatically.')}
+    ${aboutFeatureGroup('📔', 'Diary', 'A daily performance review — auto-pulled session summary, planned-vs-actual, and structured reflection (energy, focus, mood) that carries unfinished work straight into tomorrow\'s plan.')}
+    ${aboutFeatureGroup('✅', 'Daily Habits', 'Simple check-off habits, time-linked habits with real on-time detection, and an auto-tracking habit that ticks itself once you hit your daily study target — no manual entry needed.')}
+    ${aboutFeatureGroup('🤖', 'AI Tools', 'An AI Coach, Doubt Solver, Daily Plan generator, Summary Generator, and Study Chat — all tailored to your own logged progress and the preferences you set, not generic advice.')}
+    ${aboutFeatureGroup('💬', 'Chat & Head-to-Head', 'A private space to talk, nudge each other, and see exactly how your hours, streaks, and targets compare, day by day.')}
+    ${aboutFeatureGroup('💰', 'Money', "A personal expense and invoice tracker tucked inside the same app, so it's one less thing to switch apps for.")}
+    <div style="padding:4px 16px 16px;font-size:11px;color:var(--text-faint)">Installed as a Progressive Web App — works offline, feels native, and updates itself in the background.</div>
+  </div>`;
+}
+function aboutFeatureGroup(emoji, title, body){
+  return `<div style="display:flex;gap:12px;padding:12px 16px;border-top:1px solid var(--border)">
+    <div style="font-size:20px;flex-shrink:0;line-height:1.3">${emoji}</div>
+    <div><div style="font-weight:700;font-size:13px;margin-bottom:2px">${title}</div><div style="font-size:12px;line-height:1.55;color:var(--text-muted)">${body}</div></div>
   </div>`;
 }
 function notifToggleRow(key, label){
@@ -14394,12 +14410,13 @@ async function doSync(manual){
 }
 
 // ═══════════════════════════════════════════════════════════
-// SPLASH / INTRO ANIMATION — always plays on open; tries sound first
-// Was held back from Aug 2026 to Sep 2026 (Umang's call at the time) via this one flag —
-// re-enabled now. Both the auto-play-on-open trigger (in initAfterLogin()) and the Settings
-// "▶ Replay Intro" button check it, so flipping it back to false disables both again.
+// SPLASH / INTRO ANIMATION — tries sound first
+// SHOW_INTRO_SPLASH controls ONLY the auto-play-on-app-open trigger (in initAfterLogin()
+// below) — off by request, so opening the app no longer auto-plays it. The Settings
+// "▶ Replay Intro" button (replaySplash()) is intentionally independent of this flag and
+// always plays it on tap, regardless.
 // ═══════════════════════════════════════════════════════════
-const SHOW_INTRO_SPLASH = true;
+const SHOW_INTRO_SPLASH = false;
 function showSplash(onDone){
   const root = document.getElementById('splash-root');
   root.innerHTML = `
@@ -14477,7 +14494,11 @@ function handleSplashTap(){
   _splashTapTimer = setTimeout(()=>{ _splashTapCount=0; }, 400);
   if(_splashTapCount >= 2){ _splashTapCount=0; dismissSplash(); }
 }
-function replaySplash(){ if(SHOW_INTRO_SPLASH) showSplash(()=>{}); }
+// Deliberately NOT gated on SHOW_INTRO_SPLASH — that flag only controls whether the splash
+// auto-plays when the app opens (see the other showSplash() call site below). Tapping
+// "Replay Intro" in About is a direct, explicit request to see it, so it always plays
+// regardless of whether auto-play-on-open is on.
+function replaySplash(){ showSplash(()=>{}); }
 function dismissSplash(){
   clearTimeout(window._splashSafety);
   const overlay = document.getElementById('splash-overlay');
