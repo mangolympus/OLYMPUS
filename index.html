@@ -9867,14 +9867,17 @@ function timerCardHtml(){
 }
 
 // ── Today's Plan: unified pending items across lectures + auto/manual revision tasks ──
+// Both branches now read from the SAME real task list Planner's own To-Do uses
+// (manualTasksFor / S.shared.tasks) rather than lectures re-scanning independently via
+// autoTasksFor() — that used to show every lecture with a past targetDate regardless of
+// whether a task for it still actually exists, which could silently drift out of sync with
+// Planner (a task edited, rolled over, or deleted there wouldn't be reflected here). See
+// combinedTaskList()'s own comment for the same reasoning applied to Planner already.
 function pendingItemsFor(profileId){
   const items = [];
-  autoTasksFor(profileId).forEach(t=>{
-    items.push({paperId:t.paperId, itemId:t.lecId, label:t.title, date:t.date, category:'lectures'});
-  });
   (S.shared.tasks[profileId]||[]).forEach(t=>{
-    if(t.linkType==='chapter' && !t.done && t.date && t.date<=todayStr()){
-      items.push({paperId:t.paperId, itemId:t.refId, label:t.title, date:t.date, category:t.linkCategory});
+    if((t.linkType==='lecture' || t.linkType==='chapter') && !t.done && t.date && t.date<=todayStr()){
+      items.push({paperId:t.paperId, itemId:t.refId, label:t.title, date:t.date, category:t.linkType==='lecture'?'lectures':t.linkCategory});
     }
   });
   return items.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
