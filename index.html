@@ -9886,9 +9886,10 @@ function pendingPlanSection(){
   const me = S.local.myProfile;
   const items = pendingItemsFor(me);
   if(!items.length) return `<div class="section-title">Today's Plan</div><div class="card" style="text-align:center;color:var(--text-faint);font-size:12.5px;padding:20px">Nothing overdue — you're all caught up! 🎉</div>`;
+  const scrollStyle = items.length>3 ? 'max-height:172px;overflow-y:auto;-webkit-overflow-scrolling:touch' : '';
   return `
   <div class="section-title">Today's Plan</div>
-  <div class="card" style="padding:4px 0">
+  <div class="card" style="padding:4px 0;${scrollStyle}">
     ${items.map(it=>{
       const paper = paperById(it.paperId);
       const overdue = it.date < todayStr();
@@ -9906,9 +9907,10 @@ function todaysSessionsSection(profileId){
   const pid = profileId || S.local.myProfile;
   const sessions = (S.shared.logs[pid]||[]).filter(l=>l.date===todayStr() && (l.source==='timer' || l.source==='strict-countdown')).sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||''));
   if(!sessions.length) return '';
+  const scrollStyle = sessions.length>3 ? 'max-height:156px;overflow-y:auto;-webkit-overflow-scrolling:touch' : '';
   return `
   <div class="section-title">Today's Sessions</div>
-  <div class="card" style="padding:4px 0">
+  <div class="card" style="padding:4px 0;${scrollStyle}">
     ${sessions.map(s=>{
       const paper = s.paperId ? paperById(s.paperId) : null;
       const catLabel = TIMER_CATEGORY_LABELS[s.category] || '';
