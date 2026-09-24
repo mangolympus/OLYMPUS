@@ -3047,6 +3047,11 @@ function migrateShared(data){
     if(!data.dailyChallenges[p.id]) data.dailyChallenges[p.id] = { defs: [], log: {} };
     if(!data.dailyChallenges[p.id].defs) data.dailyChallenges[p.id].defs = [];
     if(!data.dailyChallenges[p.id].log) data.dailyChallenges[p.id].log = {};
+    // Backfill seeded flag: if defs already exist from a previous version, mark as seeded
+    // so dcDefs() doesn't overwrite them with fresh defaults on the next load.
+    if(data.dailyChallenges[p.id].defs.length > 0 && !data.dailyChallenges[p.id].seeded){
+      data.dailyChallenges[p.id].seeded = true;
+    }
     if(!data.dcState[p.id]) data.dcState[p.id] = { xp: 0, streakCount: 0, lastStreakDate: null };
     if(data.dcState[p.id].xp===undefined) data.dcState[p.id].xp = 0;
     if(data.dcState[p.id].streakCount===undefined) data.dcState[p.id].streakCount = 0;
@@ -15634,9 +15639,11 @@ function dcDefs(profileId){
   if(!S.shared.dailyChallenges) S.shared.dailyChallenges = {};
   if(!S.shared.dailyChallenges[profileId]) S.shared.dailyChallenges[profileId] = {defs:[],log:{}};
   const store = S.shared.dailyChallenges[profileId];
-  // Seed defaults on first access if no definitions yet
-  if(!store.defs || store.defs.length === 0){
-    store.defs = DC_DEFAULTS.map(d=>Object.assign({}, d));
+  // Seed defaults exactly once — use a `seeded` flag, NOT a length check.
+  // A length check would re-seed if the user deliberately deleted all challenges.
+  if(!store.seeded){
+    store.defs   = DC_DEFAULTS.map(d=>Object.assign({}, d));
+    store.seeded = true;
     saveShared();
   }
   return store.defs;
@@ -15727,30 +15734,30 @@ function _dcAwardXP(profileId, amount){
 // A day qualifies when ≥75% of active challenges are completed.
 // Called after every completion so the streak updates on the same render,
 // not only after a Perfect Day. Guarded by `streakUpdated` so it fires once
-// per day regardless of how many times a challenge is tapped.
+// per qualifying day regardless of how many times a challenge is tapped.
+// IMPORTANT: non-qualifying days must NOT set streakUpdated — if they did,
+// a later completion on the same day that reaches 75% would be silently blocked.
 function _dcUpdateStreak(profileId, dateStr){
   const st  = dcGetState(profileId); // live reference, never a detached copy
   const log = dcDayLog(profileId, dateStr);
-  if(!log || log.streakUpdated) return;
+  if(!log || log.streakUpdated) return; // already counted today — skip
 
   const defs      = dcActiveDefs(profileId);
   const completed = defs.filter(d=>log.states[d.id]?.completed).length;
   const threshold = Math.ceil(defs.length * 0.75);
   const qualifies = defs.length > 0 && completed >= threshold;
 
-  if(qualifies){
-    const yesterday = new Date(dateStr+'T00:00:00');
-    yesterday.setDate(yesterday.getDate()-1);
-    const yStr   = localDateStr(yesterday);
-    const prevLog = dcDayLogRO(profileId, yStr);
-    // Consecutive if yesterday was also counted OR lastStreakDate matches
-    const consecutive = (prevLog && prevLog.streakUpdated) || st.lastStreakDate === yStr;
-    st.streakCount   = consecutive ? (st.streakCount || 0) + 1 : 1;
-    st.lastStreakDate = dateStr;
-    log.streakUpdated = true;
-  }
-  // Even on non-qualifying days mark streakUpdated so we don't recheck
-  if(!qualifies) log.streakUpdated = true;
+  if(!qualifies) return; // not enough done yet — leave streakUpdated false so we can recheck
+
+  const yesterday = new Date(dateStr+'T00:00:00');
+  yesterday.setDate(yesterday.getDate()-1);
+  const yStr    = localDateStr(yesterday);
+  const prevLog = dcDayLogRO(profileId, yStr);
+  // Consecutive if yesterday was also a qualifying day OR lastStreakDate matches yesterday
+  const consecutive = (prevLog && prevLog.streakUpdated) || st.lastStreakDate === yStr;
+  st.streakCount    = consecutive ? (st.streakCount || 0) + 1 : 1;
+  st.lastStreakDate  = dateStr;
+  log.streakUpdated  = true; // mark only after qualifying — prevents double-counting
 }
 
 // ── Central completion function ─────────────────────────────────────────────
@@ -15978,7 +15985,10 @@ function renderDailyChallengesPopup(){
   const level   = dcLevel(xp);
   const prevXP  = dcPrevLevelXP(xp);
   const nextXP  = dcNextLevelXP(xp);
-  const lvlPct  = nextXP > prevXP ? Math.min(100, Math.round(((xp-prevXP)/(nextXP-prevXP))*100)) : 100;
+  const maxLevel = DC_LEVEL_THRESHOLDS.length; // 10
+  const atMax   = level >= maxLevel;
+  const lvlPct  = atMax ? 100 : (nextXP > prevXP ? Math.min(100, Math.round(((xp-prevXP)/(nextXP-prevXP))*100)) : 100);
+  const lvlSub  = atMax ? 'Max Level reached 🏆' : `${nextXP-xp} XP to Level ${level+1}`;
   const defs    = dcActiveDefs(profileId);
   const log     = dcDayLog(profileId, dateStr);
 
@@ -16018,7 +16028,7 @@ function renderDailyChallengesPopup(){
           <div style="font-size:11px;color:var(--text-muted)"><b style="color:var(--text)">${xp}</b> / ${nextXP} XP</div>
         </div>
         <div class="dc-level-bar"><div class="dc-level-fill" style="width:${lvlPct}%"></div></div>
-        <div style="font-size:10px;color:var(--text-faint);margin-top:4px">${nextXP-xp} XP to Level ${level+1}</div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:4px">${lvlSub}</div>
       </div>
 
       <!-- TODAY'S PROGRESS -->
