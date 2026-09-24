@@ -948,6 +948,76 @@ body.games-mode #games-root{display:flex}
 .feature-card:active{transform:scale(.96)}
 @media (hover:hover){.feature-card:hover{transform:scale(1.02);box-shadow:0 6px 18px rgba(0,0,0,.28)}}
 
+/* DAILY CHALLENGES — full-screen overlay, same convention as Habits/Diary/Stats above. */
+body.daily-challenges-mode header,
+body.daily-challenges-mode .bottomnav,
+body.daily-challenges-mode .fab{display:none!important}
+body.daily-challenges-mode{padding-bottom:0;overflow:hidden}
+#daily-challenges-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column}
+body.daily-challenges-mode #daily-challenges-root{display:flex}
+#daily-challenges-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+#daily-challenges-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
+#daily-challenges-root .stats-exit-bar button:active{background:var(--surface2)}
+#daily-challenges-root .dc-scroll{flex:1 1 auto;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+
+/* CHALLENGE CARDS */
+.dc-challenge-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:transform .15s ease,box-shadow .15s ease}
+.dc-challenge-card.dc-done{background:color-mix(in srgb, var(--active-accent,var(--umang)) 6%, var(--surface));border-color:color-mix(in srgb, var(--active-accent,var(--umang)) 35%, var(--border))}
+.dc-challenge-card:active{transform:scale(.99)}
+.dc-icon{font-size:24px;flex-shrink:0;line-height:1}
+.dc-card-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.dc-card-info{flex:1;min-width:0}
+.dc-card-name{font-size:13px;font-weight:800;letter-spacing:.01em;text-transform:uppercase;color:var(--text)}
+.dc-card-desc{font-size:12px;color:var(--text-muted);margin-top:2px}
+.dc-xp-badge{flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;background:var(--amber-tint);color:var(--amber);white-space:nowrap}
+.dc-done .dc-xp-badge{background:color-mix(in srgb,var(--active-accent,var(--umang)) 12%,var(--surface2));color:var(--active-accent,var(--umang))}
+.dc-progress-bar{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:8px 0 5px;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)}
+.dc-progress-fill{height:100%;border-radius:4px;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));box-shadow:0 0 7px color-mix(in srgb,var(--active-accent,var(--umang)) 60%,transparent);transition:width .5s cubic-bezier(.22,.8,.4,1)}
+.dc-progress-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:8px}
+.dc-progress-row b{color:var(--text);font-variant-numeric:tabular-nums;font-weight:700}
+.dc-complete-check{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;box-shadow:0 0 12px color-mix(in srgb,var(--active-accent,var(--umang)) 60%,transparent)}
+.dc-complete-time{font-size:11px;color:var(--active-accent,var(--umang));font-weight:700}
+.dc-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:transform .12s}
+.dc-btn:active{transform:scale(.94)}
+.dc-btn-primary{background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--active-accent,var(--umang)) 40%,transparent)}
+.dc-btn-outline{background:transparent;color:var(--active-accent,var(--umang));border:1.5px solid var(--active-accent,var(--umang))}
+.dc-streak-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-tint);padding:4px 10px;border-radius:20px}
+.dc-xp-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--purple);background:var(--purple-tint);padding:4px 10px;border-radius:20px}
+
+/* PERFECT DAY */
+.dc-perfect-banner{background:linear-gradient(135deg,color-mix(in srgb,var(--active-accent,var(--umang)) 15%,var(--surface)),var(--surface));border:1.5px solid color-mix(in srgb,var(--active-accent,var(--umang)) 40%,var(--border));border-radius:var(--radius);padding:20px;text-align:center;margin-bottom:16px}
+.dc-perfect-emoji{font-size:40px;margin-bottom:6px}
+.dc-perfect-title{font-size:18px;font-weight:800;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));-webkit-background-clip:text;background-clip:text;color:transparent}
+.dc-perfect-sub{font-size:12.5px;color:var(--text-muted);margin-top:4px}
+
+/* MANAGE CHALLENGES */
+.dc-manage-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
+.dc-manage-row:last-child{border-bottom:none}
+.dc-toggle{width:38px;height:22px;border-radius:11px;border:none;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);position:relative;flex-shrink:0;transition:background .2s}
+.dc-toggle.on{background:var(--active-accent,var(--umang));border-color:var(--active-accent,var(--umang))}
+.dc-toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.dc-toggle.on::after{transform:translateX(16px)}
+.dc-manage-info{flex:1;min-width:0}
+.dc-manage-name{font-size:12.5px;font-weight:700}
+.dc-manage-desc{font-size:11px;color:var(--text-muted);margin-top:1px}
+
+/* HOME CARD */
+.dc-home-pbar{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:8px 0 6px;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)}
+.dc-home-pfill{height:100%;border-radius:4px;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));box-shadow:0 0 7px color-mix(in srgb,var(--active-accent,var(--umang)) 60%,transparent);transition:width .5s cubic-bezier(.22,.8,.4,1)}
+
+/* XP POPUP FLASH */
+@keyframes xpPop{0%{transform:translateY(0) scale(1);opacity:1}50%{transform:translateY(-28px) scale(1.15);opacity:1}100%{transform:translateY(-48px) scale(.9);opacity:0}}
+.xp-pop-label{position:fixed;font-size:18px;font-weight:800;color:var(--amber);pointer-events:none;z-index:999;text-shadow:0 2px 8px rgba(0,0,0,.35);animation:xpPop .8s ease forwards}
+
+/* ADD CHALLENGE FORM */
+.dc-form-label{font-size:10px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;display:block}
+.dc-form-input{width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:var(--surface2);color:var(--text);font-size:13px;font-family:inherit}
+.dc-form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+
+/* XP LEVEL BAR */
+.dc-level-bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin:4px 0}
+.dc-level-fill{height:100%;border-radius:3px;background:linear-gradient(135deg,var(--purple),var(--purple-2));transition:width .5s cubic-bezier(.22,.8,.4,1)}
+
 body.fullscreen-timer-mode header,
 body.fullscreen-timer-mode .bottomnav,
 body.fullscreen-timer-mode .fab{display:none!important}
@@ -1684,6 +1754,7 @@ html[data-mode="dark"] .trend-area-fill{ opacity:.25; }
 <div id="money-root" class="money-view"></div>
 <div id="stats-root"></div>
 <div id="habits-root"></div>
+<div id="daily-challenges-root"></div>
 <div id="diary-root"></div>
 <div id="targets-root"></div>
 <div id="toast-root"></div>
@@ -2845,10 +2916,17 @@ function buildDefaultShared(){
   // left in place (never deleted) purely so nothing already synced is lost, same as diary/
   // diaryMood were kept during the Diary rebuild — nothing new reads or writes them.
   const milestoneTargets = {}; PROFILES.forEach(p=> milestoneTargets[p.id] = []);
+  // dailyChallenges: per-profile challenge definitions + daily log
+  // dcState: per-profile XP total and challenge streak
+  const dailyChallenges = {}; const dcState = {};
+  PROFILES.forEach(p=>{
+    dailyChallenges[p.id] = { defs: [], log: {} };
+    dcState[p.id] = { xp: 0, streakCount: 0, lastStreakDate: null };
+  });
   return { examDate:'2027-05-02', papers, logs, targets, chapters, lectures, mockScores, notes, tasks, questions:[], qStats:{}, chat,
     profileInfo, timerState, dailyTargetOverride, prefs, celebratedMilestones, pushSubscriptions, pushState, pushPrefs, habits, habitLog,
     money:{}, adminAnnouncement:'', dailyQuote:{date:'', text:''}, diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget,
-    milestoneTargets };
+    milestoneTargets, dailyChallenges, dcState };
 }
 // Umang and Chetna each have their own real Indirect Tax lecture schedule (different lecturers,
 // different numbering) — kept as two separate source lists rather than one shared default.
@@ -2961,6 +3039,19 @@ function migrateShared(data){
   // plannerTargets/lectureCompletionTarget (see the buildDefaultShared() note above them) —
   // nothing existing is touched.
   if(!data.milestoneTargets) data.milestoneTargets = {};
+  // dailyChallenges: per-profile challenge definitions + per-day logs. dcState: XP + streak.
+  // Purely additive — never touches any existing key.
+  if(!data.dailyChallenges) data.dailyChallenges = {};
+  if(!data.dcState) data.dcState = {};
+  PROFILES.forEach(p=>{
+    if(!data.dailyChallenges[p.id]) data.dailyChallenges[p.id] = { defs: [], log: {} };
+    if(!data.dailyChallenges[p.id].defs) data.dailyChallenges[p.id].defs = [];
+    if(!data.dailyChallenges[p.id].log) data.dailyChallenges[p.id].log = {};
+    if(!data.dcState[p.id]) data.dcState[p.id] = { xp: 0, streakCount: 0, lastStreakDate: null };
+    if(data.dcState[p.id].xp===undefined) data.dcState[p.id].xp = 0;
+    if(data.dcState[p.id].streakCount===undefined) data.dcState[p.id].streakCount = 0;
+    if(data.dcState[p.id].lastStreakDate===undefined) data.dcState[p.id].lastStreakDate = null;
+  });
   PROFILES.forEach(p=>{
     if(!data.diary[p.id]) data.diary[p.id] = {};
     if(!data.diaryMood[p.id]) data.diaryMood[p.id] = {};
@@ -10096,7 +10187,7 @@ function featuresGridHtml(){
   const cards = [
     {label:'Timer', icon:ICONS.timer, onclick:"switchView('timer')"},
     {label:'Countdown', icon:icoCountdown, onclick:"openStrictCountdownFromHome()"},
-    {label:'Challenges', icon:icoChallenges, onclick:"openHabitsPopup()"},
+    {label:'Challenges', icon:icoChallenges, onclick:"openDailyChallengesPopup()"},
     {label:'Planner', icon:ICONS.planner, onclick:"switchView('planner')"},
     {label:'Statistics', icon:ICONS.stats, onclick:"openStatsPopup()"},
     {label:'Games', icon:icoGames, onclick:"openGamesPopup()"},
@@ -10175,6 +10266,8 @@ function viewHome(){
       ${isMe && isOverridden ? `<div style="margin-top:6px;text-align:right"><span onclick="event.stopPropagation();clearTodaysTargetOverride('${vp}')" style="font-size:10px;color:var(--text-faint);text-decoration:underline;cursor:pointer">Reset to ${S.shared.targets[vp]||4}h minimum</span></div>` : ''}
     </div>
   </div>
+
+  ${isMe ? homeDailyChallengesCard(vp) : ''}
 
   ${targetsNeedsAttentionWidgetHtml(vp, isMe)}
 
@@ -15512,6 +15605,789 @@ function notifyPartnerNewMessage(me, text){
   const prof = profileById(me);
   const preview = (text||'').slice(0,80);
   sendPush(other, `💬 ${prof.nick}`, preview || 'Sent a message', {url:'./'});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DAILY CHALLENGES — personal daily habit & discipline system.
+// Architecture mirrors the Habits overlay (private per-profile, own full-screen
+// root, same history checkpoint pattern). Reads study hours from the existing
+// timer/log system — never creates a parallel study tracker.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Default challenge definitions (seeded once per profile on first open) ──
+const DC_DEFAULTS = [
+  {id:'dc-wake-up',  name:'Wake Up On Time',  icon:'🌅', desc:'Wake up before 6:30 AM',          type:'boolean',     xp:20, enabled:true,  targetValue:'06:30', unit:'time'},
+  {id:'dc-study',    name:'Deep Study',        icon:'📚', desc:'Study for 6 hours',                type:'study-hours', xp:50, enabled:true,  targetValue:6,       unit:'hours'},
+  {id:'dc-no-junk',  name:'Fast Food Detox',   icon:'🚫', desc:'No fast food today',               type:'boolean',     xp:40, enabled:true,  targetValue:null,    unit:''},
+  {id:'dc-exercise', name:'Exercise',           icon:'🏃', desc:'Exercise for 30 minutes',          type:'boolean',     xp:35, enabled:true,  targetValue:30,      unit:'min'},
+  {id:'dc-water',    name:'Hydration',          icon:'💧', desc:'Drink 8 glasses of water',         type:'boolean',     xp:10, enabled:true,  targetValue:8,       unit:'glasses'},
+  {id:'dc-read',     name:'Reading',            icon:'📖', desc:'Read for 20 minutes',              type:'boolean',     xp:20, enabled:false, targetValue:20,      unit:'min'},
+  {id:'dc-social',   name:'Limit Social Media', icon:'📱', desc:'Keep social media under 30 min',  type:'boolean',     xp:20, enabled:false, targetValue:null,    unit:''},
+  {id:'dc-sleep',    name:'Early Sleep',        icon:'😴', desc:'Sleep before 11 PM',              type:'boolean',     xp:20, enabled:false, targetValue:'23:00', unit:'time'},
+  {id:'dc-meditate', name:'Meditation',         icon:'🧘', desc:'Meditate for 10 minutes',         type:'boolean',     xp:20, enabled:false, targetValue:10,      unit:'min'},
+];
+const DC_XP_TIERS = { easy:10, medium:20, hard:35, major:50, perfect:100 };
+const DC_LEVEL_THRESHOLDS = [0,100,250,500,850,1300,1900,2700,3700,5000];
+
+// ── Accessor helpers ────────────────────────────────────────────────────────
+function dcDefs(profileId){
+  if(!S.shared.dailyChallenges) S.shared.dailyChallenges = {};
+  if(!S.shared.dailyChallenges[profileId]) S.shared.dailyChallenges[profileId] = {defs:[],log:{}};
+  const store = S.shared.dailyChallenges[profileId];
+  // Seed defaults on first access if no definitions yet
+  if(!store.defs || store.defs.length === 0){
+    store.defs = DC_DEFAULTS.map(d=>Object.assign({}, d));
+    saveShared();
+  }
+  return store.defs;
+}
+function dcActiveDefs(profileId){ return dcDefs(profileId).filter(d=>d.enabled!==false); }
+function dcDayLog(profileId, dateStr){
+  if(!S.shared.dailyChallenges) S.shared.dailyChallenges = {};
+  if(!S.shared.dailyChallenges[profileId]) S.shared.dailyChallenges[profileId] = {defs:[],log:{}};
+  const store = S.shared.dailyChallenges[profileId];
+  if(!store.log[dateStr]) store.log[dateStr] = {states:{}, perfectDayAwarded:false, streakUpdated:false};
+  return store.log[dateStr];
+}
+// Safe read-only accessor — returns the log without creating it (for weekly summary etc.)
+function dcDayLogRO(profileId, dateStr){
+  return S.shared.dailyChallenges?.[profileId]?.log?.[dateStr] || null;
+}
+function dcGetState(profileId){
+  // FIX: always return the live object from S.shared so writes persist
+  if(!S.shared.dcState) S.shared.dcState = {};
+  if(!S.shared.dcState[profileId]) S.shared.dcState[profileId] = {xp:0, streakCount:0, lastStreakDate:null};
+  return S.shared.dcState[profileId];
+}
+function dcLevel(xp){
+  for(let i=DC_LEVEL_THRESHOLDS.length-1;i>=0;i--){ if(xp>=DC_LEVEL_THRESHOLDS[i]) return i+1; }
+  return 1;
+}
+function dcNextLevelXP(xp){
+  const lvl = dcLevel(xp);
+  return lvl < DC_LEVEL_THRESHOLDS.length ? DC_LEVEL_THRESHOLDS[lvl] : DC_LEVEL_THRESHOLDS[DC_LEVEL_THRESHOLDS.length-1];
+}
+function dcPrevLevelXP(xp){
+  const lvl = dcLevel(xp);
+  return DC_LEVEL_THRESHOLDS[Math.max(0, lvl-1)];
+}
+
+// ── Study-hours progress for a challenge ──
+function dcStudyProgress(profileId, dateStr, targetHours){
+  const done = hoursOnDate(profileId, dateStr);
+  const pct  = Math.min(100, Math.round((done / Math.max(0.01, targetHours)) * 100));
+  return { done, target: targetHours, pct };
+}
+
+// ── Central progress refresh — derives auto-progress from existing data ──
+// Called on every render so study-hours challenges stay live without a tap.
+function refreshDailyChallengeProgress(profileId){
+  const dateStr = todayStr();
+  const defs    = dcActiveDefs(profileId);
+  const log     = dcDayLog(profileId, dateStr);
+  if(!log) return;
+  let changed = false;
+  defs.forEach(def=>{
+    if(def.type === 'study-hours'){
+      const sp = dcStudyProgress(profileId, dateStr, def.targetValue || 6);
+      if(!log.states[def.id]) log.states[def.id] = {};
+      const st = log.states[def.id];
+      if(sp.pct >= 100 && !st.completed){
+        // Target hit — auto-complete
+        st.completed  = true;
+        st.completedAt = nowISO();
+        if(!st.xpAwarded){
+          st.xpAwarded = true;
+          _dcAwardXP(profileId, def.xp || 50);
+          changed = true;
+        }
+        changed = true;
+      } else if(sp.pct < 100 && st.completed && !st.manuallyCompleted){
+        // Hours dropped back below target (e.g. log deleted) — un-complete
+        if(st.xpAwarded){
+          _dcAwardXP(profileId, -(def.xp || 50));
+          st.xpAwarded = false;
+        }
+        st.completed   = false;
+        st.completedAt = null;
+        changed = true;
+      }
+    }
+  });
+  if(changed){ _dcCheckPerfectDay(profileId, dateStr); saveShared(); }
+}
+
+// ── Award XP — clamps to 0 so it can never go negative ──
+function _dcAwardXP(profileId, amount){
+  const st = dcGetState(profileId);
+  st.xp = Math.max(0, (st.xp || 0) + amount);
+}
+
+// ── Challenge streak ─────────────────────────────────────────────────────────
+// A day qualifies when ≥75% of active challenges are completed.
+// Called after every completion so the streak updates on the same render,
+// not only after a Perfect Day. Guarded by `streakUpdated` so it fires once
+// per day regardless of how many times a challenge is tapped.
+function _dcUpdateStreak(profileId, dateStr){
+  const st  = dcGetState(profileId); // live reference, never a detached copy
+  const log = dcDayLog(profileId, dateStr);
+  if(!log || log.streakUpdated) return;
+
+  const defs      = dcActiveDefs(profileId);
+  const completed = defs.filter(d=>log.states[d.id]?.completed).length;
+  const threshold = Math.ceil(defs.length * 0.75);
+  const qualifies = defs.length > 0 && completed >= threshold;
+
+  if(qualifies){
+    const yesterday = new Date(dateStr+'T00:00:00');
+    yesterday.setDate(yesterday.getDate()-1);
+    const yStr   = localDateStr(yesterday);
+    const prevLog = dcDayLogRO(profileId, yStr);
+    // Consecutive if yesterday was also counted OR lastStreakDate matches
+    const consecutive = (prevLog && prevLog.streakUpdated) || st.lastStreakDate === yStr;
+    st.streakCount   = consecutive ? (st.streakCount || 0) + 1 : 1;
+    st.lastStreakDate = dateStr;
+    log.streakUpdated = true;
+  }
+  // Even on non-qualifying days mark streakUpdated so we don't recheck
+  if(!qualifies) log.streakUpdated = true;
+}
+
+// ── Central completion function ─────────────────────────────────────────────
+function completeDailyChallenge(profileId, challengeId){
+  if(profileId !== S.local.myProfile){
+    showToast("You can only complete your own challenges."); return;
+  }
+  const dateStr = todayStr();
+  const defs    = dcDefs(profileId);
+  const def     = defs.find(d=>d.id===challengeId);
+  if(!def){ showToast('Challenge not found.'); return; }
+  if(def.type === 'study-hours'){
+    showToast('This challenge tracks automatically from your logged study hours.'); return;
+  }
+
+  const log = dcDayLog(profileId, dateStr);
+  if(!log) return;
+  if(!log.states[challengeId]) log.states[challengeId] = {};
+  const entry      = log.states[challengeId];
+  const alreadyDone = entry.completed;
+
+  if(alreadyDone){
+    // Undo — not allowed after Perfect Day is sealed
+    if(log.perfectDayAwarded){
+      showToast("Perfect Day is sealed — can't undo a completed challenge."); return;
+    }
+    entry.completed  = false;
+    entry.completedAt = null;
+    entry.manuallyCompleted = false;
+    if(entry.xpAwarded){
+      _dcAwardXP(profileId, -(def.xp||20));
+      entry.xpAwarded = false;
+    }
+    saveShared();
+    renderDailyChallengesPopup();
+    renderApp();
+    return;
+  }
+
+  // Complete
+  entry.completed        = true;
+  entry.completedAt      = nowISO();
+  entry.manuallyCompleted = true;
+  if(!entry.xpAwarded){
+    entry.xpAwarded = true;
+    _dcAwardXP(profileId, def.xp || 20);
+    _dcShowXPFlash(def.xp || 20);
+  }
+
+  // FIX: update streak on every completion, not just Perfect Day
+  _dcUpdateStreak(profileId, dateStr);
+  _dcCheckPerfectDay(profileId, dateStr);
+  saveShared();
+  renderDailyChallengesPopup();
+  renderApp();
+}
+
+// ── Perfect Day check ──
+function _dcCheckPerfectDay(profileId, dateStr){
+  const log  = dcDayLog(profileId, dateStr);
+  if(!log || log.perfectDayAwarded) return;
+  const defs = dcActiveDefs(profileId);
+  if(defs.length === 0) return;
+  const allDone = defs.every(d=>log.states[d.id]?.completed);
+  if(!allDone) return;
+  log.perfectDayAwarded = true;
+  _dcAwardXP(profileId, DC_XP_TIERS.perfect);
+  _dcUpdateStreak(profileId, dateStr); // streak also updates on Perfect Day
+  saveShared();
+  celebrateMilestone('🏆 Perfect Day! Every challenge conquered. +100 XP');
+}
+
+// ── XP flash — FIX: use absolute position inside viewport, no conflicting transforms ──
+function _dcShowXPFlash(amount){
+  const el = document.createElement('div');
+  el.className  = 'xp-pop-label';
+  el.textContent = `+${amount} XP ⚡`;
+  el.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:9999;pointer-events:none;font-size:22px;font-weight:800;color:var(--amber);text-shadow:0 2px 10px rgba(0,0,0,.4)';
+  document.body.appendChild(el);
+  setTimeout(()=> el.remove(), 900);
+}
+
+// ── Today's aggregate progress ─────────────────────────────────────────────
+function dcTodayProgress(profileId){
+  const dateStr   = todayStr();
+  const defs      = dcActiveDefs(profileId);
+  const log       = dcDayLogRO(profileId, dateStr); // read-only — no side effects
+  const completed  = defs.filter(d=>log?.states?.[d.id]?.completed).length;
+  const total      = defs.length;
+  const pct        = total ? Math.round((completed/total)*100) : 0;
+  const perfectDay = !!(log?.perfectDayAwarded);
+  return { completed, total, pct, perfectDay, remaining: total - completed };
+}
+
+// ── Weekly summary ─────────────────────────────────────────────────────────
+function dcWeeklySummary(profileId){
+  let perfectDays=0, totalCompleted=0, totalPossible=0, xpEarned=0;
+  const today = new Date(todayStr()+'T00:00:00');
+  for(let i=0;i<7;i++){
+    const d   = new Date(today); d.setDate(d.getDate()-i);
+    const ds  = localDateStr(d);
+    const defs = dcActiveDefs(profileId);
+    const log  = dcDayLogRO(profileId, ds);
+    totalPossible += defs.length;
+    if(log){
+      const done = defs.filter(def=>log.states?.[def.id]?.completed).length;
+      totalCompleted += done;
+      if(log.perfectDayAwarded){ perfectDays++; xpEarned += DC_XP_TIERS.perfect; }
+      defs.forEach(def=>{ if(log.states?.[def.id]?.xpAwarded) xpEarned += (def.xp||20); });
+    }
+  }
+  const compPct = totalPossible ? Math.round((totalCompleted/totalPossible)*100) : 0;
+  return { perfectDays, totalCompleted, totalPossible, xpEarned, compPct };
+}
+
+// ── Motivational message — FIX: use exact remaining count, not threshold ──
+function dcMotivationLine(completed, total){
+  const remaining = total - completed;
+  if(total === 0)      return 'Set up your challenges below.';
+  if(remaining === 0)  return 'Day conquered. You showed up. 🏆';
+  if(remaining === 1)  return 'One challenge left — finish strong.';
+  if(completed === 0)  return 'Your day is still yours to win. 🔥';
+  if(completed >= Math.ceil(total / 2)) return "You're halfway there. Keep going.";
+  return `${remaining} challenges remaining.`;
+}
+
+// ── HOME CARD ──────────────────────────────────────────────────────────────
+function homeDailyChallengesCard(profileId){
+  refreshDailyChallengeProgress(profileId);
+  const prog   = dcTodayProgress(profileId);
+  const st     = dcGetState(profileId);
+  const streak = st.streakCount || 0;
+  const xp     = st.xp || 0;
+
+  if(prog.total === 0) return '';
+
+  if(prog.perfectDay){
+    return `
+    <div class="section-title">Daily Challenges</div>
+    <div class="card dc-perfect-banner" style="cursor:pointer" onclick="openDailyChallengesPopup()">
+      <div class="dc-perfect-emoji">🏆</div>
+      <div class="dc-perfect-title">DAY CONQUERED</div>
+      <div style="font-size:15px;font-weight:800;margin:6px 0 2px;color:var(--text)">${prog.completed} / ${prog.total} COMPLETED · 100%</div>
+      <div class="dc-perfect-sub">+100 XP Perfect Day Bonus${streak>0?` · 🔥 ${streak} day streak`:''}</div>
+    </div>`;
+  }
+
+  return `
+  <div class="section-title">Daily Challenges</div>
+  <div class="card" style="cursor:pointer;padding-bottom:14px" onclick="openDailyChallengesPopup()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="font-size:18px">🔥</span>
+        <div>
+          <div style="font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text)">Daily Challenges</div>
+          ${streak>0?`<div style="font-size:10.5px;color:var(--amber);font-weight:700">🔥 ${streak} day streak</div>`:'<div style="font-size:10.5px;color:var(--text-faint)">Start your streak today</div>'}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:800;color:var(--text)">${prog.completed}<span style="color:var(--text-faint);font-weight:600"> / ${prog.total}</span></div>
+        <div style="font-size:10px;color:var(--text-faint)">+${xp} XP total</div>
+      </div>
+    </div>
+    <div class="dc-home-pbar"><div class="dc-home-pfill" style="width:${prog.pct}%"></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted)">
+      <span>${dcMotivationLine(prog.completed, prog.total)}</span>
+      <span style="font-weight:700;color:var(--active-accent,var(--umang))">${prog.pct}% →</span>
+    </div>
+  </div>`;
+}
+
+// ── POPUP OPEN/CLOSE (mirrors habits popup pattern exactly) ─────────────────
+let _dcHistoryActive = false;
+function openDailyChallengesPopup(){
+  if(!_dcHistoryActive){
+    try{ history.pushState({olympusDC:true},'',location.href); }catch(e){}
+    _dcHistoryActive = true;
+    window.addEventListener('popstate', _onDCBackButton);
+  }
+  S.dcPopupOpen   = true;
+  S._dcManageMode = false;
+  S._dcAddMode    = false;
+  S._dcEditId     = null;
+  document.body.classList.add('daily-challenges-mode');
+  refreshDailyChallengeProgress(S.local.myProfile);
+  renderDailyChallengesPopup();
+}
+function _onDCBackButton(){ closeDailyChallengesPopup(); }
+function closeDailyChallengesPopup(){
+  if(_dcHistoryActive){
+    window.removeEventListener('popstate', _onDCBackButton);
+    _dcHistoryActive = false;
+  }
+  S.dcPopupOpen = false;
+  document.body.classList.remove('daily-challenges-mode');
+  const el = document.getElementById('daily-challenges-root');
+  if(el) el.innerHTML = '';
+  renderApp();
+}
+function exitDailyChallengesPopup(){
+  if(_dcHistoryActive) history.back(); else closeDailyChallengesPopup();
+}
+
+// ── MAIN RENDER ──────────────────────────────────────────────────────────────
+function renderDailyChallengesPopup(){
+  const root = document.getElementById('daily-challenges-root');
+  if(!root) return;
+  const profileId = S.local.myProfile;
+  refreshDailyChallengeProgress(profileId);
+
+  if(S._dcManageMode){
+    root.innerHTML = _dcManageHtml(profileId); return;
+  }
+  if(S._dcAddMode || S._dcEditId){
+    root.innerHTML = _dcFormHtml(profileId, S._dcEditId); return;
+  }
+
+  const dateStr = todayStr();
+  const d       = new Date(dateStr+'T00:00:00');
+  const dateLine = d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
+  const prog    = dcTodayProgress(profileId);
+  const st      = dcGetState(profileId);
+  const streak  = st.streakCount || 0;
+  const xp      = st.xp || 0;
+  const level   = dcLevel(xp);
+  const prevXP  = dcPrevLevelXP(xp);
+  const nextXP  = dcNextLevelXP(xp);
+  const lvlPct  = nextXP > prevXP ? Math.min(100, Math.round(((xp-prevXP)/(nextXP-prevXP))*100)) : 100;
+  const defs    = dcActiveDefs(profileId);
+  const log     = dcDayLog(profileId, dateStr);
+
+  const QUOTES = [
+    '"Win today. Build tomorrow."',
+    '"Small disciplines compound into big results."',
+    '"Every day is a chance to raise the bar."',
+    '"Consistency beats intensity."',
+    '"The most important rep is the one you almost skipped."',
+  ];
+  const quote = QUOTES[d.getDate() % QUOTES.length];
+
+  root.innerHTML = `
+  <div class="stats-exit-bar">
+    <button onclick="exitDailyChallengesPopup()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+    <div style="flex:1;font-size:13px;font-weight:800;text-align:center;color:var(--text)">Daily Challenges</div>
+    <button onclick="S._dcManageMode=true;renderDailyChallengesPopup()" style="font-size:12px;font-weight:700;color:var(--active-accent,var(--umang));background:none;border:none;cursor:pointer;padding:8px 10px">Manage</button>
+  </div>
+  <div class="dc-scroll">
+
+    <!-- HEADER -->
+    <div style="text-align:center;padding:8px 0 18px">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px">${dateLine}</div>
+      <div style="font-style:italic;font-size:13px;color:var(--text-faint);margin-bottom:14px">${quote}</div>
+      <div style="display:flex;justify-content:center;gap:10px;margin-bottom:16px">
+        <div class="dc-streak-chip">🔥 ${streak} Day Streak</div>
+        <div class="dc-xp-chip">⚡ ${xp} XP</div>
+      </div>
+
+      <!-- XP LEVEL BAR -->
+      <div class="card" style="padding:12px 16px;margin-bottom:12px;text-align:left">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:12px;font-weight:800;color:var(--purple)">⚡ LEVEL ${level}</div>
+          <div style="font-size:11px;color:var(--text-muted)"><b style="color:var(--text)">${xp}</b> / ${nextXP} XP</div>
+        </div>
+        <div class="dc-level-bar"><div class="dc-level-fill" style="width:${lvlPct}%"></div></div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:4px">${nextXP-xp} XP to Level ${level+1}</div>
+      </div>
+
+      <!-- TODAY'S PROGRESS -->
+      <div class="card" style="padding:16px;margin-bottom:4px;text-align:left">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px">Today's Progress</div>
+        <div style="font-size:28px;font-weight:800;color:var(--text);line-height:1">${prog.completed} <span style="font-size:16px;color:var(--text-faint);font-weight:600">/ ${prog.total} Completed</span></div>
+        <div class="dc-progress-bar" style="margin:10px 0 4px"><div class="dc-progress-fill" style="width:${prog.pct}%"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+          <span>${dcMotivationLine(prog.completed, prog.total)}</span>
+          <span style="font-weight:800;color:var(--active-accent,var(--umang))">${prog.pct}%</span>
+        </div>
+      </div>
+    </div>
+
+    ${prog.perfectDay ? `
+    <div class="dc-perfect-banner" style="margin-bottom:20px">
+      <div class="dc-perfect-emoji">🏆</div>
+      <div class="dc-perfect-title">PERFECT DAY</div>
+      <div style="font-size:14px;font-weight:800;color:var(--text);margin:6px 0 2px">${prog.completed} / ${prog.total} COMPLETED</div>
+      <div class="dc-perfect-sub">+100 XP BONUS · Challenge streak extended 🔥</div>
+    </div>` : ''}
+
+    <!-- CHALLENGES LIST -->
+    <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px">Today's Challenges</div>
+    ${defs.length === 0
+      ? `<div class="card" style="text-align:center;padding:28px 16px;color:var(--text-faint);font-size:13px">
+           No active challenges.<br>
+           <button class="dc-btn dc-btn-primary" style="margin-top:14px" onclick="S._dcManageMode=true;renderDailyChallengesPopup()">+ Set Up Challenges</button>
+         </div>`
+      : defs.map(def=>_dcChallengeCardHtml(profileId, def, log, dateStr)).join('')}
+
+    <!-- WEEKLY SUMMARY -->
+    ${_dcWeeklySummaryHtml(profileId)}
+
+  </div>`;
+}
+
+// ── Individual challenge card ────────────────────────────────────────────────
+function _dcChallengeCardHtml(profileId, def, log, dateStr){
+  const entry     = log?.states?.[def.id] || {};
+  const completed = entry.completed || false;
+  const xpAmt     = def.xp || 20;
+
+  let progressBlock = '';
+  let actionBlock   = '';
+
+  if(def.type === 'study-hours'){
+    const sp    = dcStudyProgress(profileId, dateStr, def.targetValue || 6);
+    const doneH = sp.done.toFixed(1);
+    const tgtH  = sp.target;
+    const remH  = Math.max(0, tgtH - sp.done).toFixed(1);
+    if(completed){
+      progressBlock = `<div class="dc-complete-time">✓ ${doneH}h logged — Target met!</div>`;
+    } else {
+      progressBlock = `
+        <div class="dc-progress-row" style="margin-bottom:4px"><b>${doneH}h</b>&nbsp;/ ${tgtH}h<span style="margin-left:auto">${remH}h remaining</span></div>
+        <div class="dc-progress-bar"><div class="dc-progress-fill" style="width:${sp.pct}%"></div></div>`;
+      // FIX: close the overlay before switching to timer so it doesn't cover the view
+      actionBlock = `<button class="dc-btn dc-btn-outline" style="margin-top:10px" onclick="exitDailyChallengesPopup();switchView('timer')">⏱ Start Timer</button>`;
+    }
+  } else {
+    if(completed){
+      const at = entry.completedAt
+        ? ' at ' + new Date(entry.completedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})
+        : '';
+      progressBlock = `<div class="dc-complete-time">✓ Completed${at}</div>`;
+      if(!log?.perfectDayAwarded){
+        actionBlock = `<button class="dc-btn dc-btn-outline" style="margin-top:8px;font-size:11px;opacity:.65" onclick="completeDailyChallenge('${profileId}','${def.id}')">Undo</button>`;
+      }
+    } else {
+      actionBlock = `<button class="dc-btn dc-btn-primary" style="margin-top:10px" onclick="completeDailyChallenge('${profileId}','${def.id}')">✓ Mark Complete</button>`;
+    }
+  }
+
+  return `
+  <div class="dc-challenge-card ${completed?'dc-done':''}">
+    <div class="dc-card-head">
+      <div class="dc-icon">${def.icon||'⭐'}</div>
+      <div class="dc-card-info">
+        <div class="dc-card-name">${escChat(def.name)}</div>
+        <div class="dc-card-desc">${escChat(def.desc)}</div>
+      </div>
+      ${completed
+        ? `<div class="dc-complete-check">✓</div>`
+        : `<div class="dc-xp-badge">+${xpAmt} XP</div>`}
+    </div>
+    ${progressBlock}
+    ${actionBlock}
+    ${completed
+      ? `<div style="margin-top:6px"><span class="dc-xp-badge" style="display:inline-flex">+${xpAmt} XP earned</span></div>`
+      : ''}
+  </div>`;
+}
+
+// ── Weekly summary block ─────────────────────────────────────────────────────
+function _dcWeeklySummaryHtml(profileId){
+  const ws = dcWeeklySummary(profileId);
+  const st = dcGetState(profileId);
+  return `
+  <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin:20px 0 10px">This Week</div>
+  <div class="card" style="margin-bottom:24px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="text-align:center;padding:10px 8px;background:var(--surface2);border-radius:10px">
+        <div style="font-size:20px;font-weight:800;color:var(--text)">${ws.perfectDays}<span style="font-size:13px;color:var(--text-faint)"> / 7</span></div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:3px">Perfect Days</div>
+      </div>
+      <div style="text-align:center;padding:10px 8px;background:var(--surface2);border-radius:10px">
+        <div style="font-size:20px;font-weight:800;color:var(--text)">${ws.totalCompleted}<span style="font-size:13px;color:var(--text-faint)"> / ${ws.totalPossible}</span></div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:3px">Challenges</div>
+      </div>
+      <div style="text-align:center;padding:10px 8px;background:var(--surface2);border-radius:10px">
+        <div style="font-size:20px;font-weight:800;color:var(--purple)">+${ws.xpEarned}</div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:3px">XP Earned</div>
+      </div>
+      <div style="text-align:center;padding:10px 8px;background:var(--surface2);border-radius:10px">
+        <div style="font-size:20px;font-weight:800;color:var(--amber)">🔥 ${st.streakCount||0}</div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:3px">Day Streak</div>
+      </div>
+    </div>
+    ${ws.totalPossible > 0 ? `
+    <div style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:4px">
+        <span>Weekly completion</span><span><b>${ws.compPct}%</b></span>
+      </div>
+      <div class="dc-progress-bar"><div class="dc-progress-fill" style="width:${ws.compPct}%"></div></div>
+    </div>` : ''}
+  </div>`;
+}
+
+// ── MANAGE SCREEN ────────────────────────────────────────────────────────────
+function _dcManageHtml(profileId){
+  const defs = dcDefs(profileId);
+  return `
+  <div class="stats-exit-bar">
+    <button onclick="S._dcManageMode=false;renderDailyChallengesPopup()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+    <div style="flex:1;font-size:13px;font-weight:800;text-align:center">My Challenges</div>
+    <div style="width:60px"></div>
+  </div>
+  <div class="dc-scroll">
+    <div style="margin-bottom:14px;color:var(--text-muted);font-size:12.5px">Toggle, edit or remove any challenge.</div>
+    <div class="card" style="padding:0 16px">
+      ${defs.length === 0
+        ? `<div style="padding:20px;text-align:center;color:var(--text-faint);font-size:13px">No challenges yet.</div>`
+        : defs.map(def=>`
+      <div class="dc-manage-row">
+        <button class="dc-toggle ${def.enabled!==false?'on':''}" onclick="dcToggleEnabled('${profileId}','${def.id}')"></button>
+        <div class="dc-manage-info">
+          <div class="dc-manage-name">${def.icon||'⭐'} ${escChat(def.name)}</div>
+          <div class="dc-manage-desc">${escChat(def.desc)} · +${def.xp||20} XP</div>
+        </div>
+        <button onclick="S._dcEditId='${def.id}';S._dcAddMode=false;renderDailyChallengesPopup()"
+          title="Edit" style="background:none;border:none;color:var(--active-accent,var(--umang));cursor:pointer;padding:6px;flex-shrink:0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg>
+        </button>
+        <button onclick="dcDeleteChallenge('${profileId}','${def.id}')"
+          title="Remove" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:19px;padding:4px 6px;line-height:1;flex-shrink:0">×</button>
+      </div>`).join('')}
+    </div>
+    <button class="btn btn-accent" style="width:100%;margin-top:16px" onclick="S._dcAddMode=true;S._dcEditId=null;renderDailyChallengesPopup()">+ Add Custom Challenge</button>
+  </div>`;
+}
+
+function dcToggleEnabled(profileId, challengeId){
+  const def = dcDefs(profileId).find(d=>d.id===challengeId);
+  if(!def) return;
+  def.enabled = !(def.enabled !== false);
+  saveShared();
+  renderDailyChallengesPopup();
+  renderApp();
+}
+function dcDeleteChallenge(profileId, challengeId){
+  const store = S.shared.dailyChallenges?.[profileId];
+  if(!store) return;
+  const def = store.defs.find(d=>d.id===challengeId);
+  if(!def) return;
+  if(!confirm(`Remove "${def.name}"?\n\nYou can recreate it anytime with "+ Add Custom Challenge".`)) return;
+  store.defs = store.defs.filter(d=>d.id!==challengeId);
+  saveShared();
+  renderDailyChallengesPopup();
+  showToast(`"${def.name}" removed.`);
+}
+
+// ── ADD / EDIT FORM ─────────────────────────────────────────────────────────
+// FIX: dcFormTypeChanged and dcFormUnitChanged are defined at global scope here
+// (not inside a <script> in innerHTML, which browsers don't execute).
+function dcFormTypeChanged(){
+  const type    = document.getElementById('dc-form-type')?.value;
+  const unitRow = document.getElementById('dc-form-unit-row');
+  const wrap    = document.getElementById('dc-target-wrap');
+  if(!type || !wrap) return;
+  if(type === 'study-hours'){
+    if(unitRow) unitRow.style.display = 'none';
+    wrap.style.display = '';
+    wrap.innerHTML = `<div class="dc-form-row">
+      <label class="dc-form-label">Target Hours</label>
+      <input class="dc-form-input" id="dc-form-target" type="number" min="0.5" max="24" step="0.5" value="6" style="max-width:120px">
+    </div>`;
+  } else {
+    if(unitRow) unitRow.style.display = '';
+    dcFormUnitChanged();
+  }
+}
+function dcFormUnitChanged(){
+  const unit = document.getElementById('dc-form-unit')?.value || '';
+  const wrap = document.getElementById('dc-target-wrap');
+  if(!wrap) return;
+  if(unit === 'time'){
+    wrap.style.display = '';
+    wrap.innerHTML = `<div class="dc-form-row">
+      <label class="dc-form-label">Target Time (complete before)</label>
+      <input class="dc-form-input" id="dc-form-target" type="time" value="06:30" style="max-width:160px">
+    </div>`;
+  } else if(unit === 'min'){
+    wrap.style.display = '';
+    wrap.innerHTML = `<div class="dc-form-row">
+      <label class="dc-form-label">Duration (minutes)</label>
+      <input class="dc-form-input" id="dc-form-target" type="number" min="1" max="300" step="1" value="30" style="max-width:120px">
+    </div>`;
+  } else if(unit === 'glasses'){
+    wrap.style.display = '';
+    wrap.innerHTML = `<div class="dc-form-row">
+      <label class="dc-form-label">Target count</label>
+      <input class="dc-form-input" id="dc-form-target" type="number" min="1" max="50" step="1" value="8" style="max-width:120px">
+    </div>`;
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function _dcTargetFieldHtml(e){
+  const t = e.type || 'boolean';
+  const u = e.unit || '';
+  if(t === 'study-hours'){
+    return `<div class="dc-form-row" id="dc-target-wrap">
+      <label class="dc-form-label">Target Hours</label>
+      <input class="dc-form-input" id="dc-form-target" type="number" min="0.5" max="24" step="0.5"
+        value="${e.targetValue||6}" style="max-width:120px">
+    </div>`;
+  }
+  if(u === 'time'){
+    return `<div class="dc-form-row" id="dc-target-wrap">
+      <label class="dc-form-label">Target Time (complete before)</label>
+      <input class="dc-form-input" id="dc-form-target" type="time" value="${e.targetValue||'06:30'}" style="max-width:160px">
+    </div>`;
+  }
+  if(u === 'min'){
+    return `<div class="dc-form-row" id="dc-target-wrap">
+      <label class="dc-form-label">Duration (minutes)</label>
+      <input class="dc-form-input" id="dc-form-target" type="number" min="1" max="300" step="1"
+        value="${e.targetValue||30}" style="max-width:120px">
+    </div>`;
+  }
+  if(u === 'glasses'){
+    return `<div class="dc-form-row" id="dc-target-wrap">
+      <label class="dc-form-label">Target count</label>
+      <input class="dc-form-input" id="dc-form-target" type="number" min="1" max="50" step="1"
+        value="${e.targetValue||8}" style="max-width:120px">
+    </div>`;
+  }
+  return `<div id="dc-target-wrap" style="display:none"><input id="dc-form-target" value="${e.targetValue||''}"></div>`;
+}
+
+function _dcFormHtml(profileId, editId){
+  const defs     = dcDefs(profileId);
+  const existing = editId ? defs.find(d=>d.id===editId) : null;
+  const e        = existing || {name:'',icon:'⭐',desc:'',xp:20,enabled:true,type:'boolean',targetValue:'',unit:''};
+  const title    = existing ? 'Edit Challenge' : 'New Challenge';
+  const XP_OPTIONS   = [10,20,35,50];
+  const TYPE_OPTIONS = [
+    {v:'boolean',     l:'Manual (tap to complete)'},
+    {v:'study-hours', l:'Study Hours (auto from timer)'},
+  ];
+  const UNIT_OPTIONS = [
+    {v:'',        l:'None'},
+    {v:'time',    l:'Time of day (HH:MM)'},
+    {v:'min',     l:'Duration in minutes'},
+    {v:'glasses', l:'Count (glasses, reps…)'},
+  ];
+  const isStudy = e.type === 'study-hours';
+  return `
+  <div class="stats-exit-bar">
+    <button onclick="S._dcAddMode=false;S._dcEditId=null;S._dcManageMode=true;renderDailyChallengesPopup()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+    <div style="flex:1;font-size:13px;font-weight:800;text-align:center">${title}</div>
+    <div style="width:60px"></div>
+  </div>
+  <div class="dc-scroll">
+    <div class="dc-form-row">
+      <label class="dc-form-label">Challenge Name</label>
+      <input class="dc-form-input" id="dc-form-name" placeholder="e.g. Morning Run" value="${escChat(e.name||'')}">
+    </div>
+    <div class="dc-form-row">
+      <label class="dc-form-label">Icon (emoji)</label>
+      <input class="dc-form-input" id="dc-form-icon" placeholder="🏃" value="${e.icon||'⭐'}" style="font-size:20px;max-width:80px">
+    </div>
+    <div class="dc-form-row">
+      <label class="dc-form-label">Description</label>
+      <input class="dc-form-input" id="dc-form-desc" placeholder="e.g. Run for 30 minutes" value="${escChat(e.desc||'')}">
+    </div>
+    <div class="dc-form-row">
+      <label class="dc-form-label">Type</label>
+      <select class="dc-form-input" id="dc-form-type" onchange="dcFormTypeChanged()">
+        ${TYPE_OPTIONS.map(t=>`<option value="${t.v}" ${e.type===t.v?'selected':''}>${t.l}</option>`).join('')}
+      </select>
+    </div>
+    <div class="dc-form-row" id="dc-form-unit-row" style="${isStudy?'display:none':''}">
+      <label class="dc-form-label">Target type <span style="font-weight:400;color:var(--text-faint)">(optional)</span></label>
+      <select class="dc-form-input" id="dc-form-unit" onchange="dcFormUnitChanged()" style="max-width:240px">
+        ${UNIT_OPTIONS.map(u=>`<option value="${u.v}" ${(e.unit||'')===(u.v)?'selected':''}>${u.l}</option>`).join('')}
+      </select>
+    </div>
+    ${_dcTargetFieldHtml(e)}
+    <div class="dc-form-row">
+      <label class="dc-form-label">XP Reward</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
+        ${XP_OPTIONS.map(v=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;cursor:pointer">
+          <input type="radio" name="dc-xp" value="${v}" ${(e.xp||20)===v?'checked':''}> +${v} XP
+        </label>`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-accent" style="width:100%;margin-top:16px" onclick="dcSaveForm('${profileId}','${editId||''}')">
+      ${editId ? '✓ Save Changes' : '+ Add Challenge'}
+    </button>
+  </div>`;
+}
+
+function dcSaveForm(profileId, editId){
+  const name  = document.getElementById('dc-form-name')?.value.trim();
+  const icon  = document.getElementById('dc-form-icon')?.value.trim() || '⭐';
+  const desc  = document.getElementById('dc-form-desc')?.value.trim();
+  const type  = document.getElementById('dc-form-type')?.value || 'boolean';
+  const unit  = (type === 'study-hours') ? 'hours' : (document.getElementById('dc-form-unit')?.value || '');
+  const tgtEl = document.getElementById('dc-form-target');
+  const tgtWrap = document.getElementById('dc-target-wrap');
+  let targetValue = null;
+  if(tgtEl && tgtWrap && tgtWrap.style.display !== 'none'){
+    targetValue = tgtEl.type === 'number' ? (parseFloat(tgtEl.value)||null) : (tgtEl.value||null);
+  }
+  const xpEl = document.querySelector('input[name="dc-xp"]:checked');
+  const xp   = xpEl ? parseInt(xpEl.value) : 20;
+  if(!name){ showToast('Enter a challenge name.'); return; }
+
+  // Auto-generate description if left blank
+  let finalDesc = desc;
+  if(!finalDesc){
+    if(unit==='time' && targetValue)         finalDesc = `Complete before ${targetValue}`;
+    else if(unit==='min' && targetValue)     finalDesc = `${name} for ${targetValue} minutes`;
+    else if(unit==='glasses' && targetValue) finalDesc = `${targetValue} glasses`;
+    else if(type==='study-hours' && targetValue) finalDesc = `Study for ${targetValue} hours`;
+    else finalDesc = name;
+  }
+
+  const defs = dcDefs(profileId);
+  if(editId){
+    const def = defs.find(d=>d.id===editId);
+    if(def) Object.assign(def, {name, icon, desc:finalDesc, type, unit, targetValue, xp});
+  } else {
+    defs.push({id:'dc-custom-'+Date.now().toString(36), name, icon, desc:finalDesc, type, unit, targetValue, xp, enabled:true});
+  }
+  saveShared();
+  S._dcAddMode = false; S._dcEditId = null; S._dcManageMode = true;
+  renderDailyChallengesPopup();
+  renderApp();
+  showToast(editId ? 'Challenge updated.' : 'Challenge added!');
 }
 
 init();
