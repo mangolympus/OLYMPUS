@@ -6713,9 +6713,13 @@ function diaryTomorrowCardHtml(profileId, dateStr){
 const CLOSE_DAY_STEPS = ['Summary','Reflection','Carry Forward','Done'];
 function openCloseDayFlow(){
   if(S.viewingProfile !== S.local.myProfile){ showToast("You can only close your own day."); return; }
+  // No separate Summary/Reflection/Carry Forward steps anymore — every field those asked
+  // for (energy/focus/mood sliders, the 4 prompts, notes) is already directly editable on
+  // the main diary page itself, so re-asking for it in a wizard was pure duplication.
+  // Closing is now one tap: flush whatever's already been typed, mark the day closed, and
+  // go straight to the confirmation screen.
   S.diaryCloseDayActive = true;
-  S.diaryCloseDayStep = 0;
-  renderDiaryPage();
+  finishCloseDay();
 }
 function closeDayBack(){
   if(S.diaryCloseDayStep===0){ S.diaryCloseDayActive = false; renderDiaryPage(); return; }
@@ -7398,6 +7402,17 @@ function quickCreateTargetForPaper(profileId, paperId, type){
     const typeSel = document.getElementById('mtc-type'); if(typeSel){ typeSel.value = type; onTargetTypeChange(); }
     const titleEl = document.getElementById('mtc-title');
     if(titleEl && !titleEl.value) titleEl.value = `Complete ${paperById(paperId).code} ${targetTypeInfo(type).label}`;
+  }, 0);
+}
+
+// Prefilled quick-create, reached from the Calendar day-detail's "Add Target" button —
+// same pattern as quickCreateTargetForPaper above, but prefilling the deadline with
+// whichever date was tapped in the calendar instead of a paper/type.
+function quickCreateTargetForDate(profileId, dateStr){
+  openTargetsPopup();
+  openTargetCreateForm();
+  setTimeout(()=>{
+    const deadlineEl = document.getElementById('mtc-deadline'); if(deadlineEl) deadlineEl.value = dateStr;
   }, 0);
 }
 
@@ -12366,10 +12381,6 @@ function calDayDetail(profileId, iso, isMe){
     ${completedLectures.length?`<div style="font-size:12px;margin:8px 0 4px">✓ Lectures completed: ${completedLectures.join(', ')}</div>`:''}
     ${mocks.length?`<div style="font-size:12px">📝 ${mocks.join(' · ')}</div>`:''}
     `}
-  ${isMe?`<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
-    <div style="font-weight:800;font-size:11px;margin-bottom:8px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em">Log study time for this day</div>
-    ${logFormForDate(profileId, iso)}
-  </div>`:''}
   ${isMe?plannerDayActionsHtml(profileId, iso):''}
   </div>`;
 }
@@ -12382,6 +12393,10 @@ function plannerDayActionsHtml(profileId, iso){
       <button class="btn btn-sm" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px" onclick="openDiary('${iso}')">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
         Open Diary
+      </button>
+      <button class="btn btn-sm" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px" onclick="quickCreateTargetForDate('${profileId}','${iso}')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+        Add Target
       </button>
     </div>
     ${plannerTargetsDueHtml(profileId, iso)}
