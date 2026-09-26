@@ -15938,7 +15938,6 @@ function openDailyChallengesPopup(){
     window.addEventListener('popstate', _onDCBackButton);
   }
   S.dcPopupOpen   = true;
-  S._dcManageMode = false;
   S._dcAddMode    = false;
   S._dcEditId     = null;
   document.body.classList.add('daily-challenges-mode');
@@ -15968,9 +15967,6 @@ function renderDailyChallengesPopup(){
   const profileId = S.local.myProfile;
   refreshDailyChallengeProgress(profileId);
 
-  if(S._dcManageMode){
-    root.innerHTML = _dcManageHtml(profileId); return;
-  }
   if(S._dcAddMode || S._dcEditId){
     root.innerHTML = _dcFormHtml(profileId, S._dcEditId); return;
   }
@@ -16008,7 +16004,7 @@ function renderDailyChallengesPopup(){
       Back
     </button>
     <div style="flex:1;font-size:13px;font-weight:800;text-align:center;color:var(--text)">Daily Challenges</div>
-    <button onclick="S._dcManageMode=true;renderDailyChallengesPopup()" style="font-size:12px;font-weight:700;color:var(--active-accent,var(--umang));background:none;border:none;cursor:pointer;padding:8px 10px">Manage</button>
+    <button onclick="S._dcAddMode=true;S._dcEditId=null;renderDailyChallengesPopup()" title="Add Challenge" aria-label="Add Challenge" style="font-size:22px;line-height:1;font-weight:700;color:var(--active-accent,var(--umang));background:none;border:none;cursor:pointer;padding:8px 12px">+</button>
   </div>
   <div class="dc-scroll">
 
@@ -16052,11 +16048,12 @@ function renderDailyChallengesPopup(){
     </div>` : ''}
 
     <!-- CHALLENGES LIST -->
-    <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px">Today's Challenges</div>
+    <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin-bottom:2px">Today's Challenges</div>
+    ${defs.length ? `<div style="font-size:10.5px;color:var(--text-faint);margin-bottom:10px">Long-press a challenge to edit it</div>` : ''}
     ${defs.length === 0
       ? `<div class="card" style="text-align:center;padding:28px 16px;color:var(--text-faint);font-size:13px">
            No active challenges.<br>
-           <button class="dc-btn dc-btn-primary" style="margin-top:14px" onclick="S._dcManageMode=true;renderDailyChallengesPopup()">+ Set Up Challenges</button>
+           <button class="dc-btn dc-btn-primary" style="margin-top:14px" onclick="S._dcAddMode=true;S._dcEditId=null;renderDailyChallengesPopup()">+ Set Up Challenges</button>
          </div>`
       : defs.map(def=>_dcChallengeCardHtml(profileId, def, log, dateStr)).join('')}
 
@@ -16104,7 +16101,8 @@ function _dcChallengeCardHtml(profileId, def, log, dateStr){
   }
 
   return `
-  <div class="dc-challenge-card ${completed?'dc-done':''}">
+  <div class="dc-challenge-card ${completed?'dc-done':''}"
+    onpointerdown="dcCardPressStart(event,'${def.id}')" onpointerup="dcCardPressEnd(event)" onpointermove="dcCardPressMove(event)" onpointercancel="dcCardPressEnd(event)">
     <div class="dc-card-head">
       <div class="dc-icon">${def.icon||'⭐'}</div>
       <div class="dc-card-info">
@@ -16121,6 +16119,35 @@ function _dcChallengeCardHtml(profileId, def, log, dateStr){
       ? `<div style="margin-top:6px"><span class="dc-xp-badge" style="display:inline-flex">+${xpAmt} XP earned</span></div>`
       : ''}
   </div>`;
+}
+
+// ── Long-press a challenge card to jump straight into editing it (pointer events cover
+// touch + mouse, same 450ms/vibrate convention as chatPressStart's long-press-to-open-sheet
+// gesture elsewhere in this file — kept as its own small state machine rather than reusing
+// chatPressStart's, since that one also drives swipe-to-reply, which doesn't apply here). ──
+let _dcPressTimer=null, _dcPressId=null, _dcPressStartX=0, _dcPressStartY=0, _dcPressMoved=false;
+function dcCardPressStart(ev, id){
+  if(ev.pointerType==='mouse' && ev.button!==0) return;
+  if(ev.target.closest('.dc-btn')) return; // don't hijack taps on Mark Complete / Undo / Start Timer
+  _dcPressId = id; _dcPressStartX = ev.clientX; _dcPressStartY = ev.clientY; _dcPressMoved = false;
+  clearTimeout(_dcPressTimer);
+  _dcPressTimer = setTimeout(()=>{
+    _dcPressTimer = null;
+    if(!_dcPressMoved && _dcPressId){
+      if(navigator.vibrate) navigator.vibrate(12);
+      S._dcEditId = _dcPressId; S._dcAddMode = false;
+      renderDailyChallengesPopup();
+    }
+  }, 450);
+}
+function dcCardPressMove(ev){
+  if(_dcPressId==null) return;
+  const dx = ev.clientX - _dcPressStartX, dy = ev.clientY - _dcPressStartY;
+  if(Math.abs(dx) > 10 || Math.abs(dy) > 10){ _dcPressMoved = true; clearTimeout(_dcPressTimer); _dcPressTimer = null; }
+}
+function dcCardPressEnd(ev){
+  if(_dcPressTimer){ clearTimeout(_dcPressTimer); _dcPressTimer = null; }
+  _dcPressId = null; _dcPressMoved = false;
 }
 
 // ── Weekly summary block ─────────────────────────────────────────────────────
@@ -16158,42 +16185,11 @@ function _dcWeeklySummaryHtml(profileId){
   </div>`;
 }
 
-// ── MANAGE SCREEN ────────────────────────────────────────────────────────────
-function _dcManageHtml(profileId){
-  const defs = dcDefs(profileId);
-  return `
-  <div class="stats-exit-bar">
-    <button onclick="S._dcManageMode=false;renderDailyChallengesPopup()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
-      Back
-    </button>
-    <div style="flex:1;font-size:13px;font-weight:800;text-align:center">My Challenges</div>
-    <div style="width:60px"></div>
-  </div>
-  <div class="dc-scroll">
-    <div style="margin-bottom:14px;color:var(--text-muted);font-size:12.5px">Toggle, edit or remove any challenge.</div>
-    <div class="card" style="padding:0 16px">
-      ${defs.length === 0
-        ? `<div style="padding:20px;text-align:center;color:var(--text-faint);font-size:13px">No challenges yet.</div>`
-        : defs.map(def=>`
-      <div class="dc-manage-row">
-        <button class="dc-toggle ${def.enabled!==false?'on':''}" onclick="dcToggleEnabled('${profileId}','${def.id}')"></button>
-        <div class="dc-manage-info">
-          <div class="dc-manage-name">${def.icon||'⭐'} ${escChat(def.name)}</div>
-          <div class="dc-manage-desc">${escChat(def.desc)} · +${def.xp||20} XP</div>
-        </div>
-        <button onclick="S._dcEditId='${def.id}';S._dcAddMode=false;renderDailyChallengesPopup()"
-          title="Edit" style="background:none;border:none;color:var(--active-accent,var(--umang));cursor:pointer;padding:6px;flex-shrink:0">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg>
-        </button>
-        <button onclick="dcDeleteChallenge('${profileId}','${def.id}')"
-          title="Remove" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:19px;padding:4px 6px;line-height:1;flex-shrink:0">×</button>
-      </div>`).join('')}
-    </div>
-    <button class="btn btn-accent" style="width:100%;margin-top:16px" onclick="S._dcAddMode=true;S._dcEditId=null;renderDailyChallengesPopup()">+ Add Custom Challenge</button>
-  </div>`;
-}
-
+// ── Toggle-enabled / delete — now surfaced from inside the Edit form itself (see
+// _dcFormHtml's "Active" toggle and "Delete Challenge" button) rather than a separate
+// Manage screen; the old dedicated My-Challenges list view was removed since long-press
+// (dcCardPressStart) + the top "+" button now cover add/edit, and this replaces the
+// browse/enable/delete list entirely. ──────────────────────────────────────────────────
 function dcToggleEnabled(profileId, challengeId){
   const def = dcDefs(profileId).find(d=>d.id===challengeId);
   if(!def) return;
@@ -16207,10 +16203,16 @@ function dcDeleteChallenge(profileId, challengeId){
   if(!store) return;
   const def = store.defs.find(d=>d.id===challengeId);
   if(!def) return;
-  if(!confirm(`Remove "${def.name}"?\n\nYou can recreate it anytime with "+ Add Custom Challenge".`)) return;
+  if(!confirm(`Remove "${def.name}"?\n\nYou can recreate it anytime with the + button.`)) return;
   store.defs = store.defs.filter(d=>d.id!==challengeId);
   saveShared();
+  // Reset out of the edit form (this is normally called from inside it, via long-press) —
+  // otherwise renderDailyChallengesPopup() would try to redraw a form for an id that no
+  // longer exists in defs, silently falling back to a blank "New Challenge" form instead of
+  // returning to the list.
+  S._dcAddMode = false; S._dcEditId = null;
   renderDailyChallengesPopup();
+  renderApp();
   showToast(`"${def.name}" removed.`);
 }
 
@@ -16313,7 +16315,7 @@ function _dcFormHtml(profileId, editId){
   const isStudy = e.type === 'study-hours';
   return `
   <div class="stats-exit-bar">
-    <button onclick="S._dcAddMode=false;S._dcEditId=null;S._dcManageMode=true;renderDailyChallengesPopup()">
+    <button onclick="S._dcAddMode=false;S._dcEditId=null;renderDailyChallengesPopup()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
@@ -16321,6 +16323,11 @@ function _dcFormHtml(profileId, editId){
     <div style="width:60px"></div>
   </div>
   <div class="dc-scroll">
+    ${existing ? `
+    <div class="dc-form-row" style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:6px">
+      <label class="dc-form-label" style="margin:0">Active</label>
+      <button class="dc-toggle ${e.enabled!==false?'on':''}" onclick="dcToggleEnabled('${profileId}','${editId}')"></button>
+    </div>` : ''}
     <div class="dc-form-row">
       <label class="dc-form-label">Challenge Name</label>
       <input class="dc-form-input" id="dc-form-name" placeholder="e.g. Morning Run" value="${escChat(e.name||'')}">
@@ -16357,6 +16364,7 @@ function _dcFormHtml(profileId, editId){
     <button class="btn btn-accent" style="width:100%;margin-top:16px" onclick="dcSaveForm('${profileId}','${editId||''}')">
       ${editId ? '✓ Save Changes' : '+ Add Challenge'}
     </button>
+    ${existing ? `<button class="dc-btn dc-btn-outline" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)" onclick="dcDeleteChallenge('${profileId}','${editId}')">Delete Challenge</button>` : ''}
   </div>`;
 }
 
@@ -16394,7 +16402,7 @@ function dcSaveForm(profileId, editId){
     defs.push({id:'dc-custom-'+Date.now().toString(36), name, icon, desc:finalDesc, type, unit, targetValue, xp, enabled:true});
   }
   saveShared();
-  S._dcAddMode = false; S._dcEditId = null; S._dcManageMode = true;
+  S._dcAddMode = false; S._dcEditId = null;
   renderDailyChallengesPopup();
   renderApp();
   showToast(editId ? 'Challenge updated.' : 'Challenge added!');
