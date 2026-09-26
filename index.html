@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#050912">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
 
 :root{
   /* Umang's neutral palette (default until applyTheme() switches it — see below) */
@@ -10266,7 +10266,7 @@ function dailyQuoteBoxHtml(){
   </div>
   <div class="card" id="motivation-card" ${lpAttrs} style="background:color-mix(in srgb,var(--active-accent,var(--umang)) 6%,var(--surface));border-color:color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--border));padding:16px 18px;transition:transform .12s,box-shadow .12s">
     ${hasToday
-      ? `<div style="font-size:14px;font-weight:700;line-height:1.6;color:var(--text);letter-spacing:-.01em">${escChat(q.text)}</div>`
+      ? `<div style="font-size:15.5px;font-weight:700;line-height:1.65;color:var(--text);font-family:'Playfair Display',Georgia,serif;font-style:italic;letter-spacing:.01em">${escChat(q.text)}</div>`
       : `<div style="display:flex;align-items:center;gap:10px;color:var(--text-faint)">
            <div class="loading-dots" style="margin:0"><span></span><span></span><span></span></div>
            <span style="font-size:12.5px">Building today's motivation…</span>
@@ -10306,77 +10306,63 @@ function _motLpCancel(){
   const el = document.getElementById('motivation-card');
   if(el){ el.style.transform=''; el.style.boxShadow=''; }
 }
-// Paper grid on Home — 2 columns × 3 rows (2×3).
-// Ring 104 px (−10%), score % inside, name at 20 px.
-// Deep 3D: tier-coloured bottom edge, glow ring, press-down animation.
+// Paper grid — 3×2. Row 1: FR, AFM, AUDIT | Row 2: DT, IDT, IBS
+// Clean flat design: tier-tinted card, prominent ring with score inside,
+// paper name below. No 3D — single soft shadow, scale press only.
 function homePaperGridHtml(profileId){
   const cards = PAPERS.map(p=>{
     const comp = paperComponents(profileId, p.id);
     const score = comp.prepScore;
 
-    const ringColor = score>=70?'var(--green)':score>=40?'var(--amber)':'var(--active-accent,var(--umang))';
-    const ringGlow  = score>=70
-      ? 'color-mix(in srgb,var(--green) 55%,transparent)'
-      : score>=40
-        ? 'color-mix(in srgb,var(--amber) 55%,transparent)'
-        : 'color-mix(in srgb,var(--active-accent,var(--umang)) 55%,transparent)';
-    const ringTrack = score>=70
-      ? 'color-mix(in srgb,var(--green) 14%,var(--surface2))'
-      : score>=40
-        ? 'color-mix(in srgb,var(--amber) 14%,var(--surface2))'
-        : 'color-mix(in srgb,var(--active-accent,var(--umang)) 10%,var(--surface2))';
-    const edgeColor = score>=70
-      ? 'color-mix(in srgb,var(--green) 70%,var(--border))'
-      : score>=40
-        ? 'color-mix(in srgb,var(--amber) 70%,var(--border))'
-        : 'color-mix(in srgb,var(--active-accent,var(--umang)) 70%,var(--border))';
+    // Tier colours
+    const tc   = score>=70 ? 'var(--green)'  : score>=40 ? 'var(--amber)'  : 'var(--active-accent,var(--umang))';
+    const tBg  = score>=70 ? 'color-mix(in srgb,var(--green) 7%,var(--surface))'
+               : score>=40 ? 'color-mix(in srgb,var(--amber) 7%,var(--surface))'
+               :             'color-mix(in srgb,var(--active-accent,var(--umang)) 7%,var(--surface))';
+    const tBdr = score>=70 ? 'color-mix(in srgb,var(--green) 22%,var(--border))'
+               : score>=40 ? 'color-mix(in srgb,var(--amber) 22%,var(--border))'
+               :             'color-mix(in srgb,var(--active-accent,var(--umang)) 22%,var(--border))';
+    const tTrk = score>=70 ? 'color-mix(in srgb,var(--green) 12%,var(--surface2))'
+               : score>=40 ? 'color-mix(in srgb,var(--amber) 12%,var(--surface2))'
+               :             'color-mix(in srgb,var(--active-accent,var(--umang)) 10%,var(--surface2))';
 
-    const RS=104,RW=11,RR=(RS-RW)/2;
+    // Ring — 70 px, score % centred inside
+    const RS=70, RW=8, RR=(RS-RW)/2;
     const circ=2*Math.PI*RR, offset=circ*(1-(score/100));
     const uid='pg'+(Math.random()*1e6|0);
-
-    const ring=`<svg width="${RS}" height="${RS}" viewBox="0 0 ${RS} ${RS}"
-      style="display:block;filter:drop-shadow(0 0 9px ${ringGlow})">
+    const ring=`<svg width="${RS}" height="${RS}" viewBox="0 0 ${RS} ${RS}" style="display:block">
       <defs>
-        <linearGradient id="${uid}-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="${ringColor}" stop-opacity=".7"/>
-          <stop offset="100%" stop-color="${ringColor}" stop-opacity="1"/>
+        <linearGradient id="${uid}" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="${tc}" stop-opacity=".65"/>
+          <stop offset="100%" stop-color="${tc}" stop-opacity="1"/>
         </linearGradient>
       </defs>
-      <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none" stroke="${ringTrack}" stroke-width="${RW}"/>
+      <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none" stroke="${tTrk}" stroke-width="${RW}"/>
       <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none"
-        stroke="url(#${uid}-g)" stroke-width="${RW}"
+        stroke="url(#${uid})" stroke-width="${RW}"
         stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
         stroke-linecap="round" transform="rotate(-90 ${RS/2} ${RS/2})"/>
       <text x="${RS/2}" y="${RS/2}" text-anchor="middle" dominant-baseline="central"
-        font-size="20" font-weight="800" fill="${ringColor}"
+        font-size="14" font-weight="800" fill="${tc}"
         font-family="'Plus Jakarta Sans',system-ui,sans-serif">${score}%</text>
     </svg>`;
 
-    const RS_SH=`0 2px 0 rgba(255,255,255,.13) inset,0 -1px 0 rgba(0,0,0,.2) inset,0 7px 0 0 ${edgeColor},0 10px 0 0 color-mix(in srgb,${edgeColor} 35%,transparent),0 13px 29px rgba(0,0,0,.35),0 4px 9px rgba(0,0,0,.22)`;
-    const PS_SH=`0 2px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.2) inset,0 2px 0 0 ${edgeColor},0 4px 11px rgba(0,0,0,.28),0 1px 4px rgba(0,0,0,.18)`;
-
     return `<button onclick="openWorkspaceFor('${profileId}','${p.id}')"
-      style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-        gap:13px;aspect-ratio:1;border-radius:20px;padding:18px 11px;
-        text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent;
-        border:1.5px solid color-mix(in srgb,${edgeColor} 55%,var(--border));
-        background:linear-gradient(170deg,
-          color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--surface)) 0%,
-          color-mix(in srgb,var(--active-accent,var(--umang)) 9%,var(--surface)) 55%,
-          color-mix(in srgb,var(--active-accent,var(--umang)) 3%,var(--surface)) 100%);
-        box-shadow:${RS_SH};
-        transition:transform .12s cubic-bezier(.22,.8,.4,1),box-shadow .12s;
-        transform:translateY(0)"
-      onpointerdown="this.style.transform='translateY(6px)';this.style.boxShadow='${PS_SH}'"
+      style="
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        gap:10px;aspect-ratio:1;border-radius:18px;padding:16px 8px;
+        background:${tBg};border:1.5px solid ${tBdr};
+        box-shadow:0 2px 14px rgba(0,0,0,.07);
+        cursor:pointer;-webkit-tap-highlight-color:transparent;
+        transition:transform .13s ease,box-shadow .13s ease;text-align:center"
+      onpointerdown="this.style.transform='scale(.95)';this.style.boxShadow='0 1px 4px rgba(0,0,0,.06)'"
       onpointerup="this.style.transform='';this.style.boxShadow=''"
       onpointercancel="this.style.transform='';this.style.boxShadow=''">
       ${ring}
-      <div style="font-size:20px;font-weight:800;line-height:1.2;color:var(--text);
-        letter-spacing:-.02em;text-shadow:0 1px 3px rgba(0,0,0,.2)">${p.nick}</div>
+      <div style="font-size:12.5px;font-weight:800;color:var(--text);letter-spacing:-.01em;line-height:1">${p.nick}</div>
     </button>`;
   });
-  return `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-bottom:4px">${cards.join('')}</div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:6px">${cards.join('')}</div>`;
 }
 function viewHome(){
   const vp = S.viewingProfile;
