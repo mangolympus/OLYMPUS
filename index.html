@@ -1475,6 +1475,16 @@ button, a, .btn, .ptab, .icon-btn, .bottomnav button, .profile-pill button,
   margin:2px auto 12px;
 }
 .oly-dragging{ transition:none !important; }
+/* Lecture long-press edit sheet */
+.lec-edit-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:flex;align-items:flex-end;justify-content:center;animation:sheetFadeIn .18s}
+.lec-edit-sheet{background:var(--surface);border-radius:18px 18px 0 0;padding:0 0 env(safe-area-inset-bottom);width:100%;max-width:480px;box-shadow:0 -4px 32px rgba(0,0,0,.4);max-height:75vh;display:flex;flex-direction:column}
+.lec-edit-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.lec-edit-title{font-size:14px;font-weight:800}
+.lec-edit-body{overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+.lec-field-label{font-size:10px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.lec-field-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;transition:border-color .15s}
+.lec-field-input:focus{outline:none;border-color:var(--active-accent,var(--umang))}
+.lec-edit-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0}
 
 /* ── E. ACCESSIBILITY — visible focus ring only for keyboard users ─────────── */
 .btn:focus-visible, .ptab:focus-visible, .icon-btn:focus-visible,
@@ -3647,6 +3657,18 @@ function renderApp(){
     // outside a real navigation, and nothing would ever fix them back up again short of a
     // fresh navigation. Snap instantly here so they're always correct, every render.
     animateCountUps(root, true);
+  }
+  // Attach long-press listeners to lecture rows whenever the workspace lectures tab is visible
+  if(S.view==='workspace' && S.workspaceTab==='lectures'){
+    const vp = S.viewingProfile;
+    const isMe = vp === S.local.myProfile;
+    if(isMe){
+      const paperId = S.workspacePaper;
+      (lecturesFor(vp, paperId)||[]).forEach(l=>{
+        const el = document.getElementById(`lec-row-${l.id}`);
+        if(el && !el._lpWired){ el._lpWired=true; attachLecLongPress(el, vp, paperId, l.id); }
+      });
+    }
   }
 }
 function openWorkspace(paperId, tab){
@@ -10230,13 +10252,89 @@ function homeDateHeaderHtml(){
 function dailyQuoteBoxHtml(){
   const q = S.shared.dailyQuote;
   const hasToday = q && q.date===todayStr() && q.text;
+  const isMe = S.viewingProfile === S.local.myProfile;
+  // Only show the refresh affordance for own profile view — Chetna shouldn't regenerate
+  // Umang's quote and vice-versa; the quote is shared state but feels personal.
+  const refreshBtn = isMe && hasToday
+    ? `<button onclick="regenerateDailyQuote()" style="background:none;border:none;color:var(--text-faint);font-size:10.5px;cursor:pointer;padding:4px 6px;border-radius:6px;font-weight:600;letter-spacing:.03em">↻ New quote</button>`
+    : '';
   return `
-  <div class="section-title">AI Motivation</div>
-  <div class="card" style="text-align:center;padding:22px 16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:4px">
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint)">Today's Focus</div>
+    ${refreshBtn}
+  </div>
+  <div class="card" style="background:color-mix(in srgb,var(--active-accent,var(--umang)) 6%,var(--surface));border-color:color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--border));padding:16px 18px">
     ${hasToday
-      ? `<div style="font-style:italic;font-size:13.5px;line-height:1.55;color:var(--text)">&ldquo;${escChat(q.text)}&rdquo;</div>`
-      : `<div style="font-size:12.5px;color:var(--text-faint)">Finding today's motivation&hellip;</div>`}
+      ? `<div style="font-size:14px;font-weight:700;line-height:1.6;color:var(--text);letter-spacing:-.01em">${escChat(q.text)}</div>`
+      : `<div style="display:flex;align-items:center;gap:10px;color:var(--text-faint)">
+           <div class="loading-dots" style="margin:0"><span></span><span></span><span></span></div>
+           <span style="font-size:12.5px">Building today's focus…</span>
+         </div>`}
   </div>`;
+}
+// Allow manual refresh of the daily quote — resets the date so ensureDailyQuote()
+// fires a fresh call on the next renderApp(). Rate-limited client-side: won't allow
+// more than one refresh per 60 seconds to avoid hammering the Gemini API.
+let _lastQuoteRefresh = 0;
+function regenerateDailyQuote(){
+  const now = Date.now();
+  if(now - _lastQuoteRefresh < 60000){ toast('Try again in a moment.'); return; }
+  _lastQuoteRefresh = now;
+  S.shared.dailyQuote = {date:'', text:''};
+  renderApp();
+  ensureDailyQuote();
+}
+// Paper grid on Home — 3 cards per row (2 per row on very narrow screens).
+// Each card shows: paper code + short name, a prep-score ring, lecture %, rev1 %, rev2 %.
+// Tapping opens that paper's Workspace. Color-coded by readiness tier:
+//   ≥70% → green tint  |  40–69% → amber tint  |  <40% → muted (default surface)
+// The ring and numbers use data-countup so they animate in the same sweep as every other
+// hero number on this page, and the card border pulses with the paper's readiness color.
+function homePaperGridHtml(profileId){
+  const PAPER_ICONS = {fr:'📊', afm:'📈', audit:'🔍', dt:'🏛️', idt:'💼', ibs:'🧩'};
+  const cards = PAPERS.map(p=>{
+    const comp = paperComponents(profileId, p.id);
+    const score = comp.prepScore;
+    const tierColor = score>=70 ? 'var(--green)' : score>=40 ? 'var(--amber)' : 'var(--text-faint)';
+    const tierBg   = score>=70 ? 'color-mix(in srgb,var(--green) 8%,var(--surface))' :
+                     score>=40 ? 'color-mix(in srgb,var(--amber) 7%,var(--surface))' :
+                                 'var(--surface)';
+    const tierBorder = score>=70 ? 'var(--green)' : score>=40 ? 'var(--amber)' : 'var(--border)';
+    // Mini 3-bar progress strip: lectures, rev1, rev2
+    const bar = (pct, col) => `<div style="flex:1;height:4px;border-radius:2px;overflow:hidden;background:var(--surface2)"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px"></div></div>`;
+    // Small compact ring (non-hero — no animation overhead for 6 rings at once)
+    const ringSize = 54, ringStroke = 6, ringR = (ringSize-ringStroke)/2;
+    const circ = 2*Math.PI*ringR;
+    const offset = circ*(1-(score/100));
+    const uid = 'pr'+(Math.random()*1e6|0);
+    const ring = `<svg width="${ringSize}" height="${ringSize}" viewBox="0 0 ${ringSize} ${ringSize}" style="display:block;flex-shrink:0">
+      <circle cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" fill="none" stroke="var(--surface2)" stroke-width="${ringStroke}"/>
+      <circle cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="${ringStroke}"
+        stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
+        stroke-linecap="round" transform="rotate(-90 ${ringSize/2} ${ringSize/2})"/>
+    </svg>`;
+    return `<button onclick="openWorkspaceFor('${profileId}','${p.id}')" style="display:flex;flex-direction:column;background:${tierBg};border:1.5px solid ${tierBorder};border-radius:14px;padding:12px 10px 10px;gap:8px;text-align:left;cursor:pointer;transition:transform .15s;-webkit-tap-highlight-color:transparent" onpointerdown="this.style.transform='scale(.97)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''">
+      <div style="display:flex;align-items:center;gap:8px">
+        ${ring}
+        <div style="min-width:0;flex:1">
+          <div style="font-size:9px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px">${p.code}</div>
+          <div style="font-size:12.5px;font-weight:800;line-height:1.2;color:var(--text)">${p.nick}</div>
+          <div style="font-size:18px;font-weight:800;color:${tierColor};line-height:1.1;margin-top:2px">${score}%</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;align-items:center;gap:5px">
+          ${bar(comp.lecPct,'var(--active-accent,var(--umang))')}
+          ${bar(comp.rev1Pct,'var(--good)')}
+          ${bar(comp.rev2Pct,'var(--purple)')}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-faint);font-weight:600">
+          <span>L ${comp.lecPct}%</span><span>R1 ${comp.rev1Pct}%</span><span>R2 ${comp.rev2Pct}%</span>
+        </div>
+      </div>
+    </button>`;
+  });
+  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px">${cards.join('')}</div>`;
 }
 function viewHome(){
   const vp = S.viewingProfile;
@@ -10280,9 +10378,7 @@ function viewHome(){
   ${featuresGridHtml()}
 
   <div class="section-title">Papers</div>
-  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    ${PAPERS.map(p=>`<button class="btn" style="width:100%;padding:14px 8px;font-size:13px" onclick="openWorkspaceFor('${vp}','${p.id}')">${p.nick}</button>`).join('')}
-  </div>
+  ${homePaperGridHtml(vp)}
 
   ${homeLectureCompletionBlock(vp)}
 
@@ -10297,12 +10393,6 @@ function viewHome(){
     <div class="week-vals">${weekValsRow(vp, S.homeWeekOffset||0)}</div>
     <div class="week-bars">${weekBars(vp, S.homeWeekOffset||0)}</div>
     <div class="week-dates">${weekDatesRow(S.homeWeekOffset||0)}</div>
-  </div>
-
-  <div class="section-title">Average Study Hours</div>
-  <div class="stat-grid">
-    <div class="card stat-box"><div class="v" data-countup="${hoursInRange(vp,7)/7}" data-countup-decimals="1">0.0</div><div class="l">Avg / day (7d)</div></div>
-    <div class="card stat-box"><div class="v" data-countup="${hoursInRange(vp,30)/30}" data-countup-decimals="1">0.0</div><div class="l">Avg / day (30d)</div></div>
   </div>
 
   <div class="section-title">Inter-Profile Comparison</div>
@@ -11023,124 +11113,111 @@ function addLog(profileId){
 // COMPARISON
 // ═══════════════════════════════════════════════════════════
 function comparisonBlock(){
-  const a = PROFILES[0], b = PROFILES[1];
-  const metrics = [
-    {label:'Total Hours',  va:totalHours(a.id).toFixed(1),       vb:totalHours(b.id).toFixed(1),       suffix:'h',   numA:totalHours(a.id),          numB:totalHours(b.id)},
-    {label:'Prep Score',   va:overallPrep(a.id).prepScore,        vb:overallPrep(b.id).prepScore,        suffix:'%',   numA:overallPrep(a.id).prepScore, numB:overallPrep(b.id).prepScore},
-    {label:'Lectures',     va:overallPrep(a.id).lecPct,           vb:overallPrep(b.id).lecPct,           suffix:'%',   numA:overallPrep(a.id).lecPct,    numB:overallPrep(b.id).lecPct},
-    {label:'Revision',     va:Math.round((overallPrep(a.id).rev1Pct+overallPrep(a.id).rev2Pct)/2), vb:Math.round((overallPrep(b.id).rev1Pct+overallPrep(b.id).rev2Pct)/2), suffix:'%', numA:Math.round((overallPrep(a.id).rev1Pct+overallPrep(a.id).rev2Pct)/2), numB:Math.round((overallPrep(b.id).rev1Pct+overallPrep(b.id).rev2Pct)/2)},
-    {label:'Mock Avg',     va:overallPrep(a.id).mockAvg,          vb:overallPrep(b.id).mockAvg,          suffix:'%',   numA:overallPrep(a.id).mockAvg,   numB:overallPrep(b.id).mockAvg},
-    {label:'Streak',       va:streak(a.id),                       vb:streak(b.id),                       suffix:'d',   numA:streak(a.id),                numB:streak(b.id)},
-    {label:'This week',    va:hoursInRange(a.id,7).toFixed(1),    vb:hoursInRange(b.id,7).toFixed(1),    suffix:'h',   numA:hoursInRange(a.id,7),        numB:hoursInRange(b.id,7)},
-    {label:'This month',   va:hoursInRange(a.id,30).toFixed(1),   vb:hoursInRange(b.id,30).toFixed(1),   suffix:'h',   numA:hoursInRange(a.id,30),       numB:hoursInRange(b.id,30)},
-  ];
-  const overA = overallPrep(a.id).prepScore, overB = overallPrep(b.id).prepScore;
-  return `
-  <div class="card">
-    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin-bottom:16px">
-      <div style="text-align:center;padding:12px;background:color-mix(in srgb,var(--umang) 8%,var(--surface2));border-radius:10px;border:1.5px solid ${overA>=overB?'var(--umang)':'var(--border)'}">
-        <div style="width:36px;height:36px;border-radius:50%;background:var(--umang);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;margin:0 auto 6px">${a.nick[0]}</div>
-        <div style="font-weight:800;font-size:13px">${a.nick}</div>
-        <div class="hero-num" style="font-size:22px;font-weight:800">${overA}%</div>
-        <div style="font-size:9px;color:var(--text-faint)">Prep score</div>
-        ${overA>overB?`<div style="font-size:9px;color:var(--umang);font-weight:700;margin-top:3px">🏆 Leading</div>`:''}
-      </div>
-      <div style="text-align:center;font-size:11px;color:var(--text-faint);font-weight:700">VS</div>
-      <div style="text-align:center;padding:12px;background:color-mix(in srgb,var(--chetna) 8%,var(--surface2));border-radius:10px;border:1.5px solid ${overB>overA?'var(--chetna)':'var(--border)'}">
-        <div style="width:36px;height:36px;border-radius:50%;background:var(--chetna);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;margin:0 auto 6px">${b.nick[0]}</div>
-        <div style="font-weight:800;font-size:13px">${b.nick}</div>
-        <div class="hero-num" style="font-size:22px;font-weight:800">${overB}%</div>
-        <div style="font-size:9px;color:var(--text-faint)">Prep score</div>
-        ${overB>overA?`<div style="font-size:9px;color:var(--chetna);font-weight:700;margin-top:3px">🏆 Leading</div>`:''}
-      </div>
-    </div>
-    ${metrics.map(m=>{
-      const max = Math.max(1, m.numA, m.numB);
-      const wA = Math.round(m.numA/max*100), wB = Math.round(m.numB/max*100);
-      const aWins = m.numA>m.numB, bWins = m.numB>m.numA;
-      return `<div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:11px;font-weight:${aWins?'800':'400'};color:${aWins?'var(--umang)':'var(--text)'}">${m.va}${m.suffix}</span>
-          <span style="font-size:9.5px;color:var(--text-faint);font-weight:600">${m.label}</span>
-          <span style="font-size:11px;font-weight:${bWins?'800':'400'};color:${bWins?'var(--chetna)':'var(--text)'}">${m.vb}${m.suffix}</span>
+  const a = PROFILES[0], b = PROFILES[1]; // Umang, Chetna
+  const prepA = overallPrep(a.id), prepB = overallPrep(b.id);
+  const scoreA = prepA.prepScore, scoreB = prepB.prepScore;
+  const todayA = todayHoursLive(a.id), todayB = todayHoursLive(b.id);
+  const weekA = hoursInRange(a.id,7), weekB = hoursInRange(b.id,7);
+  const totalA = totalHours(a.id), totalB = totalHours(b.id);
+  const strkA = streak(a.id), strkB = streak(b.id);
+  const aLeads = scoreA >= scoreB;
+  const diff = Math.abs(scoreA - scoreB);
+
+  // Head banner: who's currently ahead and by how much
+  const bannerMsg = scoreA === scoreB
+    ? `Dead even — neck and neck at ${scoreA}%`
+    : `${aLeads ? a.nick : b.nick} is ahead by ${diff}%`;
+  const bannerColor = aLeads ? 'var(--umang)' : 'var(--chetna)';
+
+  // Mini battle row: one metric, winner highlighted, dual bar in the middle
+  function battleRow(label, numA, numB, suffix, decimals){
+    suffix = suffix||''; decimals = decimals||0;
+    const max = Math.max(0.01, numA, numB);
+    const wA = Math.round(numA/max*46), wB = Math.round(numB/max*46);
+    const aW = numA >= numB, bW = numB >= numA;
+    const fmtA = Number.isInteger(numA) && !decimals ? numA : numA.toFixed(decimals);
+    const fmtB = Number.isInteger(numB) && !decimals ? numB : numB.toFixed(decimals);
+    return `<div style="display:grid;grid-template-columns:1fr 92px 1fr;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="text-align:right;font-size:12px;font-weight:${aW?'800':'400'};color:${aW?'var(--umang)':'var(--text-muted)'}">${fmtA}${suffix}</div>
+      <div>
+        <div style="font-size:9px;color:var(--text-faint);text-align:center;font-weight:600;margin-bottom:3px">${label}</div>
+        <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;background:var(--surface2)">
+          <div style="width:${wA}%;background:var(--umang);margin-left:${46-wA}%;border-radius:3px 0 0 3px"></div>
+          <div style="width:${wB}%;background:var(--chetna);border-radius:0 3px 3px 0"></div>
         </div>
-        <div style="display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--surface2);box-shadow:inset 0 1px 2px rgba(0,0,0,.3)">
-          <div class="chart-animate hbar-grow-left" style="width:${Math.round(wA/2)}%;background:var(--umang);margin-left:${50-Math.round(wA/2)}%;box-shadow:0 0 6px color-mix(in srgb,var(--umang) 50%,transparent);--target-w:${Math.round(wA/2)}%;--target-ml:${50-Math.round(wA/2)}%"></div>
-          <div class="chart-animate hbar-grow-right" style="width:${Math.round(wB/2)}%;background:var(--chetna);box-shadow:0 0 6px color-mix(in srgb,var(--chetna) 50%,transparent);--target-w:${Math.round(wB/2)}%"></div>
-        </div>
-      </div>`;
-    }).join('')}
-    <div style="margin-top:12px">${radarSVG()}</div>
-  </div>`;
-}
-function radarSVG(){
-  const a = radarMetrics('umang'), b = radarMetrics('chetna');
-  const n = a.length;
-  const cx=110, cy=100, R=78;
-  const uid = 'rdr'+(Math.random()*1e6|0);
-  const pt = (i,val)=>{
-    const ang = -Math.PI/2 + i*(2*Math.PI/n);
-    const r = R*(val/100);
-    return [cx+r*Math.cos(ang), cy+r*Math.sin(ang)];
-  };
-  const ring = (frac)=>{
-    let d='';
-    for(let i=0;i<n;i++){
-      const ang=-Math.PI/2+i*(2*Math.PI/n);
-      const x=cx+R*frac*Math.cos(ang), y=cy+R*frac*Math.sin(ang);
-      d += (i===0?'M':'L')+x.toFixed(2)+','+y.toFixed(2);
-    }
-    return d+'Z';
-  };
-  const poly = (data)=> data.map((m,i)=>pt(i,m.value)).map(([x,y],i)=>(i===0?'M':'L')+x.toFixed(2)+','+y.toFixed(2)).join('')+'Z';
-  const labels = a.map((m,i)=>{
-    const bVal = b[i].value;
-    const ang=-Math.PI/2+i*(2*Math.PI/n);
-    const x=cx+(R+18)*Math.cos(ang), y=cy+(R+18)*Math.sin(ang);
-    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" fill="var(--text-faint)">
-      <tspan x="${x.toFixed(1)}" dy="-3" font-size="9">${m.label}</tspan>
-      <tspan x="${x.toFixed(1)}" dy="11" font-size="8.5" font-weight="800"><tspan fill="var(--umang)">${Math.round(m.value)}</tspan><tspan fill="var(--text-faint)"> · </tspan><tspan fill="var(--chetna)">${Math.round(bVal)}</tspan></tspan>
-    </text>`;
-  }).join('');
-  // Active point markers for both polygons
-  const dotMarkers = (data, colorVar, delay)=>
-    data.map((m,i)=>{
-      const [x,y]=pt(i,m.value);
-      return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3" fill="${colorVar}" stroke="var(--surface)" stroke-width="1.5" class="chart-animate trend-dot" style="animation-delay:${(delay+i*0.04).toFixed(2)}s"/>`;
-    }).join('');
+      </div>
+      <div style="text-align:left;font-size:12px;font-weight:${bW?'800':'400'};color:${bW?'var(--chetna)':'var(--text-muted)'}">${fmtB}${suffix}</div>
+    </div>`;
+  }
+
+  // Score arc: a semicircular progress arc for each profile
+  function scoreArc(score, colorVar, size){
+    size = size||80;
+    const r = size/2 - 7, cx = size/2, cy = size/2;
+    // Draw an arc from 180° (left) to 0° (right) — a half circle on top
+    const startAngle = Math.PI, sweepAngle = Math.PI * (score/100);
+    const endAngle = startAngle + sweepAngle;
+    const x1 = cx + r*Math.cos(startAngle), y1 = cy + r*Math.sin(startAngle);
+    const x2 = cx + r*Math.cos(endAngle),   y2 = cy + r*Math.sin(endAngle);
+    const largeArc = sweepAngle > Math.PI ? 1 : 0;
+    const uid = 'arc'+(Math.random()*1e6|0);
+    return `<svg width="${size}" height="${size/2+4}" viewBox="0 0 ${size} ${size/2+4}" style="display:block;overflow:visible">
+      <defs>
+        <linearGradient id="${uid}" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="${colorVar}" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="${colorVar}" stop-opacity="1"/>
+        </linearGradient>
+      </defs>
+      <path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 1 1 ${(cx+r).toFixed(2)},${cy.toFixed(2)}"
+        fill="none" stroke="var(--surface2)" stroke-width="6" stroke-linecap="round"/>
+      ${score>0?`<path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${largeArc} 1 ${x2.toFixed(2)},${y2.toFixed(2)}"
+        fill="none" stroke="url(#${uid})" stroke-width="6" stroke-linecap="round"/>`:``}
+    </svg>`;
+  }
 
   return `
-  <svg viewBox="0 0 220 200" width="100%" style="max-width:320px;display:block;margin:0 auto;overflow:visible">
-    <defs>
-      <radialGradient id="${uid}-ga" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="var(--umang)" stop-opacity="0.35"/>
-        <stop offset="100%" stop-color="var(--umang)" stop-opacity="0.08"/>
-      </radialGradient>
-      <radialGradient id="${uid}-gb" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="var(--chetna)" stop-opacity="0.3"/>
-        <stop offset="100%" stop-color="var(--chetna)" stop-opacity="0.06"/>
-      </radialGradient>
-      <filter id="${uid}-glow-a" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="bl"/>
-        <feMerge><feMergeNode in="bl"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="${uid}-glow-b" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="bl"/>
-        <feMerge><feMergeNode in="bl"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-    </defs>
-    <!-- Grid rings: subtle concentric, alternating tone -->
-    ${[0.25,0.5,0.75,1].map((f,fi)=>`<path d="${ring(f)}" class="radar-ring" stroke-opacity="${fi===3?0.5:0.3}" stroke-dasharray="${fi===3?'none':'3 3'}"/>`).join('')}
-    <!-- Spoke lines -->
-    ${a.map((_,i)=>{const ang=-Math.PI/2+i*(2*Math.PI/n);return `<line x1="${cx}" y1="${cy}" x2="${(cx+R*Math.cos(ang)).toFixed(2)}" y2="${(cy+R*Math.sin(ang)).toFixed(2)}" stroke="var(--border)" stroke-width="1" stroke-opacity="0.4"/>`;}).join('')}
-    <!-- B polygon behind A -->
-    <path d="${poly(b)}" fill="url(#${uid}-gb)" filter="url(#${uid}-glow-b)" stroke="var(--chetna)" stroke-width="1.8" stroke-linejoin="round" class="chart-animate radar-poly" style="animation-delay:.06s"/>
-    <path d="${poly(a)}" fill="url(#${uid}-ga)" filter="url(#${uid}-glow-a)" stroke="var(--umang)" stroke-width="1.8" stroke-linejoin="round" class="chart-animate radar-poly"/>
-    <!-- Active vertex markers -->
-    ${dotMarkers(b,'var(--chetna)',0.45)}
-    ${dotMarkers(a,'var(--umang)',0.6)}
-    ${labels}
-  </svg>`;
+  <div class="card" style="padding:0;overflow:hidden">
+    <!-- Banner -->
+    <div style="padding:10px 14px;background:color-mix(in srgb,${bannerColor} 10%,var(--surface2));border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <span style="font-size:13px">⚔️</span>
+      <span style="font-size:12px;font-weight:700;color:${bannerColor}">${bannerMsg}</span>
+    </div>
+
+    <!-- Profile score cards -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+      <div style="padding:14px 12px;border-right:1px solid var(--border);text-align:center;background:${aLeads?'color-mix(in srgb,var(--umang) 5%,transparent)':'transparent'}">
+        <img src="${AVATAR_MANGU}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin:0 auto 6px;display:block;border:2px solid ${aLeads?'var(--umang)':'var(--border)'}">
+        <div style="font-size:12px;font-weight:800;margin-bottom:6px">${a.nick} ${aLeads?'🏆':''}</div>
+        ${scoreArc(scoreA,'var(--umang)',80)}
+        <div class="hero-num" style="font-size:22px;font-weight:800;color:var(--umang);margin-top:2px">${scoreA}%</div>
+        <div style="font-size:9px;color:var(--text-faint)">PREP SCORE</div>
+      </div>
+      <div style="padding:14px 12px;text-align:center;background:${!aLeads?'color-mix(in srgb,var(--chetna) 5%,transparent)':'transparent'}">
+        <img src="${AVATAR_CHETNA}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin:0 auto 6px;display:block;border:2px solid ${!aLeads?'var(--chetna)':'var(--border)'}">
+        <div style="font-size:12px;font-weight:800;margin-bottom:6px">${b.nick} ${!aLeads?'🏆':''}</div>
+        ${scoreArc(scoreB,'var(--chetna)',80)}
+        <div class="hero-num" style="font-size:22px;font-weight:800;color:var(--chetna);margin-top:2px">${scoreB}%</div>
+        <div style="font-size:9px;color:var(--text-faint)">PREP SCORE</div>
+      </div>
+    </div>
+
+    <!-- Battle rows -->
+    <div style="padding:0 14px 8px">
+      ${battleRow('Today',        todayA,         todayB,         'h', 1)}
+      ${battleRow('This Week',    weekA,           weekB,           'h', 1)}
+      ${battleRow('Total Hours',  totalA,          totalB,          'h', 1)}
+      ${battleRow('Lectures',     prepA.lecPct,    prepB.lecPct,    '%', 0)}
+      ${battleRow('Revision',     Math.round((prepA.rev1Pct+prepA.rev2Pct)/2), Math.round((prepB.rev1Pct+prepB.rev2Pct)/2), '%', 0)}
+      ${battleRow('Mock Avg',     prepA.mockAvg,   prepB.mockAvg,   '%', 0)}
+      <div style="display:grid;grid-template-columns:1fr 92px 1fr;align-items:center;gap:6px;padding:7px 0">
+        <div style="text-align:right;font-size:12px;font-weight:${strkA>=strkB?'800':'400'};color:${strkA>=strkB?'var(--umang)':'var(--text-muted)'}">${strkA}d 🔥</div>
+        <div style="font-size:9px;color:var(--text-faint);text-align:center;font-weight:600">Streak</div>
+        <div style="text-align:left;font-size:12px;font-weight:${strkB>=strkA?'800':'400'};color:${strkB>=strkA?'var(--chetna)':'var(--text-muted)'}">🔥 ${strkB}d</div>
+      </div>
+    </div>
+    <!-- Radar -->
+    <div style="border-top:1px solid var(--border);padding:10px 14px 14px">${radarSVG()}</div>
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -11459,8 +11536,9 @@ function wsLectures(profileId, paperId, editable){
     ${lecs.length===0?emptyState('📖','No lectures yet — add one below.'):
     lecs.map((l,i)=>{
       const expanded = !!(S.expandedLectures && S.expandedLectures[l.id]);
+      const rowId = editable ? `lec-row-${l.id}` : '';
       return `
-      <div style="border-bottom:1px solid var(--border)">
+      <div ${rowId?`id="${rowId}"`:''} style="border-bottom:1px solid var(--border)${editable?';user-select:none;-webkit-user-select:none':''}">
         <div class="ch-row" style="gap:10px;padding:9px 14px;border-bottom:none">
           <div class="task-check ${l.status==='done'?'on':''}" ${editable?`onclick="toggleLectureStatus('${profileId}','${paperId}','${l.id}')"`:''} style="width:19px;height:19px;flex-shrink:0;cursor:${editable?'pointer':'default'}">${l.status==='done'?'✓':''}</div>
           <div style="width:24px;flex-shrink:0;font-size:10.5px;color:var(--text-faint);font-variant-numeric:tabular-nums">${i+1}</div>
@@ -11505,6 +11583,102 @@ function wsLectures(profileId, paperId, editable){
 function toggleLectureExpand(lecId){
   if(!S.expandedLectures) S.expandedLectures = {};
   S.expandedLectures[lecId] = !S.expandedLectures[lecId];
+  renderApp();
+}
+// ── Lecture long-press edit sheet ─────────────────────────────────────────────
+// Opens a bottom sheet to edit num, topic, and duration of an existing lecture.
+// Triggered by a 500ms long-press on any lecture row in wsLectures().
+// deleteLecture() is only available for editable (own-profile) view — never for
+// the partner's schedule which is always read-only.
+let _lecLongPressTimer = null;
+function _clearLecLongPress(){ if(_lecLongPressTimer){ clearTimeout(_lecLongPressTimer); _lecLongPressTimer = null; } }
+function attachLecLongPress(el, profileId, paperId, lecId){
+  el.addEventListener('pointerdown', e=>{
+    _clearLecLongPress();
+    _lecLongPressTimer = setTimeout(()=>{ _lecLongPressTimer=null; openLectureEditSheet(profileId, paperId, lecId); }, 500);
+  }, {passive:true});
+  el.addEventListener('pointerup', _clearLecLongPress, {passive:true});
+  el.addEventListener('pointercancel', _clearLecLongPress, {passive:true});
+  el.addEventListener('pointermove', e=>{ if(e.movementX||e.movementY) _clearLecLongPress(); }, {passive:true});
+}
+function openLectureEditSheet(profileId, paperId, lecId){
+  const l = lecturesFor(profileId, paperId).find(x=>x.id===lecId);
+  if(!l) return;
+  // Prevent accidental tap-triggered opens (e.g. touchend that also fires click)
+  if(document.getElementById('lec-edit-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'lec-edit-overlay';
+  overlay.id = 'lec-edit-overlay';
+  overlay.innerHTML = `
+    <div class="lec-edit-sheet" id="lec-edit-sheet">
+      <div class="oly-sheet-handle"></div>
+      <div class="lec-edit-header">
+        <span class="lec-edit-title">✏️ Edit Lecture</span>
+        <button class="icon-btn" style="width:28px;height:28px;font-size:13px" onclick="closeLectureEditSheet()">✕</button>
+      </div>
+      <div class="lec-edit-body">
+        <div>
+          <div class="lec-field-label">Lecture Number</div>
+          <input class="lec-field-input" id="lec-edit-num" type="text" value="${escChat(l.num||'')}" placeholder="e.g. 1A, 3.2">
+        </div>
+        <div>
+          <div class="lec-field-label">Topic / Name</div>
+          <input class="lec-field-input" id="lec-edit-topic" type="text" value="${escChat(l.topic||'')}" placeholder="Lecture topic">
+        </div>
+        <div>
+          <div class="lec-field-label">Duration (h:mm)</div>
+          <input class="lec-field-input" id="lec-edit-dur" type="text" value="${escChat(l.duration||'')}" placeholder="e.g. 1:30">
+        </div>
+        <div>
+          <div class="lec-field-label">Section</div>
+          <input class="lec-field-input" id="lec-edit-section" type="text" value="${escChat(l.section||'')}" placeholder="e.g. GST, TDS">
+        </div>
+      </div>
+      <div class="lec-edit-footer">
+        <button class="btn" style="flex:1;background:var(--bad-tint);color:var(--bad);border:1px solid var(--bad)" onclick="deleteLectureConfirm('${profileId}','${paperId}','${lecId}')">Delete</button>
+        <button class="btn btn-accent" style="flex:2" onclick="saveLectureEdit('${profileId}','${paperId}','${lecId}')">Save Changes</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('pointerdown', e=>{ if(e.target===overlay) closeLectureEditSheet(); });
+  document.body.appendChild(overlay);
+  const sheet = document.getElementById('lec-edit-sheet');
+  olyAttachSheetDrag(sheet, overlay, closeLectureEditSheet);
+  requestAnimationFrame(()=>{ const i=document.getElementById('lec-edit-num'); if(i) i.focus(); });
+}
+function closeLectureEditSheet(){
+  const el = document.getElementById('lec-edit-overlay');
+  if(el) el.remove();
+}
+function saveLectureEdit(profileId, paperId, lecId){
+  const l = lecturesFor(profileId, paperId).find(x=>x.id===lecId);
+  if(!l) return;
+  const num = (document.getElementById('lec-edit-num').value||'').trim();
+  if(!num){ alert('Lecture number cannot be empty.'); return; }
+  const oldNum = l.num;
+  l.num = num;
+  l.topic = (document.getElementById('lec-edit-topic').value||'').trim();
+  l.duration = (document.getElementById('lec-edit-dur').value||'').trim();
+  l.section = (document.getElementById('lec-edit-section').value||'').trim();
+  // Mirror num/topic/duration change to the other profile for DT (definition sync, same as addLecture)
+  if(paperId==='dt' && num!==oldNum){
+    const other = otherProfileId(profileId);
+    const match = lecturesFor(other, paperId).find(x=>x.num===oldNum);
+    if(match){ match.num=num; match.topic=l.topic; match.duration=l.duration; match.section=l.section; }
+  }
+  saveShared();
+  closeLectureEditSheet();
+  renderApp();
+}
+function deleteLectureConfirm(profileId, paperId, lecId){
+  const l = lecturesFor(profileId, paperId).find(x=>x.id===lecId);
+  if(!l) return;
+  if(!confirm(`Delete "${l.num}${l.topic?' — '+l.topic:''}"? This cannot be undone.`)) return;
+  S.shared.lectures[profileId][paperId] = lecturesFor(profileId, paperId).filter(x=>x.id!==lecId);
+  // Remove linked planner task if any
+  if(S.shared.tasks && S.shared.tasks[profileId])
+    S.shared.tasks[profileId] = S.shared.tasks[profileId].filter(t=>!(t.linkType==='lecture' && t.refId===lecId));
+  saveShared();
+  closeLectureEditSheet();
   renderApp();
 }
 function setLectureField(profileId, paperId, lecId, field, value){
@@ -14172,11 +14346,36 @@ async function ensureDailyQuote(){
   if(_dailyQuoteFetching) return;
   _dailyQuoteFetching = true;
   try{
-    const text = await callClaudeAI('Generate a single, short motivational quote for CA Final students in Hinglish, using fear-based urgency as the hook — the cost of wasted time, the exam date getting closer, the regret of not having tried hard enough. Keep it supportive, not harsh: name the fear honestly, then turn it into belief that they can still act on it today. No shaming, no hopelessness, no personal attacks. Return ONLY the quote, no quotes or intro text.');
+    // Build a context-aware prompt using live app data so the message actually fits today.
+  const days = Math.max(0, daysUntilExam());
+  const todayH = hoursOnDate(S.local.myProfile, todayStr());
+  const weekH = Number(hoursInRange(S.local.myProfile,7).toFixed(1));
+  const strkDays = streak(S.local.myProfile);
+  const prep = overallPrep(S.local.myProfile);
+  const profile = profileById(S.local.myProfile);
+  // Build context sentence for the AI so it can make the message hyper-relevant
+  const ctx = [
+    days>0 ? `${days} days left until the CA Final exam.` : 'Exam is today or has passed.',
+    todayH>0 ? `They have already logged ${todayH.toFixed(1)} hours today.` : 'No study hours logged yet today.',
+    weekH>0 ? `${weekH}h studied this week so far.` : 'No hours this week yet.',
+    strkDays>1 ? `Current study streak: ${strkDays} days.` : strkDays===1 ? 'Streak just started today.' : 'No active streak right now.',
+    `Overall prep score: ${prep.prepScore}%. Lectures: ${prep.lecPct}%. Revision R1: ${prep.rev1Pct}%. Mock avg: ${prep.mockAvg}%.`,
+  ].join(' ');
+  const promptText = `You are a sharp, warm study coach for ${escChat(profile.nick)}, a CA Final student. Here is their situation today: ${ctx}
+
+Write a single focused message for them — 1 to 3 short sentences. It should:
+- Acknowledge where they actually are right now (use the data naturally, not robotically)
+- Give them one clear mental anchor or action for today
+- Sound like it comes from someone who knows them and believes in them — direct, real, not generic
+- Mix Hindi/Hinglish and English naturally the way Indian students actually speak (not forced)
+- End with energy, not a question
+
+Do NOT write a quote with quotation marks. Do NOT write a list. Do NOT use the word "journey". Return ONLY the message text, nothing else.`;
+  const text = await callClaudeAI(promptText);
     S.shared.dailyQuote = {date: todayStr(), text: (text||'').trim()};
     saveShared(); // triggers the normal debounced driveSyncSave() internally — see saveShared()
     if(S.view==='home') renderApp();
-    if(S.shared.dailyQuote.text) fireLocalPushNotification('Daily AI Motivation', S.shared.dailyQuote.text, {tag:'olympus-daily-quote'});
+    if(S.shared.dailyQuote.text) fireLocalPushNotification("Today's Focus", S.shared.dailyQuote.text, {tag:'olympus-daily-quote'});
   }catch(e){
     console.warn('Daily quote fetch failed:', e); // stays showing the loading placeholder; retried next app open
   }
