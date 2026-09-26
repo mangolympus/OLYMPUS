@@ -10278,7 +10278,7 @@ function dailyQuoteBoxHtml(){
 let _lastQuoteRefresh = 0;
 function regenerateDailyQuote(){
   const now = Date.now();
-  if(now - _lastQuoteRefresh < 60000){ toast('Try again in a moment.'); return; }
+  if(now - _lastQuoteRefresh < 60000){ showToast('Wait a moment before refreshing again.'); return; }
   _lastQuoteRefresh = now;
   S.shared.dailyQuote = {date:'', text:''};
   renderApp();
@@ -14417,7 +14417,7 @@ async function ensureDailyQuote(){
   _dailyQuoteFetching = true;
   try{
     // Build a context-aware prompt using live app data so the message actually fits today.
-  const days = Math.max(0, daysUntilExam());
+  const _rawDays = daysUntilExam(); const days = Number.isFinite(_rawDays) ? Math.max(0, _rawDays) : 0;
   const todayH = hoursOnDate(S.local.myProfile, todayStr());
   const weekH = Number(hoursInRange(S.local.myProfile,7).toFixed(1));
   const strkDays = streak(S.local.myProfile);
