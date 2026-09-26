@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#050912">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root{
   /* Umang's neutral palette (default until applyTheme() switches it — see below) */
@@ -10266,7 +10266,7 @@ function dailyQuoteBoxHtml(){
   </div>
   <div class="card" id="motivation-card" ${lpAttrs} style="background:color-mix(in srgb,var(--active-accent,var(--umang)) 6%,var(--surface));border-color:color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--border));padding:16px 18px;transition:transform .12s,box-shadow .12s">
     ${hasToday
-      ? `<div style="font-size:15.5px;font-weight:700;line-height:1.65;color:var(--text);font-family:'Playfair Display',Georgia,serif;font-style:italic;letter-spacing:.01em">${escChat(q.text)}</div>`
+      ? `<div style="font-size:14.5px;font-weight:600;line-height:1.6;color:var(--text);letter-spacing:-.01em">${escChat(q.text)}</div>`
       : `<div style="display:flex;align-items:center;gap:10px;color:var(--text-faint)">
            <div class="loading-dots" style="margin:0"><span></span><span></span><span></span></div>
            <span style="font-size:12.5px">Building today's motivation…</span>
