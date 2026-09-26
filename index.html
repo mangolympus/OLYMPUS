@@ -10253,28 +10253,30 @@ function dailyQuoteBoxHtml(){
   const q = S.shared.dailyQuote;
   const hasToday = q && q.date===todayStr() && q.text;
   const isMe = S.viewingProfile === S.local.myProfile;
-  // Only show the refresh affordance for own profile view — Chetna shouldn't regenerate
-  // Umang's quote and vice-versa; the quote is shared state but feels personal.
-  const refreshBtn = isMe && hasToday
-    ? `<button onclick="regenerateDailyQuote()" style="background:none;border:none;color:var(--text-faint);font-size:10.5px;cursor:pointer;padding:4px 6px;border-radius:6px;font-weight:600;letter-spacing:.03em">↻ New quote</button>`
+  // Long-press (hard press) on the card refreshes the motivation — own profile only.
+  // Uses a 600ms pointerdown timer that gets cancelled on pointerup/pointercancel.
+  // The ripple flash on the card confirms the gesture was registered.
+  const lpAttrs = isMe
+    ? `onpointerdown="_motLpStart(event,this)" onpointerup="_motLpCancel()" onpointercancel="_motLpCancel()" oncontextmenu="event.preventDefault()" style="cursor:pointer;-webkit-touch-callout:none;user-select:none"`
     : '';
   return `
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:4px">
-    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint)">Today's Focus</div>
-    ${refreshBtn}
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint)">Today's Motivation</div>
+    ${isMe ? `<span style="font-size:9.5px;color:var(--text-faint);font-style:italic">hold to refresh</span>` : ''}
   </div>
-  <div class="card" style="background:color-mix(in srgb,var(--active-accent,var(--umang)) 6%,var(--surface));border-color:color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--border));padding:16px 18px">
+  <div class="card" id="motivation-card" ${lpAttrs} style="background:color-mix(in srgb,var(--active-accent,var(--umang)) 6%,var(--surface));border-color:color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--border));padding:16px 18px;transition:transform .12s,box-shadow .12s">
     ${hasToday
       ? `<div style="font-size:14px;font-weight:700;line-height:1.6;color:var(--text);letter-spacing:-.01em">${escChat(q.text)}</div>`
       : `<div style="display:flex;align-items:center;gap:10px;color:var(--text-faint)">
            <div class="loading-dots" style="margin:0"><span></span><span></span><span></span></div>
-           <span style="font-size:12.5px">Building today's focus…</span>
+           <span style="font-size:12.5px">Building today's motivation…</span>
          </div>`}
   </div>`;
 }
-// Allow manual refresh of the daily quote — resets the date so ensureDailyQuote()
+// Allow manual refresh of the daily motivation — resets the date so ensureDailyQuote()
 // fires a fresh call on the next renderApp(). Rate-limited client-side: won't allow
 // more than one refresh per 60 seconds to avoid hammering the Gemini API.
+// Triggered by a long-press (hold ≥600ms) on the motivation card.
 let _lastQuoteRefresh = 0;
 function regenerateDailyQuote(){
   const now = Date.now();
@@ -10284,57 +10286,97 @@ function regenerateDailyQuote(){
   renderApp();
   ensureDailyQuote();
 }
-// Paper grid on Home — 3 cards per row (2 per row on very narrow screens).
-// Each card shows: paper code + short name, a prep-score ring, lecture %, rev1 %, rev2 %.
-// Tapping opens that paper's Workspace. Color-coded by readiness tier:
-//   ≥70% → green tint  |  40–69% → amber tint  |  <40% → muted (default surface)
-// The ring and numbers use data-countup so they animate in the same sweep as every other
-// hero number on this page, and the card border pulses with the paper's readiness color.
+let _motLpTimer = null;
+function _motLpStart(ev, el){
+  if(ev.pointerType === 'mouse' && ev.button !== 0) return;
+  el.style.transform = 'scale(.98)';
+  el.style.boxShadow = '0 0 0 2px color-mix(in srgb,var(--active-accent,var(--umang)) 45%,transparent)';
+  _motLpTimer = setTimeout(()=>{
+    _motLpTimer = null;
+    el.style.transform = '';
+    el.style.boxShadow = '';
+    // Brief flash to confirm
+    el.style.background = 'color-mix(in srgb,var(--active-accent,var(--umang)) 18%,var(--surface))';
+    setTimeout(()=>{ el.style.background=''; }, 180);
+    regenerateDailyQuote();
+  }, 600);
+}
+function _motLpCancel(){
+  if(_motLpTimer){ clearTimeout(_motLpTimer); _motLpTimer=null; }
+  const el = document.getElementById('motivation-card');
+  if(el){ el.style.transform=''; el.style.boxShadow=''; }
+}
+// Paper grid on Home — 2 columns × 3 rows (2×3).
+// Ring 104 px (−10%), score % inside, name at 20 px.
+// Deep 3D: tier-coloured bottom edge, glow ring, press-down animation.
 function homePaperGridHtml(profileId){
-  const PAPER_ICONS = {fr:'📊', afm:'📈', audit:'🔍', dt:'🏛️', idt:'💼', ibs:'🧩'};
   const cards = PAPERS.map(p=>{
     const comp = paperComponents(profileId, p.id);
     const score = comp.prepScore;
-    const tierColor = score>=70 ? 'var(--green)' : score>=40 ? 'var(--amber)' : 'var(--text-faint)';
-    const tierBg   = score>=70 ? 'color-mix(in srgb,var(--green) 8%,var(--surface))' :
-                     score>=40 ? 'color-mix(in srgb,var(--amber) 7%,var(--surface))' :
-                                 'var(--surface)';
-    const tierBorder = score>=70 ? 'var(--green)' : score>=40 ? 'var(--amber)' : 'var(--border)';
-    // Mini 3-bar progress strip: lectures, rev1, rev2
-    const bar = (pct, col) => `<div style="flex:1;height:4px;border-radius:2px;overflow:hidden;background:var(--surface2)"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px"></div></div>`;
-    // Small compact ring (non-hero — no animation overhead for 6 rings at once)
-    const ringSize = 54, ringStroke = 6, ringR = (ringSize-ringStroke)/2;
-    const circ = 2*Math.PI*ringR;
-    const offset = circ*(1-(score/100));
-    const uid = 'pr'+(Math.random()*1e6|0);
-    const ring = `<svg width="${ringSize}" height="${ringSize}" viewBox="0 0 ${ringSize} ${ringSize}" style="display:block;flex-shrink:0">
-      <circle cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" fill="none" stroke="var(--surface2)" stroke-width="${ringStroke}"/>
-      <circle cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="${ringStroke}"
+
+    const ringColor = score>=70?'var(--green)':score>=40?'var(--amber)':'var(--active-accent,var(--umang))';
+    const ringGlow  = score>=70
+      ? 'color-mix(in srgb,var(--green) 55%,transparent)'
+      : score>=40
+        ? 'color-mix(in srgb,var(--amber) 55%,transparent)'
+        : 'color-mix(in srgb,var(--active-accent,var(--umang)) 55%,transparent)';
+    const ringTrack = score>=70
+      ? 'color-mix(in srgb,var(--green) 14%,var(--surface2))'
+      : score>=40
+        ? 'color-mix(in srgb,var(--amber) 14%,var(--surface2))'
+        : 'color-mix(in srgb,var(--active-accent,var(--umang)) 10%,var(--surface2))';
+    const edgeColor = score>=70
+      ? 'color-mix(in srgb,var(--green) 70%,var(--border))'
+      : score>=40
+        ? 'color-mix(in srgb,var(--amber) 70%,var(--border))'
+        : 'color-mix(in srgb,var(--active-accent,var(--umang)) 70%,var(--border))';
+
+    const RS=104,RW=11,RR=(RS-RW)/2;
+    const circ=2*Math.PI*RR, offset=circ*(1-(score/100));
+    const uid='pg'+(Math.random()*1e6|0);
+
+    const ring=`<svg width="${RS}" height="${RS}" viewBox="0 0 ${RS} ${RS}"
+      style="display:block;filter:drop-shadow(0 0 9px ${ringGlow})">
+      <defs>
+        <linearGradient id="${uid}-g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="${ringColor}" stop-opacity=".7"/>
+          <stop offset="100%" stop-color="${ringColor}" stop-opacity="1"/>
+        </linearGradient>
+      </defs>
+      <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none" stroke="${ringTrack}" stroke-width="${RW}"/>
+      <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none"
+        stroke="url(#${uid}-g)" stroke-width="${RW}"
         stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
-        stroke-linecap="round" transform="rotate(-90 ${ringSize/2} ${ringSize/2})"/>
+        stroke-linecap="round" transform="rotate(-90 ${RS/2} ${RS/2})"/>
+      <text x="${RS/2}" y="${RS/2}" text-anchor="middle" dominant-baseline="central"
+        font-size="20" font-weight="800" fill="${ringColor}"
+        font-family="'Plus Jakarta Sans',system-ui,sans-serif">${score}%</text>
     </svg>`;
-    return `<button onclick="openWorkspaceFor('${profileId}','${p.id}')" style="display:flex;flex-direction:column;background:${tierBg};border:1.5px solid ${tierBorder};border-radius:14px;padding:12px 10px 10px;gap:8px;text-align:left;cursor:pointer;transition:transform .15s;-webkit-tap-highlight-color:transparent" onpointerdown="this.style.transform='scale(.97)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''">
-      <div style="display:flex;align-items:center;gap:8px">
-        ${ring}
-        <div style="min-width:0;flex:1">
-          <div style="font-size:9px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px">${p.code}</div>
-          <div style="font-size:12.5px;font-weight:800;line-height:1.2;color:var(--text)">${p.nick}</div>
-          <div style="font-size:18px;font-weight:800;color:${tierColor};line-height:1.1;margin-top:2px">${score}%</div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        <div style="display:flex;align-items:center;gap:5px">
-          ${bar(comp.lecPct,'var(--active-accent,var(--umang))')}
-          ${bar(comp.rev1Pct,'var(--good)')}
-          ${bar(comp.rev2Pct,'var(--purple)')}
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-faint);font-weight:600">
-          <span>L ${comp.lecPct}%</span><span>R1 ${comp.rev1Pct}%</span><span>R2 ${comp.rev2Pct}%</span>
-        </div>
-      </div>
+
+    const RS_SH=`0 2px 0 rgba(255,255,255,.13) inset,0 -1px 0 rgba(0,0,0,.2) inset,0 7px 0 0 ${edgeColor},0 10px 0 0 color-mix(in srgb,${edgeColor} 35%,transparent),0 13px 29px rgba(0,0,0,.35),0 4px 9px rgba(0,0,0,.22)`;
+    const PS_SH=`0 2px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.2) inset,0 2px 0 0 ${edgeColor},0 4px 11px rgba(0,0,0,.28),0 1px 4px rgba(0,0,0,.18)`;
+
+    return `<button onclick="openWorkspaceFor('${profileId}','${p.id}')"
+      style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+        gap:13px;aspect-ratio:1;border-radius:20px;padding:18px 11px;
+        text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent;
+        border:1.5px solid color-mix(in srgb,${edgeColor} 55%,var(--border));
+        background:linear-gradient(170deg,
+          color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--surface)) 0%,
+          color-mix(in srgb,var(--active-accent,var(--umang)) 9%,var(--surface)) 55%,
+          color-mix(in srgb,var(--active-accent,var(--umang)) 3%,var(--surface)) 100%);
+        box-shadow:${RS_SH};
+        transition:transform .12s cubic-bezier(.22,.8,.4,1),box-shadow .12s;
+        transform:translateY(0)"
+      onpointerdown="this.style.transform='translateY(6px)';this.style.boxShadow='${PS_SH}'"
+      onpointerup="this.style.transform='';this.style.boxShadow=''"
+      onpointercancel="this.style.transform='';this.style.boxShadow=''">
+      ${ring}
+      <div style="font-size:20px;font-weight:800;line-height:1.2;color:var(--text);
+        letter-spacing:-.02em;text-shadow:0 1px 3px rgba(0,0,0,.2)">${p.nick}</div>
     </button>`;
   });
-  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px">${cards.join('')}</div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-bottom:4px">${cards.join('')}</div>`;
 }
 function viewHome(){
   const vp = S.viewingProfile;
@@ -11123,169 +11165,187 @@ function comparisonBlock(){
   const aLeads = scoreA >= scoreB;
   const diff = Math.abs(scoreA - scoreB);
 
-  // Head banner: who's currently ahead and by how much
-  const bannerMsg = scoreA === scoreB
-    ? `Dead even — neck and neck at ${scoreA}%`
-    : `${aLeads ? a.nick : b.nick} is ahead by ${diff}%`;
-  const bannerColor = aLeads ? 'var(--umang)' : 'var(--chetna)';
-
-  // Mini battle row: one metric, winner highlighted, dual bar in the middle
-  function battleRow(label, numA, numB, suffix, decimals){
-    suffix = suffix||''; decimals = decimals||0;
-    const max = Math.max(0.01, numA, numB);
-    const wA = Math.round(numA/max*46), wB = Math.round(numB/max*46);
-    const aW = numA >= numB, bW = numB >= numA;
-    const fmtA = Number.isInteger(numA) && !decimals ? numA : numA.toFixed(decimals);
-    const fmtB = Number.isInteger(numB) && !decimals ? numB : numB.toFixed(decimals);
-    return `<div style="display:grid;grid-template-columns:1fr 92px 1fr;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border)">
-      <div style="text-align:right;font-size:12px;font-weight:${aW?'800':'400'};color:${aW?'var(--umang)':'var(--text-muted)'}">${fmtA}${suffix}</div>
-      <div>
-        <div style="font-size:9px;color:var(--text-faint);text-align:center;font-weight:600;margin-bottom:3px">${label}</div>
-        <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;background:var(--surface2)">
-          <div style="width:${wA}%;background:var(--umang);margin-left:${46-wA}%;border-radius:3px 0 0 3px"></div>
-          <div style="width:${wB}%;background:var(--chetna);border-radius:0 3px 3px 0"></div>
-        </div>
-      </div>
-      <div style="text-align:left;font-size:12px;font-weight:${bW?'800':'400'};color:${bW?'var(--chetna)':'var(--text-muted)'}">${fmtB}${suffix}</div>
-    </div>`;
-  }
-
-  // Score arc: a semicircular progress arc for each profile
-  function scoreArc(score, colorVar, size){
-    size = size||80;
-    const r = size/2 - 7, cx = size/2, cy = size/2;
-    // Draw an arc from 180° (left) to 0° (right) — a half circle on top
-    const startAngle = Math.PI, sweepAngle = Math.PI * (score/100);
-    const endAngle = startAngle + sweepAngle;
-    const x1 = cx + r*Math.cos(startAngle), y1 = cy + r*Math.sin(startAngle);
-    const x2 = cx + r*Math.cos(endAngle),   y2 = cy + r*Math.sin(endAngle);
-    const largeArc = sweepAngle > Math.PI ? 1 : 0;
-    const uid = 'arc'+(Math.random()*1e6|0);
-    return `<svg width="${size}" height="${size/2+4}" viewBox="0 0 ${size} ${size/2+4}" style="display:block;overflow:visible">
+  // Full-circle score ring for each profile card
+  function scoreRing(score, colorVar){
+    const RS = 72, RW = 7, RR = (RS-RW)/2;
+    const circ = 2*Math.PI*RR;
+    const offset = circ*(1-(score/100));
+    const uid = 'cpr'+(Math.random()*1e6|0);
+    return `<svg width="${RS}" height="${RS}" viewBox="0 0 ${RS} ${RS}" style="display:block;margin:0 auto 4px">
       <defs>
-        <linearGradient id="${uid}" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stop-color="${colorVar}" stop-opacity="0.5"/>
+        <linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${colorVar}" stop-opacity="0.7"/>
           <stop offset="100%" stop-color="${colorVar}" stop-opacity="1"/>
         </linearGradient>
       </defs>
-      <path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 1 1 ${(cx+r).toFixed(2)},${cy.toFixed(2)}"
-        fill="none" stroke="var(--surface2)" stroke-width="6" stroke-linecap="round"/>
-      ${score>0?`<path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${largeArc} 1 ${x2.toFixed(2)},${y2.toFixed(2)}"
-        fill="none" stroke="url(#${uid})" stroke-width="6" stroke-linecap="round"/>`:``}
+      <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none" stroke="color-mix(in srgb,${colorVar} 14%,var(--surface2))" stroke-width="${RW}"/>
+      <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none" stroke="url(#${uid})" stroke-width="${RW}"
+        stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
+        stroke-linecap="round" transform="rotate(-90 ${RS/2} ${RS/2})"/>
+      <text x="${RS/2}" y="${RS/2}" text-anchor="middle" dominant-baseline="central"
+        font-size="15" font-weight="800" fill="${colorVar}" font-family="inherit">${score}%</text>
     </svg>`;
   }
 
+  // Horizontal VS bar — metric flows left-to-right; winner side is wider & brighter
+  function vsBar(label, numA, numB, suffix, decimals){
+    suffix = suffix||''; decimals = decimals||0;
+    const total = Math.max(0.01, numA+numB);
+    const pctA = Math.round(numA/total*100), pctB = 100-pctA;
+    const aW = numA >= numB, bW = numB >= numA;
+    const fmtA = decimals ? numA.toFixed(decimals) : Math.round(numA);
+    const fmtB = decimals ? numB.toFixed(decimals) : Math.round(numB);
+    return `
+    <div style="margin-bottom:10px">
+      <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-align:center;letter-spacing:.05em;margin-bottom:4px;text-transform:uppercase">${label}</div>
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="font-size:12.5px;font-weight:${aW?'800':'500'};color:${aW?'var(--umang)':'var(--text-muted)'};min-width:36px;text-align:right">${fmtA}${suffix}</span>
+        <div style="flex:1;display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface2)">
+          <div style="width:${pctA}%;background:var(--umang);border-radius:4px 0 0 4px;transition:width .6s cubic-bezier(.22,.8,.4,1)"></div>
+          <div style="width:${pctB}%;background:var(--chetna);border-radius:0 4px 4px 0;transition:width .6s cubic-bezier(.22,.8,.4,1)"></div>
+        </div>
+        <span style="font-size:12.5px;font-weight:${bW?'800':'500'};color:${bW?'var(--chetna)':'var(--text-muted)'};min-width:36px">${fmtB}${suffix}</span>
+      </div>
+    </div>`;
+  }
+
+  // Who's ahead banner
+  const bannerMsg = scoreA === scoreB
+    ? `Dead even at ${scoreA}%`
+    : `${aLeads?a.nick:b.nick} leads by ${diff} pts`;
+  const bannerColor = aLeads ? 'var(--umang)' : 'var(--chetna)';
+
   return `
   <div class="card" style="padding:0;overflow:hidden">
-    <!-- Banner -->
-    <div style="padding:10px 14px;background:color-mix(in srgb,${bannerColor} 10%,var(--surface2));border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-      <span style="font-size:13px">⚔️</span>
-      <span style="font-size:12px;font-weight:700;color:${bannerColor}">${bannerMsg}</span>
-    </div>
 
-    <!-- Profile score cards -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
-      <div style="padding:14px 12px;border-right:1px solid var(--border);text-align:center;background:${aLeads?'color-mix(in srgb,var(--umang) 5%,transparent)':'transparent'}">
-        <img src="${AVATAR_MANGU}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin:0 auto 6px;display:block;border:2px solid ${aLeads?'var(--umang)':'var(--border)'}">
-        <div style="font-size:12px;font-weight:800;margin-bottom:6px">${a.nick} ${aLeads?'🏆':''}</div>
-        ${scoreArc(scoreA,'var(--umang)',80)}
-        <div class="hero-num" style="font-size:22px;font-weight:800;color:var(--umang);margin-top:2px">${scoreA}%</div>
-        <div style="font-size:9px;color:var(--text-faint)">PREP SCORE</div>
+    <!-- Head-to-head hero panel -->
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--surface2)">
+      <!-- Umang side -->
+      <div style="padding:16px 12px 14px;text-align:center;background:${aLeads?'color-mix(in srgb,var(--umang) 7%,transparent)':'transparent'};border-right:1px solid var(--border)">
+        ${scoreRing(scoreA,'var(--umang)')}
+        <div style="font-size:12px;font-weight:800;color:var(--text);margin-top:2px">${a.nick}${aLeads?' 🏆':''}</div>
       </div>
-      <div style="padding:14px 12px;text-align:center;background:${!aLeads?'color-mix(in srgb,var(--chetna) 5%,transparent)':'transparent'}">
-        <img src="${AVATAR_CHETNA}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin:0 auto 6px;display:block;border:2px solid ${!aLeads?'var(--chetna)':'var(--border)'}">
-        <div style="font-size:12px;font-weight:800;margin-bottom:6px">${b.nick} ${!aLeads?'🏆':''}</div>
-        ${scoreArc(scoreB,'var(--chetna)',80)}
-        <div class="hero-num" style="font-size:22px;font-weight:800;color:var(--chetna);margin-top:2px">${scoreB}%</div>
-        <div style="font-size:9px;color:var(--text-faint)">PREP SCORE</div>
+      <!-- VS divider -->
+      <div style="padding:0 10px;display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="font-size:11px;font-weight:800;color:var(--text-faint);letter-spacing:.04em">VS</div>
+        <div style="width:1px;height:32px;background:var(--border)"></div>
+      </div>
+      <!-- Chetna side -->
+      <div style="padding:16px 12px 14px;text-align:center;background:${!aLeads?'color-mix(in srgb,var(--chetna) 7%,transparent)':'transparent'};border-left:1px solid var(--border)">
+        ${scoreRing(scoreB,'var(--chetna)')}
+        <div style="font-size:12px;font-weight:800;color:var(--text);margin-top:2px">${b.nick}${!aLeads?' 🏆':''}</div>
       </div>
     </div>
 
-    <!-- Battle rows -->
-    <div style="padding:0 14px 8px">
-      ${battleRow('Today',        todayA,         todayB,         'h', 1)}
-      ${battleRow('This Week',    weekA,           weekB,           'h', 1)}
-      ${battleRow('Total Hours',  totalA,          totalB,          'h', 1)}
-      ${battleRow('Lectures',     prepA.lecPct,    prepB.lecPct,    '%', 0)}
-      ${battleRow('Revision',     Math.round((prepA.rev1Pct+prepA.rev2Pct)/2), Math.round((prepB.rev1Pct+prepB.rev2Pct)/2), '%', 0)}
-      ${battleRow('Mock Avg',     prepA.mockAvg,   prepB.mockAvg,   '%', 0)}
-      <div style="display:grid;grid-template-columns:1fr 92px 1fr;align-items:center;gap:6px;padding:7px 0">
-        <div style="text-align:right;font-size:12px;font-weight:${strkA>=strkB?'800':'400'};color:${strkA>=strkB?'var(--umang)':'var(--text-muted)'}">${strkA}d 🔥</div>
-        <div style="font-size:9px;color:var(--text-faint);text-align:center;font-weight:600">Streak</div>
-        <div style="text-align:left;font-size:12px;font-weight:${strkB>=strkA?'800':'400'};color:${strkB>=strkA?'var(--chetna)':'var(--text-muted)'}">🔥 ${strkB}d</div>
+    <!-- Leader banner -->
+    <div style="padding:8px 14px;background:color-mix(in srgb,${bannerColor} 9%,var(--surface));border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:7px">
+      <span style="font-size:13px">${scoreA===scoreB?'🤝':'⚡'}</span>
+      <span style="font-size:12.5px;font-weight:700;color:${bannerColor}">${bannerMsg}</span>
+    </div>
+
+    <!-- Dual-bar metrics -->
+    <div style="padding:14px 16px 6px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:10px;font-weight:800;color:var(--umang);letter-spacing:.03em">${a.nick}</span>
+        <span style="font-size:10px;font-weight:800;color:var(--chetna);letter-spacing:.03em">${b.nick}</span>
+      </div>
+      ${vsBar('Today',       todayA,       todayB,       'h', 1)}
+      ${vsBar('This Week',   weekA,        weekB,        'h', 1)}
+      ${vsBar('Total Hours', totalA,       totalB,       'h', 1)}
+      ${vsBar('Lectures',    prepA.lecPct, prepB.lecPct, '%', 0)}
+      ${vsBar('Revision',    Math.round((prepA.rev1Pct+prepA.rev2Pct)/2), Math.round((prepB.rev1Pct+prepB.rev2Pct)/2), '%', 0)}
+      ${vsBar('Mock Avg',    prepA.mockAvg, prepB.mockAvg, '%', 0)}
+      ${vsBar('Streak',      strkA,        strkB,        'd', 0)}
+    </div>
+
+    <!-- Radar chart -->
+    <div style="border-top:1px solid var(--border);padding:14px 14px 16px">
+      <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);text-align:center;margin-bottom:10px">Skill Radar</div>
+      ${radarSVG()}
+      <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--umang)"><span style="width:10px;height:10px;border-radius:50%;background:var(--umang);display:inline-block"></span>${a.nick}</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--chetna)"><span style="width:10px;height:10px;border-radius:50%;background:var(--chetna);display:inline-block"></span>${b.nick}</span>
       </div>
     </div>
-    <!-- Radar -->
-    <div style="border-top:1px solid var(--border);padding:10px 14px 14px">${radarSVG()}</div>
   </div>`;
 }
 
 function radarSVG(){
   const a = radarMetrics('umang'), b = radarMetrics('chetna');
   const n = a.length;
-  const cx=110, cy=100, R=78;
+  // Wider viewBox with generous label clearance
+  const W=260, H=220, cx=130, cy=106, R=72;
   const uid = 'rdr'+(Math.random()*1e6|0);
-  const pt = (i,val)=>{
-    const ang = -Math.PI/2 + i*(2*Math.PI/n);
+
+  const ang = i => -Math.PI/2 + i*(2*Math.PI/n);
+  const pt = (i,val) => {
     const r = R*(val/100);
-    return [cx+r*Math.cos(ang), cy+r*Math.sin(ang)];
+    return [cx+r*Math.cos(ang(i)), cy+r*Math.sin(ang(i))];
   };
-  const ring = (frac)=>{
+  // Background grid rings at 25/50/75/100%
+  const gridRing = frac => {
     let d='';
     for(let i=0;i<n;i++){
-      const ang=-Math.PI/2+i*(2*Math.PI/n);
-      const x=cx+R*frac*Math.cos(ang), y=cy+R*frac*Math.sin(ang);
-      d += (i===0?'M':'L')+x.toFixed(2)+','+y.toFixed(2);
+      const x=cx+R*frac*Math.cos(ang(i)), y=cy+R*frac*Math.sin(ang(i));
+      d+=(i===0?'M':'L')+x.toFixed(2)+','+y.toFixed(2);
     }
     return d+'Z';
   };
-  const poly = (data)=> data.map((m,i)=>pt(i,m.value)).map(([x,y],i)=>(i===0?'M':'L')+x.toFixed(2)+','+y.toFixed(2)).join('')+'Z';
+  // Data polygon path
+  const poly = data => data.map((m,i)=>pt(i,m.value)).map(([x,y],i)=>(i===0?'M':'L')+x.toFixed(2)+','+y.toFixed(2)).join('')+'Z';
+
+  // Axis labels with score chips below
   const labels = a.map((m,i)=>{
     const bVal = b[i].value;
-    const ang=-Math.PI/2+i*(2*Math.PI/n);
-    const x=cx+(R+18)*Math.cos(ang), y=cy+(R+18)*Math.sin(ang);
-    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" fill="var(--text-faint)">
-      <tspan x="${x.toFixed(1)}" dy="-3" font-size="9">${m.label}</tspan>
-      <tspan x="${x.toFixed(1)}" dy="11" font-size="8.5" font-weight="800"><tspan fill="var(--umang)">${Math.round(m.value)}</tspan><tspan fill="var(--text-faint)"> · </tspan><tspan fill="var(--chetna)">${Math.round(bVal)}</tspan></tspan>
+    const θ = ang(i);
+    const lx = cx+(R+22)*Math.cos(θ), ly = cy+(R+22)*Math.sin(θ);
+    // Shift chips slightly further out
+    const cx2 = cx+(R+22)*Math.cos(θ), cy2 = cy+(R+24)*Math.sin(θ)+9;
+    return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-weight="700" fill="var(--text-muted)">${m.label}</text>
+    <text x="${cx2.toFixed(1)}" y="${(cy2+2).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="800">
+      <tspan fill="var(--umang)">${Math.round(m.value)}</tspan><tspan fill="var(--text-faint)"> · </tspan><tspan fill="var(--chetna)">${Math.round(bVal)}</tspan>
     </text>`;
   }).join('');
-  // Active point markers for both polygons
-  const dotMarkers = (data, colorVar, delay)=>
-    data.map((m,i)=>{
-      const [x,y]=pt(i,m.value);
-      return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3" fill="${colorVar}" stroke="var(--surface)" stroke-width="1.5" class="chart-animate trend-dot" style="animation-delay:${(delay+i*0.04).toFixed(2)}s"/>`;
-    }).join('');
+
+  // Vertex dot markers
+  const dots = (data, col, delay) => data.map((m,i)=>{
+    const [x,y]=pt(i,m.value);
+    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3.5" fill="${col}" stroke="var(--surface)" stroke-width="1.8" class="chart-animate trend-dot" style="animation-delay:${(delay+i*0.06).toFixed(2)}s"/>`;
+  }).join('');
 
   return `
-  <svg viewBox="0 0 220 200" width="100%" style="max-width:320px;display:block;margin:0 auto;overflow:visible">
+  <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;margin:0 auto;overflow:visible">
     <defs>
       <radialGradient id="${uid}-ga" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="var(--umang)" stop-opacity="0.35"/>
-        <stop offset="100%" stop-color="var(--umang)" stop-opacity="0.08"/>
+        <stop offset="0%" stop-color="var(--umang)" stop-opacity="0.32"/>
+        <stop offset="100%" stop-color="var(--umang)" stop-opacity="0.07"/>
       </radialGradient>
       <radialGradient id="${uid}-gb" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="var(--chetna)" stop-opacity="0.3"/>
-        <stop offset="100%" stop-color="var(--chetna)" stop-opacity="0.06"/>
+        <stop offset="0%" stop-color="var(--chetna)" stop-opacity="0.28"/>
+        <stop offset="100%" stop-color="var(--chetna)" stop-opacity="0.05"/>
       </radialGradient>
-      <filter id="${uid}-glow-a" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="bl"/>
-        <feMerge><feMergeNode in="bl"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="${uid}-glow-b" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="bl"/>
-        <feMerge><feMergeNode in="bl"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
+      <filter id="${uid}-gA"><feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="bl"/><feMerge><feMergeNode in="bl"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="${uid}-gB"><feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="bl"/><feMerge><feMergeNode in="bl"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     </defs>
-    <!-- Grid rings: subtle concentric, alternating tone -->
-    ${[0.25,0.5,0.75,1].map((f,fi)=>`<path d="${ring(f)}" class="radar-ring" stroke-opacity="${fi===3?0.5:0.3}" stroke-dasharray="${fi===3?'none':'3 3'}"/>`).join('')}
-    <!-- Spoke lines -->
-    ${a.map((_,i)=>{const ang=-Math.PI/2+i*(2*Math.PI/n);return `<line x1="${cx}" y1="${cy}" x2="${(cx+R*Math.cos(ang)).toFixed(2)}" y2="${(cy+R*Math.sin(ang)).toFixed(2)}" stroke="var(--border)" stroke-width="1" stroke-opacity="0.4"/>`;}).join('')}
-    <!-- B polygon behind A -->
-    <path d="${poly(b)}" fill="url(#${uid}-gb)" filter="url(#${uid}-glow-b)" stroke="var(--chetna)" stroke-width="1.8" stroke-linejoin="round" class="chart-animate radar-poly" style="animation-delay:.06s"/>
-    <path d="${poly(a)}" fill="url(#${uid}-ga)" filter="url(#${uid}-glow-a)" stroke="var(--umang)" stroke-width="1.8" stroke-linejoin="round" class="chart-animate radar-poly"/>
-    <!-- Active vertex markers -->
-    ${dotMarkers(b,'var(--chetna)',0.45)}
-    ${dotMarkers(a,'var(--umang)',0.6)}
+
+    <!-- Grid: concentric web rings -->
+    ${[0.25,0.5,0.75,1].map((f,fi)=>`
+      <path d="${gridRing(f)}" fill="${fi%2===0?'color-mix(in srgb,var(--border) 30%,transparent)':'none'}" stroke="var(--border)" stroke-width="${fi===3?1.2:0.8}" stroke-opacity="${fi===3?0.55:0.35}" ${fi<3?'stroke-dasharray="3 3"':''}/>
+    `).join('')}
+
+    <!-- Spokes -->
+    ${a.map((_,i)=>`<line x1="${cx}" y1="${cy}" x2="${(cx+R*Math.cos(ang(i))).toFixed(2)}" y2="${(cy+R*Math.sin(ang(i))).toFixed(2)}" stroke="var(--border)" stroke-width="1" stroke-opacity="0.45"/>`).join('')}
+
+    <!-- Chetna polygon (back) -->
+    <path d="${poly(b)}" fill="url(#${uid}-gb)" filter="url(#${uid}-gB)" stroke="var(--chetna)" stroke-width="2" stroke-linejoin="round" stroke-opacity="0.9" class="chart-animate radar-poly" style="animation-delay:.08s"/>
+    <!-- Umang polygon (front) -->
+    <path d="${poly(a)}" fill="url(#${uid}-ga)" filter="url(#${uid}-gA)" stroke="var(--umang)" stroke-width="2" stroke-linejoin="round" class="chart-animate radar-poly"/>
+
+    <!-- Vertex dots -->
+    ${dots(b,'var(--chetna)',0.5)}
+    ${dots(a,'var(--umang)',0.65)}
+
+    <!-- Axis labels -->
     ${labels}
   </svg>`;
 }
@@ -14445,7 +14505,7 @@ Do NOT write a quote with quotation marks. Do NOT write a list. Do NOT use the w
     S.shared.dailyQuote = {date: todayStr(), text: (text||'').trim()};
     saveShared(); // triggers the normal debounced driveSyncSave() internally — see saveShared()
     if(S.view==='home') renderApp();
-    if(S.shared.dailyQuote.text) fireLocalPushNotification("Today's Focus", S.shared.dailyQuote.text, {tag:'olympus-daily-quote'});
+    if(S.shared.dailyQuote.text) fireLocalPushNotification("Today's Motivation", S.shared.dailyQuote.text, {tag:'olympus-daily-quote'});
   }catch(e){
     console.warn('Daily quote fetch failed:', e); // stays showing the loading placeholder; retried next app open
   }
