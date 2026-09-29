@@ -4,7 +4,17 @@
 // The activate handler deletes any cache that doesn't match this string, so bumping it is
 // what makes the "new version available" flow in index.html actually pick up the change —
 // forgetting to bump it means devices keep serving the old cached copy indefinitely.
-const CACHE_VERSION = 'olympus-v108';
+// Bumped for the app-shell change that moved the intro video out of index.html (see
+// INTRO_VIDEO_SRC there) and externalised the FR case-scenario bank — index.html dropped
+// from ~4.1 MB to ~1.77 MB, so every device needs to pick the new shell up rather than
+// keep serving the old cached copy.
+const CACHE_VERSION = 'olympus-v111';
+
+// NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
+// played by the "Replay Intro" button in Settings > About, so precaching it would put the
+// entire cost straight back into every install and every version bump. The runtime cache in
+// the fetch handler still stores it after the first successful play, so offline replay
+// keeps working from then on.
 
 // Same-origin, always-available files only. Google Sign-In (accounts.google.com), Google
 // Fonts, and any Drive/Gemini API calls are all cross-origin and deliberately never touched
@@ -92,14 +102,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Navigations are matched with ignoreSearch, so a query string on the URL still resolves
+  // to the cached shell. This is exactly the notificationclick path below: tapping Pause/End
+  // when no tab is open calls openWindow('./?timerAction=pause'), and a plain caches.match()
+  // treats that as a different URL from './' — so it missed the cache entirely and went to
+  // the network, making a notification tap slow on a bad connection and doing nothing at all
+  // offline, even though the shell was sitting right there. index.html reads the parameter
+  // off location.search (applyPendingTimerActionFromUrl) and the server never varies the
+  // response by query string, so the cached shell is always the correct thing to return.
+  const isNavigation = req.mode === 'navigate';
   event.respondWith(
-    caches.match(req).then((cached) => {
+    caches.match(req, isNavigation ? { ignoreSearch: true } : undefined).then((cached) => {
       if (cached) return cached;
       return fetch(req)
         .then((res) => {
           // Cache same-origin GETs as they're seen, so anything not pre-listed in APP_SHELL
-          // still becomes available offline after the first successful load.
-          if (res && res.ok) {
+          // still becomes available offline after the first successful load. Navigations are
+          // skipped here on purpose — they're already served from the shell entry above, and
+          // storing them would add a separate near-duplicate copy of index.html per distinct
+          // query string (./?timerAction=pause, ./?timerAction=stop, …) that nothing reads.
+          if (res && res.ok && !isNavigation) {
             const copy = res.clone();
             caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
           }
@@ -108,7 +130,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // Offline and not cached — for a page navigation, fall back to the shell rather
           // than showing the browser's default offline error page.
-          if (req.mode === 'navigate') return caches.match('./index.html');
+          if (isNavigation) return caches.match('./index.html');
         });
     })
   );
