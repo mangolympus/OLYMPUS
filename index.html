@@ -416,6 +416,9 @@ textarea.jsonbox{width:100%;height:90px;border:1px solid var(--border);border-ra
 .cal-dot{width:4px;height:4px;border-radius:50%}
 .task-row{display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--border)}
 .task-row:last-child{border-bottom:none}
+.task-row[data-task-id]{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.task-row[data-task-id] .task-check{position:relative}
+.task-row[data-task-id] .task-check::after{content:'';position:absolute;inset:-11px}
 .task-check{width:19px;height:19px;border-radius:5px;border:1.5px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
 .task-check.on{background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));border-color:var(--active-accent,var(--umang))}
 .task-text{flex:1;font-size:12.5px}
@@ -1502,6 +1505,11 @@ button, a, .btn, .ptab, .icon-btn, .bottomnav button, .profile-pill button,
 .lec-field-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;transition:border-color .15s}
 .lec-field-input:focus{outline:none;border-color:var(--active-accent,var(--umang))}
 .lec-edit-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0}
+/* Planner task long-press action sheet */
+.task-action-list{display:flex;flex-direction:column;padding:6px 10px 14px}
+.task-action-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:14px 12px;font-size:14px;font-weight:700;background:none;border:none;border-radius:10px;color:var(--text);cursor:pointer;font-family:inherit}
+.task-action-btn:active{background:var(--surface2)}
+.task-action-btn.danger{color:var(--bad)}
 
 /* ── E. ACCESSIBILITY — visible focus ring only for keyboard users ─────────── */
 .btn:focus-visible, .ptab:focus-visible, .icon-btn:focus-visible,
@@ -2792,6 +2800,7 @@ function syncPlannerTaskFromSource(linkType, linkCategory, profileId, paperId, r
   tasks.forEach(t=>{
     if(t.linkType===linkType && t.linkCategory===linkCategory && t.paperId===paperId && t.refId===refId && t.done!==doneState){
       t.done = doneState; changed = true;
+      if(doneState) delete t.rolledFrom;
     }
   });
   if(changed) saveShared();
@@ -7376,15 +7385,19 @@ function refreshAllTargets(profileId){
 // ── CRUD ─────────────────────────────────────────────────────────────────────────────────
 function createTarget(profileId, fields){
   const t = {
-    id: uid(), title: fields.title, paperId: fields.paperId, type: fields.type,
-    unit: fields.type==='overall' ? 'percent' : fields.unit,
+    id: uid(), title: fields.title, paperId: fields.paperId || '', type: fields.type,
+    unit: fields.type==='overall' ? 'percent' : (fields.unit || 'percent'),
     targetValue: fields.targetValue, startDate: fields.startDate, deadline: fields.deadline,
     priority: fields.priority || 'med', createdAt: Date.now(), updatedAt: Date.now(),
     completedAt: null, progressLog: [], manualProgress: fields.type==='custom' ? 0 : undefined,
     plannedTaskIds: [],
   };
-  milestoneTargetsFor(profileId).push(t);
-  ensureTargetSnapshot(profileId, t);
+  // Ensure the milestoneTargets structure exists before pushing
+  if(!S.shared.milestoneTargets) S.shared.milestoneTargets = {};
+  if(!S.shared.milestoneTargets[profileId]) S.shared.milestoneTargets[profileId] = [];
+  S.shared.milestoneTargets[profileId].push(t);
+  // Wrap snapshot in try-catch: a failure here must never prevent the save from firing
+  try { ensureTargetSnapshot(profileId, t); } catch(e) { console.warn('[Targets] snapshot error on create:', e); }
   saveShared();
   return t;
 }
@@ -7395,6 +7408,23 @@ function updateTarget(profileId, targetId, patch){
 }
 function deleteTarget(profileId, targetId){
   if(!confirm('Delete this target? This cannot be undone.')) return;
+  // Retrieve the target before deleting so we can clean up its planned tasks in the Planner
+  const targetToDelete = targetById(profileId, targetId);
+  if(targetToDelete && targetToDelete.plannedTaskIds && targetToDelete.plannedTaskIds.length > 0){
+    const idsToRemove = new Set(targetToDelete.plannedTaskIds);
+    if(S.shared.tasks && S.shared.tasks[profileId]){
+      // Clear each removed task's linked lecture targetDate FIRST, same as
+      // deleteManualTask()/resetFuturePlanner() already do for a hand-deleted task — the two
+      // are meant to be interchangeable (see syncLectureTargetDateFromTask's own comment:
+      // "Clearing the date removes the linked task" is the reverse direction of this exact
+      // link). Without this, a lecture planThisTarget() had scheduled would keep showing
+      // "scheduled for <date>" with no Planner task or Target behind it anymore.
+      S.shared.tasks[profileId].forEach(task=>{
+        if(idsToRemove.has(task.id)) syncLectureTargetDateFromTask(profileId, task, null);
+      });
+      S.shared.tasks[profileId] = S.shared.tasks[profileId].filter(task => !idsToRemove.has(task.id));
+    }
+  }
   S.shared.milestoneTargets[profileId] = milestoneTargetsFor(profileId).filter(t=>t.id!==targetId);
   saveShared();
   S.targetsView = 'dashboard';
@@ -7451,6 +7481,9 @@ function planThisTarget(profileId, targetId){
   const existingOpen = t.plannedTaskIds.filter(id=>manualTasksFor(profileId).some(x=>x.id===id && !x.done));
   const info = targetTypeInfo(t.type);
   let created = 0;
+  // Always guard the tasks array — it could be missing for a profile on first use
+  if(!S.shared.tasks) S.shared.tasks = {};
+  if(!S.shared.tasks[profileId]) S.shared.tasks[profileId] = [];
   if(t.type==='overall' || t.type==='custom'){
     if(existingOpen.length===0){
       const paper = t.paperId ? paperById(t.paperId) : null;
@@ -7466,7 +7499,7 @@ function planThisTarget(profileId, targetId){
     let pendingItems;
     if(t.type==='lectures'){
       pendingItems = lecturesFor(profileId, t.paperId).filter(l=>l.status!=='done')
-        .map(l=>({refId:l.id, label:`${paperById(t.paperId).code} — Lecture: L${l.num} ${l.topic||''}`.trim()}));
+        .map(l=>({refId:l.id, label:lectureTaskTitle(t.paperId, l)}));
     } else {
       pendingItems = (chaptersFor(profileId, t.paperId)||[]).filter(c=>!c[flag])
         .map(c=>({refId:c.id, label:`${paperById(t.paperId).code} — ${targetTypeInfo(t.type).label}: ${c.name}`}));
@@ -7478,15 +7511,22 @@ function planThisTarget(profileId, targetId){
     const neededCount = Math.max(0, goalCount - done - existingOpen.length);
     const toCreate = pendingItems.slice(0, neededCount);
     const newIds = [];
+    let createdNow = 0;
     toCreate.forEach((item, i)=>{
+      const linkType = t.type==='lectures' ? 'lecture' : 'chapter';
+      // Item already has an open Planner task → reuse it instead of stacking a duplicate on top.
+      const dup = manualTasksFor(profileId).find(x=>x.linkType===linkType && x.linkCategory===linkCategory && x.paperId===t.paperId && x.refId===item.refId && !x.done);
+      if(dup){ newIds.push(dup.id); return; }
       const d = new Date(); d.setDate(d.getDate()+i);
       const task = {id:uid(), title:item.label, date:todayStr(d), done:false,
-        linkType: t.type==='lectures' ? 'lecture' : 'chapter', linkCategory, paperId:t.paperId, refId:item.refId,
+        linkType, linkCategory, paperId:t.paperId, refId:item.refId,
         priority:t.priority, notes:'Created from Targets — "Plan This Target".'};
       S.shared.tasks[profileId].push(task);
+      syncLectureTargetDateFromTask(profileId, task, task.date);
       newIds.push(task.id);
+      createdNow++;
     });
-    created = newIds.length;
+    created = createdNow;
     t.plannedTaskIds = existingOpen.concat(newIds);
   }
   saveShared();
@@ -8279,7 +8319,14 @@ function chatStatusInfo(otherId){
 // (a missed notification, not lost study data) left as-is rather than rushed into this fix.
 const SINGLE_OWNER_SHARED_KEYS = ['logs','targets','chapters','lectures','mockScores','tasks',
   'profileInfo','dailyTargetOverride','prefs','celebratedMilestones','habits','habitLog',
-  'diary','plannerTargets','lectureCompletionTarget','papers'];
+  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets'];
+// milestoneTargets was missing from this list entirely — the rebuilt Targets page (see its
+// own big comment above) added a genuinely new single-owner field but never registered it
+// here, so a target you created could survive locally for a while and then quietly vanish:
+// without this key protected, refreshOtherProfileDataFromRemote() never refreshed either
+// side's cached copy of it before a save, so whichever device (yours or your partner's)
+// next saved using a stale in-memory milestoneTargets would overwrite the other's newer
+// targets with that stale copy — reported as "targets are not getting saved."
 // Replaces this device's cached copy of the OTHER profile's own data with whatever a fresh
 // Drive read just returned. Safe specifically because I never write to their slice of any of
 // these fields myself — the whole point of SINGLE_OWNER_SHARED_KEYS above — so remote's copy
@@ -9915,7 +9962,11 @@ function offerMarkItemComplete(profileId, paperId, category, itemId, itemLabel){
   } else {
     const flag = CATEGORY_FLAG[category];
     const c = flag && chapterById(profileId, paperId, itemId);
-    if(c && !c[flag]){ c[flag] = true; saveShared(); checkMilestones(profileId, paperId, itemId); renderApp(); }
+    if(c && !c[flag]){
+      c[flag] = true;
+      syncPlannerTaskFromSource('chapter', category, profileId, paperId, itemId, true);
+      saveShared(); checkMilestones(profileId, paperId, itemId); renderApp();
+    }
   }
 }
 // Ordinary Discard — user-initiated, asks first, never used for a Strict Countdown session
@@ -11870,9 +11921,10 @@ function toggleChapterExpand(chId){
 }
 function toggleChapterFlag(profileId, paperId, chId, key){
   const c = chapterById(profileId, paperId, chId); if(!c) return;
-  c[key] = !c[key]; saveShared(); renderApp();
+  c[key] = !c[key];
   const cat = FLAG_TO_CATEGORY[key];
   if(cat) syncPlannerTaskFromSource('chapter', cat, profileId, paperId, chId, c[key]);
+  saveShared(); renderApp();
   checkMilestones(profileId, paperId, chId);
 }
 function toggleTopicFlag(profileId, paperId, chId, topicId, key){
@@ -12069,11 +12121,18 @@ function saveLectureEdit(profileId, paperId, lecId){
   l.topic = (document.getElementById('lec-edit-topic').value||'').trim();
   l.duration = (document.getElementById('lec-edit-dur').value||'').trim();
   l.section = (document.getElementById('lec-edit-section').value||'').trim();
-  // Mirror num/topic/duration change to the other profile for DT (definition sync, same as addLecture)
-  if(paperId==='dt' && num!==oldNum){
+  // Linked Planner tasks carry the lecture's number/topic in their title — keep them current.
+  refreshLinkedLectureTaskTitles(profileId, paperId, l);
+  // Mirror num/topic/duration/section changes to the other profile for DT (definition sync, same
+  // as addLecture). This used to run only when the NUMBER changed, so editing just the topic,
+  // duration or section on one profile silently left the other profile's copy stale.
+  if(paperId==='dt'){
     const other = otherProfileId(profileId);
     const match = lecturesFor(other, paperId).find(x=>x.num===oldNum);
-    if(match){ match.num=num; match.topic=l.topic; match.duration=l.duration; match.section=l.section; }
+    if(match){
+      match.num=num; match.topic=l.topic; match.duration=l.duration; match.section=l.section;
+      refreshLinkedLectureTaskTitles(other, paperId, match);
+    }
   }
   saveShared();
   closeLectureEditSheet();
@@ -12130,18 +12189,36 @@ function syncLectureTargetDateFromTask(profileId, task, newDateOrNull){
 // added through the Planner's own "+ Add Task" form) so it gets notes/priority/edit/status-menu
 // too, instead of only ever showing up as the old read-only auto-reminder row. Clearing the date
 // removes the linked task, since there's nothing left to schedule around.
+// Canonical title for a lecture's linked Planner task — every code path that creates or
+// refreshes one uses this, so the same lecture never shows up under two different names.
+function lectureTaskTitle(paperId, l){
+  const paper = paperById(paperId);
+  return `${paper?paper.code:''} — Lectures: Lecture ${l.num}${l.topic?(' — '+l.topic):''}`;
+}
+function refreshLinkedLectureTaskTitles(profileId, paperId, l){
+  ((S.shared.tasks && S.shared.tasks[profileId])||[]).forEach(t=>{
+    if(t.linkType==='lecture' && t.paperId===paperId && t.refId===l.id) t.title = lectureTaskTitle(paperId, l);
+  });
+}
 function upsertLectureLinkedTask(profileId, paperId, lecId, dateVal){
   const tasks = manualTasksFor(profileId);
-  const existing = tasks.find(t=>t.linkType==='lecture' && t.paperId===paperId && t.refId===lecId);
+  // There should only ever be ONE Planner task per lecture. If older data or an earlier code path
+  // left several, keep the first and drop the rest so status/date can't drift between copies.
+  const all = tasks.filter(t=>t.linkType==='lecture' && t.paperId===paperId && t.refId===lecId);
   if(!dateVal){
-    if(existing) S.shared.tasks[profileId] = tasks.filter(t=>t!==existing);
+    if(all.length) S.shared.tasks[profileId] = tasks.filter(t=>!all.includes(t));
     return;
   }
-  if(existing){ existing.date = dateVal; return; }
+  if(all.length){
+    const keep = all[0];
+    keep.date = dateVal;
+    delete keep.rolledFrom; // the user picked this date on purpose — the auto-shift note no longer applies
+    if(all.length>1) S.shared.tasks[profileId] = tasks.filter(t=>t===keep || !all.includes(t));
+    return;
+  }
   const l = lecturesFor(profileId,paperId).find(x=>x.id===lecId); if(!l) return;
-  const paper = paperById(paperId);
   S.shared.tasks[profileId].push({
-    id:uid(), title:`${paper.code} — Lectures: Lecture ${l.num}${l.topic?(' — '+l.topic):''}`,
+    id:uid(), title:lectureTaskTitle(paperId, l),
     date:dateVal, done:l.status==='done', linkType:'lecture', linkCategory:'lectures',
     paperId, refId:lecId, priority:'', notes:''
   });
@@ -12179,8 +12256,8 @@ function toggleLectureStatus(profileId, paperId, lecId){
   const l = lecturesFor(profileId,paperId).find(x=>x.id===lecId); if(!l) return;
   l.status = l.status==='done' ? 'pending' : 'done';
   l.completionDate = l.status==='done' ? todayStr() : null;
-  saveShared(); renderApp();
   syncPlannerTaskFromSource('lecture', 'lectures', profileId, paperId, lecId, l.status==='done');
+  saveShared(); renderApp();
   checkMilestones(profileId, paperId, null);
 }
 
@@ -12721,28 +12798,19 @@ function viewPlanner(){
   <div class="card" style="padding:0;margin-bottom:20px">
     ${combined.length===0?emptyState('📋', dateFilter?'Nothing due on this day.':'Nothing due — tap "+ Add Task" above.'):
       combined.map(t=>{
-        const menuOpen = S.openStatusMenuTaskId===t.id;
-        return `<div class="task-row">
-        <div class="task-check ${t.done?'on':''}" ${isMe && !t.isManual?`onclick="${t.autoToggle}"`:''} style="cursor:${isMe && !t.isManual?'pointer':'default'}">${t.done?'✓':''}</div>
-        <div style="flex:1">
+        return `<div class="task-row" data-task-id="${t.id}" data-profile="${vp}" data-editable="${isMe?'1':'0'}">
+        <div class="task-check ${t.done?'on':''}" ${isMe?`onclick="toggleManualTask('${vp}','${t.id}')"`:''} style="cursor:${isMe?'pointer':'default'}">${t.done?'✓':''}</div>
+        <div style="flex:1;min-width:0">
           <div class="task-text ${t.done?'done':''}">${escChat(t.title)}${t.priority?`<span class="task-prio ${t.priority}">${t.priority}</span>`:''}</div>
           ${t.rolledFrom?`<div class="task-meta" style="color:var(--amber)">↷ moved from ${new Date(t.rolledFrom+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} — wasn't done that day</div>`:''}
           ${t.meta?`<div class="task-meta">${escChat(t.meta)}</div>`:''}
           ${t.notes?`<div class="task-notes">${escChat(t.notes)}</div>`:''}
         </div>
-        ${isMe && t.isManual?`<div class="status-menu-wrap">
-          <button class="icon-btn" style="width:26px;height:26px;font-size:16px;line-height:1" onclick="toggleStatusMenu('${t.id}')">⋯</button>
-          ${menuOpen ? `<div class="status-menu">
-            <button onclick="setTaskStatus('${vp}','${t.id}','completed')">✓ Completed</button>
-            <button onclick="setTaskStatus('${vp}','${t.id}','pending')">↷ Pending → tomorrow</button>
-            ${t.editable?`<button onclick="openEditTask('${vp}','${t.id}')">✎ Edit</button>`:''}
-            <button class="opt-cancel" onclick="setTaskStatus('${vp}','${t.id}','cancel')">✕ Cancel task</button>
-          </div>` : ''}
-        </div>`:''}
       </div>`;
       }).join('')
     }
   </div>
+  ${isMe && combined.length ? `<div style="font-size:10.5px;color:var(--text-faint);text-align:center;margin:-12px 0 18px">Tap the box to complete · long-press a task to edit, move or delete</div>` : ''}
 
   <div class="section-title">Calendar — ${profileById(vp).nick}</div>
   <div class="card">${calendarGrid(vp, isMe)}</div>
@@ -12824,7 +12892,7 @@ function editTaskFormHtml(profileId, taskId){
   if(!t) return '';
   const isCustom = !t.linkType;
   return `
-  <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">
+  <div class="card" id="task-edit-card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">
     <div style="font-weight:800;font-size:12.5px">Edit Task</div>
     ${isCustom?`
     <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:10px;color:var(--text-faint)">Task</label>
@@ -12879,27 +12947,129 @@ function addManualTask(profileId){
     const catLabel = TASK_CATEGORIES.find(c=>c.id===category).label;
     const itemLabel = itemSelect.options[itemSelect.selectedIndex].text;
     const linkType = category==='lectures' ? 'lecture' : 'chapter';
-    S.shared.tasks[profileId].push({
-      id:uid(), title:`${paper.code} — ${catLabel}: ${itemLabel}`, date, done:false,
-      linkType, linkCategory:category, paperId, refId, priority, notes
-    });
+    // Already planned? Move that task instead of stacking a second copy on the same item —
+    // duplicates were the main way the lecture ⇄ planner link drifted out of sync.
+    const existing = manualTasksFor(profileId).find(x=>x.linkType===linkType && x.linkCategory===category && x.paperId===paperId && x.refId===refId && !x.done);
+    if(existing){
+      existing.date = date; delete existing.rolledFrom;
+      if(priority) existing.priority = priority;
+      if(notes) existing.notes = notes;
+      syncLectureTargetDateFromTask(profileId, existing, date);
+      showToast('Already in your Planner — moved it to that date.');
+    } else {
+      const task = {
+        id:uid(), title:`${paper.code} — ${catLabel}: ${itemLabel}`, date, done:false,
+        linkType, linkCategory:category, paperId, refId, priority, notes
+      };
+      S.shared.tasks[profileId].push(task);
+      // Keep the lecture's own Target date in step with the task you just scheduled.
+      syncLectureTargetDateFromTask(profileId, task, date);
+    }
   }
   saveShared();
   S.plannerAddOpen = false;
   renderApp();
 }
 function toggleManualTask(profileId, taskId){
+  if(profileId !== S.local.myProfile) return; // partner's planner is read-only
   const t = manualTasksFor(profileId).find(x=>x.id===taskId); if(!t) return;
   t.done = !t.done;
-  if(t.done) delete t.rolledFrom; // same as the status-menu "Completed" action — once done, the auto-shift note isn't worth surfacing anymore
+  if(t.done) delete t.rolledFrom; // once done, the auto-shift note isn't worth surfacing anymore
   if(t.linkType==='lecture'){
     const l = lecturesFor(profileId, t.paperId).find(x=>x.id===t.refId);
     if(l){ l.status = t.done?'done':'pending'; l.completionDate = t.done?todayStr():null; }
+    // Catches any older duplicate task for the same lecture too.
+    syncPlannerTaskFromSource('lecture', 'lectures', profileId, t.paperId, t.refId, t.done);
   } else if(t.linkType==='chapter'){
     const c = chapterById(profileId, t.paperId, t.refId);
     if(c){ const flag = CATEGORY_FLAG[t.linkCategory]; if(flag) c[flag] = t.done; }
+    syncPlannerTaskFromSource('chapter', t.linkCategory, profileId, t.paperId, t.refId, t.done);
   }
   saveShared(); renderApp();
+  if(t.done && t.linkType) checkMilestones(profileId, t.paperId, t.linkType==='chapter' ? t.refId : null);
+}
+// Wipes every Planner task from today onward for the signed-in profile (Settings → Profile & Targets).
+// History is never touched: past days stay exactly as they are, and so do tasks already completed today.
+function resetFuturePlanner(){
+  const me = S.local.myProfile; if(!me) return;
+  const today = todayStr();
+  const list = manualTasksFor(me);
+  const doomed = list.filter(t=> t.date && t.date>=today && !(t.done && t.date===today));
+  if(!doomed.length){ showToast('No upcoming planner tasks to reset.'); return; }
+  if(!confirm(`Delete ${doomed.length} planner task${doomed.length>1?'s':''} from today onward?\n\nPast days and anything you already completed today stay untouched. This can't be undone.`)) return;
+  // A lecture's Target date is what puts its task in the Planner — clear it too, otherwise the
+  // load-time backfill would quietly recreate the very task that was just deleted.
+  doomed.forEach(t=>syncLectureTargetDateFromTask(me, t, null));
+  S.shared.tasks[me] = list.filter(t=>!doomed.includes(t));
+  if(S.plannerEditingTaskId && doomed.some(t=>t.id===S.plannerEditingTaskId)) S.plannerEditingTaskId = null;
+  saveShared();
+  showToast(`Planner reset — ${doomed.length} upcoming task${doomed.length>1?'s':''} removed.`);
+  renderApp();
+}
+// ── Planner task long-press actions (edit / move to next day / delete) ──
+let _taskLpTimer = null, _taskLpStart = null;
+function _clearTaskLongPress(){ if(_taskLpTimer){ clearTimeout(_taskLpTimer); _taskLpTimer = null; } _taskLpStart = null; }
+document.addEventListener('pointerdown', e=>{
+  const row = e.target.closest && e.target.closest('.task-row[data-task-id]');
+  if(!row || row.dataset.editable!=='1') return;
+  if(e.target.closest('.task-check')) return;           // tapping the box completes the task — never a long-press
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  _clearTaskLongPress();
+  _taskLpStart = {x:e.clientX, y:e.clientY};
+  const pid = row.dataset.profile, tid = row.dataset.taskId;
+  _taskLpTimer = setTimeout(()=>{
+    _taskLpTimer = null; _taskLpStart = null;
+    if(navigator.vibrate){ try{ navigator.vibrate(15); }catch(_){} }
+    openTaskActionSheet(pid, tid);
+  }, 500);
+}, {passive:true});
+document.addEventListener('pointermove', e=>{
+  if(_taskLpTimer && _taskLpStart && (Math.abs(e.clientX-_taskLpStart.x)>8 || Math.abs(e.clientY-_taskLpStart.y)>8)) _clearTaskLongPress();
+}, {passive:true});
+['pointerup','pointercancel','scroll'].forEach(ev=>document.addEventListener(ev, _clearTaskLongPress, {passive:true, capture:true}));
+document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.task-row[data-task-id]')) e.preventDefault(); });
+function openTaskActionSheet(profileId, taskId){
+  if(profileId !== S.local.myProfile) return;
+  const t = manualTasksFor(profileId).find(x=>x.id===taskId); if(!t) return;
+  closeTaskActionSheet();
+  const overlay = document.createElement('div');
+  overlay.className = 'lec-edit-overlay';
+  overlay.id = 'task-action-overlay';
+  overlay.innerHTML = `
+    <div class="lec-edit-sheet" id="task-action-sheet">
+      <div class="oly-sheet-handle"></div>
+      <div class="lec-edit-header">
+        <span class="lec-edit-title" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:10px">${escChat(t.title)}</span>
+        <button class="icon-btn" style="width:28px;height:28px;font-size:13px;flex-shrink:0" onclick="closeTaskActionSheet()">✕</button>
+      </div>
+      <div class="task-action-list">
+        <button class="task-action-btn" onclick="taskActionEdit('${profileId}','${taskId}')">✎ Edit</button>
+        ${t.done ? '' : `<button class="task-action-btn" onclick="taskActionMoveNext('${profileId}','${taskId}')">↷ Move to next day</button>`}
+        <button class="task-action-btn danger" onclick="taskActionDelete('${profileId}','${taskId}')">🗑 Delete</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('pointerdown', e=>{ if(e.target===overlay) closeTaskActionSheet(); });
+  document.body.appendChild(overlay);
+  olyAttachSheetDrag(document.getElementById('task-action-sheet'), overlay, closeTaskActionSheet);
+}
+function closeTaskActionSheet(){
+  const el = document.getElementById('task-action-overlay');
+  if(el) el.remove();
+}
+function taskActionEdit(profileId, taskId){
+  closeTaskActionSheet();
+  openEditTask(profileId, taskId);
+  setTimeout(()=>{ const el = document.getElementById('task-edit-card'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); }, 60);
+}
+function taskActionMoveNext(profileId, taskId){
+  closeTaskActionSheet();
+  setTaskStatus(profileId, taskId, 'pending');   // pushes the date by one day (and the linked lecture's target date with it)
+  showToast('Moved to the next day.');
+}
+function taskActionDelete(profileId, taskId){
+  closeTaskActionSheet();
+  if(!confirm('Delete this task?')) return;
+  deleteManualTask(profileId, taskId);
 }
 function deleteManualTask(profileId, taskId){
   const t = manualTasksFor(profileId).find(x=>x.id===taskId);
@@ -14435,6 +14605,8 @@ function settingsSectionProfile(){
       <input type="date" value="${S.shared.examDate}" onchange="setExamDate(this.value)"></div>
     ${prefToggleRow('countBreakTime', "Count break time toward today's total", prefs.countBreakTime)}
     ${prefToggleRow('autoRevisionEnabled', 'Auto-schedule R1/R2 revision reminders', prefs.autoRevisionEnabled)}
+    <div class="settings-row"><div><div class="settings-row-lbl">Reset future planner</div><div class="settings-row-sub">Deletes every Planner task from today onward. Past days (and anything you've already completed today) stay untouched.</div></div>
+      <button class="btn" style="background:var(--bad-tint);color:var(--bad);border:1px solid var(--bad);flex-shrink:0" onclick="resetFuturePlanner()">Reset Planner</button></div>
   </div>`;
 }
 function settingsSectionAccount(){
