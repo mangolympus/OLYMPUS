@@ -8,7 +8,7 @@
 // INTRO_VIDEO_SRC there) and externalised the FR case-scenario bank — index.html dropped
 // from ~4.1 MB to ~1.77 MB, so every device needs to pick the new shell up rather than
 // keep serving the old cached copy.
-const CACHE_VERSION = 'olympus-v111';
+const CACHE_VERSION = 'olympus-v112';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

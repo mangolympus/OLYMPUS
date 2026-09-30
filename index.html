@@ -1025,8 +1025,25 @@ body.fullscreen-timer-mode{padding-bottom:0;overflow:hidden}
 #fullscreen-timer-root{position:fixed;inset:0;z-index:70;background:#000;display:none;flex-direction:column}
 body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
 #fullscreen-timer-root .fs-timer-body{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;text-align:center}
-#fs-time-display{font-size:min(20vw,96px);font-weight:800;font-variant-numeric:tabular-nums;color:#fff;letter-spacing:.01em;transition:transform .25s ease;user-select:none}
-#fullscreen-timer-root.fs-rotated #fs-time-display{transform:rotate(90deg)}
+#fs-time-display{font-size:min(20vw,96px);font-weight:800;font-variant-numeric:tabular-nums;color:#fff;letter-spacing:.01em;user-select:none}
+/* Fallback "fake landscape" for when screen.orientation.lock() isn't available (common outside
+   an installed/standalone PWA — see toggleFullscreenOrientation()'s comment) and the phone is
+   still physically in portrait. Previously only the clock digits themselves got a 90deg text
+   transform, leaving the subject line, Rotate/Exit buttons and the overall narrow portrait-
+   shaped layout all untouched — digits sideways, everything else upright, which is exactly
+   what "rotation doesn't work properly" looks like. Rotating the whole root box instead (with
+   width/height swapped to viewport units so it re-fills the screen edge to edge after the
+   turn) carries every child along with it as one rigid unit, so nothing needs its own rotation
+   anymore. right/bottom are reset to auto alongside the explicit top/left/width/height below —
+   left with the base rule's inset:0 (== top/right/bottom/left:0) still in play, an explicit
+   width plus right:0 both set on a fixed element is over-constrained and a browser is allowed
+   to silently ignore the width, which is exactly the bug this rule exists to avoid. */
+#fullscreen-timer-root.fs-rotated{
+  top:50%; left:50%; right:auto; bottom:auto;
+  width:100vh; height:100vw;
+  transform:translate(-50%,-50%) rotate(90deg);
+  transition:transform .25s ease;
+}
 #fs-subject-display{font-size:14px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
 #fullscreen-timer-root .fs-control-bar{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 20px calc(16px + env(safe-area-inset-bottom))}
 #fullscreen-timer-root .fs-control-bar button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:13.5px;font-weight:700;
@@ -3232,6 +3249,50 @@ function migrateShared(data){
       });
     });
   });
+  // One-time-per-divergence heal, naturally idempotent (nothing left to do once both sides
+  // agree, so safe to run on every load, no seeded-flag needed): DT's lecture SCHEDULE
+  // (num/section/topic/duration) is meant to be identical for both profiles — see
+  // freshDtLectures()'s comment — and addLecture()/saveLectureEdit() mirror new
+  // additions/edits to the other profile going forward, but that mirroring didn't exist for
+  // lectures added before it shipped, so real, already-added lectures were reported stuck
+  // showing on only one profile ("adding a lecture only updates my id"). Reconciles by
+  // lecture `num` (the same natural key the live mirror code matches on): any num present in
+  // only one profile's list gets copied into the other's with a FRESH id, targetDate:null,
+  // status:'pending', completionDate:null — own pace and own completion are never copied,
+  // exactly like any other freshly-added lecture. Where a num exists on both sides but one
+  // has a blank topic/duration/section and the other doesn't, fills the blank from the
+  // populated side. Never overwrites two genuinely different non-blank values against each
+  // other — that would mean a real, deliberate edit on one side, and guessing which one is
+  // "right" would risk destroying it.
+  {
+    const dtByNum = {};
+    PROFILES.forEach(p=>{
+      (data.lectures[p.id]['dt']||[]).forEach(l=>{
+        if(!dtByNum[l.num]) dtByNum[l.num] = {};
+        dtByNum[l.num][p.id] = l;
+      });
+    });
+    Object.keys(dtByNum).forEach(num=>{
+      const have = dtByNum[num];
+      const present = PROFILES.filter(p=>have[p.id]);
+      const missing = PROFILES.filter(p=>!have[p.id]);
+      if(present.length && missing.length){
+        const src = have[present[0].id];
+        missing.forEach(p=>{
+          data.lectures[p.id]['dt'].push({
+            id:uid(), num:src.num, section:src.section, topic:src.topic, duration:src.duration,
+            targetDate:null, remarks:'', status:'pending', completionDate:null
+          });
+        });
+      } else if(present.length===PROFILES.length){
+        const vals = present.map(p=>have[p.id]);
+        ['section','topic','duration'].forEach(f=>{
+          const withVal = vals.find(v=>v[f]);
+          if(withVal) vals.forEach(v=>{ if(!v[f]) v[f] = withVal[f]; });
+        });
+      }
+    });
+  }
   return data;
 }
 
@@ -7837,6 +7898,20 @@ function exitNativeFullscreen(){
     if(p && p.catch) p.catch(()=>{});
   }catch(e){}
 }
+// The native Fullscreen API can be exited by the OS/browser itself — a system gesture, the
+// browser's own fullscreen-exit control, a notification interrupting it — without ever going
+// through exitFullscreenTimer()/closeFullscreenTimer() below. Nothing previously caught that,
+// so the black fullscreen-timer-mode overlay (and its own back-button history entry) stayed
+// stuck open with real fullscreen already gone underneath it — status bar back, CSS overlay
+// still covering the screen, Exit button doing an extra, visible no-op history.back() first.
+// Mirrors the same vendor-prefix fallback as requestNativeFullscreen/exitNativeFullscreen
+// above, since this fires from whichever one actually engaged.
+function onNativeFullscreenChange(){
+  const active = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+  if(!active && S.fullscreenTimerOpen) closeFullscreenTimer();
+}
+['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(evt=>
+  document.addEventListener(evt, onNativeFullscreenChange));
 let _fsTimerHistoryActive = false;
 function onFullscreenTimerBackButton(){
   if(S.fullscreenTimerOpen) closeFullscreenTimer();
@@ -12012,6 +12087,22 @@ function deleteLectureConfirm(profileId, paperId, lecId){
   // Remove linked planner task if any
   if(S.shared.tasks && S.shared.tasks[profileId])
     S.shared.tasks[profileId] = S.shared.tasks[profileId].filter(t=>!(t.linkType==='lecture' && t.refId===lecId));
+  // Mirror the deletion to the other profile for DT, same as addLecture()/saveLectureEdit()
+  // mirror the definition on add/edit — otherwise a lecture removed as a duplicate or typo on
+  // one side (the two schedules are meant to be identical) would keep sitting on the other's
+  // list forever with no way back in sync short of deleting it there too by hand. Matches by
+  // num, same as the rest of the DT mirror logic; only removes the OTHER profile's copy, never
+  // touches their own completion status on anything else.
+  if(paperId==='dt'){
+    const other = otherProfileId(profileId);
+    const otherLecs = lecturesFor(other, paperId);
+    const match = otherLecs.find(x=>x.num===l.num);
+    if(match){
+      S.shared.lectures[other][paperId] = otherLecs.filter(x=>x.id!==match.id);
+      if(S.shared.tasks && S.shared.tasks[other])
+        S.shared.tasks[other] = S.shared.tasks[other].filter(t=>!(t.linkType==='lecture' && t.refId===match.id));
+    }
+  }
   saveShared();
   closeLectureEditSheet();
   renderApp();
