@@ -1025,32 +1025,40 @@ body.fullscreen-timer-mode header,
 body.fullscreen-timer-mode .bottomnav,
 body.fullscreen-timer-mode .fab{display:none!important}
 body.fullscreen-timer-mode{padding-bottom:0;overflow:hidden}
-#fullscreen-timer-root{position:fixed;inset:0;z-index:70;background:#000;display:none;flex-direction:column}
+#fullscreen-timer-root{position:fixed;inset:0;z-index:70;background:#000;display:none;flex-direction:column;
+  /* Bidirectional transition: both adding AND removing fs-rotated animate smoothly.
+     Previously only the .fs-rotated rule had this, so snap-back was instant. */
+  transition:transform .25s ease}
 body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
 #fullscreen-timer-root .fs-timer-body{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;text-align:center}
 #fs-time-display{font-size:min(20vw,96px);font-weight:800;font-variant-numeric:tabular-nums;color:#fff;letter-spacing:.01em;user-select:none}
 /* Fallback "fake landscape" for when screen.orientation.lock() isn't available (common outside
    an installed/standalone PWA — see toggleFullscreenOrientation()'s comment) and the phone is
-   still physically in portrait. Previously only the clock digits themselves got a 90deg text
-   transform, leaving the subject line, Rotate/Exit buttons and the overall narrow portrait-
-   shaped layout all untouched — digits sideways, everything else upright, which is exactly
-   what "rotation doesn't work properly" looks like. Rotating the whole root box instead (with
-   width/height swapped to viewport units so it re-fills the screen edge to edge after the
-   turn) carries every child along with it as one rigid unit, so nothing needs its own rotation
-   anymore. right/bottom are reset to auto alongside the explicit top/left/width/height below —
-   left with the base rule's inset:0 (== top/right/bottom/left:0) still in play, an explicit
-   width plus right:0 both set on a fixed element is over-constrained and a browser is allowed
-   to silently ignore the width, which is exactly the bug this rule exists to avoid. */
+   still physically in portrait. Rotating the whole root box (with width/height swapped to
+   viewport units so it re-fills the screen edge-to-edge after the turn) carries every child
+   along with it as one rigid unit. right/bottom are reset to auto — with inset:0 still in the
+   base rule, an explicit width plus right:0 on a fixed element is over-constrained and a
+   browser may silently ignore the width, which is the bug this rule exists to avoid.
+   NOTE: fs-rotated is ONLY for the CSS-fallback case (API unavailable/denied). When
+   screen.orientation.lock() succeeds, the screen physically rotates and fs-rotated must NOT
+   be applied — adding it then would double-rotate the content (CSS on top of physical). */
 #fullscreen-timer-root.fs-rotated{
   top:50%; left:50%; right:auto; bottom:auto;
   width:100vh; height:100vw;
   transform:translate(-50%,-50%) rotate(90deg);
-  transition:transform .25s ease;
 }
+/* In CSS-rotated mode the visual "width" is the portrait viewport height, so font-size must
+   be relative to vh (not vw) to fill that axis correctly after the 90° software rotation. */
+#fullscreen-timer-root.fs-rotated #fs-time-display{font-size:clamp(40px,18vh,96px)}
 #fs-subject-display{font-size:14px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
-#fullscreen-timer-root .fs-control-bar{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 20px calc(16px + env(safe-area-inset-bottom))}
-#fullscreen-timer-root .fs-control-bar button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:13.5px;font-weight:700;
-  display:flex;align-items:center;gap:6px;padding:10px 18px;border-radius:20px;cursor:pointer}
+/* Sub-line shown during a break: "STUDY SO FAR: hh:mm:ss" */
+#fs-break-sub{font-size:12px;color:rgba(255,165,0,.7);font-weight:700;letter-spacing:.04em;margin-top:4px}
+#fullscreen-timer-root .fs-control-bar{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  gap:10px;flex-wrap:wrap;padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+#fullscreen-timer-root .fs-control-bar button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:13px;font-weight:700;
+  display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:20px;cursor:pointer}
+/* Accent variant for Resume button — mirrors btn-accent green tint on dark bg */
+#fullscreen-timer-root .fs-control-bar button.fs-btn-accent{background:rgba(79,203,146,.18);border-color:rgba(79,203,146,.45);color:#7FDCB0}
 #fullscreen-timer-root .fs-control-bar button:active{background:rgba(255,255,255,.18)}
 
 .chat-page{
@@ -3829,6 +3837,11 @@ function renderApp(){
       });
     }
   }
+  // Keep the fullscreen timer overlay in sync with timer state changes (timerPause, timerResume,
+  // etc. all call renderApp but never renderFullscreenTimer directly). Without this the overlay's
+  // buttons and status text would remain stale — still showing "Pause" after a pause from a
+  // notification tap, for example — until the user exited and re-entered fullscreen.
+  if(S.fullscreenTimerOpen && typeof renderFullscreenTimer === 'function') renderFullscreenTimer();
 }
 function openWorkspace(paperId, tab){
   if(!confirmLeaveTest()) return;
@@ -7953,10 +7966,19 @@ function onNativeFullscreenChange(){
 ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(evt=>
   document.addEventListener(evt, onNativeFullscreenChange));
 let _fsTimerHistoryActive = false;
+// Tracks whether the user has toggled into "landscape mode" via the Rotate button, independent
+// of whether we got there via the real Screen Orientation API (physical rotation, no CSS class)
+// or the CSS-rotation fallback (fs-rotated class on the overlay). Without this, a successful
+// orientation.lock() can't be reversed on the next tap — the function would still try to lock
+// to 'landscape' because the CSS class (which the old code used as the state signal) was never
+// applied in the success path.
+let _fsWantsLandscape = false;
 function onFullscreenTimerBackButton(){
   if(S.fullscreenTimerOpen) closeFullscreenTimer();
 }
 function openFullscreenTimer(){
+  // Always start in portrait orientation — user taps Rotate if they want landscape.
+  _fsWantsLandscape = false;
   if(!_fsTimerHistoryActive){
     try{ history.pushState({olympusFsTimer:true}, '', location.href); }catch(e){}
     _fsTimerHistoryActive = true;
@@ -7964,6 +7986,8 @@ function openFullscreenTimer(){
   }
   S.fullscreenTimerOpen = true;
   document.body.classList.add('fullscreen-timer-mode');
+  const root = document.getElementById('fullscreen-timer-root');
+  if(root) root.classList.remove('fs-rotated'); // ensure clean state on (re-)open
   renderFullscreenTimer();
   startTimerTick(); // idempotent — ensures #fs-time-display actually gets fed even if nothing else already started it
   requestNativeFullscreen(document.documentElement);
@@ -7976,7 +8000,8 @@ function closeFullscreenTimer(){
   S.fullscreenTimerOpen = false;
   document.body.classList.remove('fullscreen-timer-mode');
   const el = document.getElementById('fullscreen-timer-root');
-  if(el) el.innerHTML = '';
+  if(el){ el.innerHTML = ''; el.classList.remove('fs-rotated'); }
+  _fsWantsLandscape = false;
   exitNativeFullscreen();
   try{ screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); }catch(e){}
 }
@@ -7988,37 +8013,73 @@ function renderFullscreenTimer(){
   const root = document.getElementById('fullscreen-timer-root');
   if(!root) return;
   const ts = myLiveStatus();
-  const isCountdown = ts.countdownTargetMs>0;
+  const isCountdown = ts.countdownTargetMs > 0;
+  const isOnBreak   = ts.status === 'break';
+  // During a break on a regular timer, show the break clock (how long they've been resting);
+  // the "STUDY SO FAR" sub-line below keeps study elapsed visible simultaneously.
+  // For a Strict Countdown the primary display is always the remaining time, even mid-break.
   const displayText = ts.startTime
-    ? (isCountdown ? '-'+fmtHMS(Math.max(0, ts.countdownTargetMs/1000 - computeElapsedSeconds(ts))) : fmtHMS(computeElapsedSeconds(ts)))
+    ? (isCountdown
+        ? '-'+fmtHMS(Math.max(0, ts.countdownTargetMs/1000 - computeElapsedSeconds(ts)))
+        : isOnBreak ? fmtHMS(computeBreakSeconds(ts)) : fmtHMS(computeElapsedSeconds(ts)))
     : '00:00:00';
-  // Same long-press-to-abort fail-safe as the normal Timer card (see timerCardHtml()) — a
-  // Strict Countdown started by accident deserves the same escape hatch here, without
-  // needing to exit fullscreen first just to reach it.
-  const abortHold = isCountdown ? `onpointerdown="startAbortHold()" onpointerup="cancelAbortHold()" onpointerleave="cancelAbortHold()" onpointercancel="cancelAbortHold()"` : '';
+  // Long-press-to-abort only active while countdown is actively running (not paused) — mirrors
+  // timerCardHtml(). Pointer events cover touch and mouse alike.
+  const abortHold = (isCountdown && !isOnBreak)
+    ? `onpointerdown="startAbortHold()" onpointerup="cancelAbortHold()" onpointerleave="cancelAbortHold()" onpointercancel="cancelAbortHold()"`
+    : '';
+  // Action buttons mirror the main timer card so users never need to exit fullscreen to
+  // pause, resume, or stop — previously there were NO action buttons here at all.
+  let actionBtns = '';
+  if(ts.startTime){
+    if(isOnBreak){
+      actionBtns = `<button class="fs-btn-accent" onclick="timerResume()">▶ Resume</button>`
+                 + (isCountdown ? '' : `<button onclick="timerStop()">⏹ Stop</button>`);
+    } else {
+      actionBtns = `<button onclick="timerPause()">⏸ Pause</button>`;
+    }
+  }
   root.innerHTML = `
     <div class="fs-timer-body">
-      <div id="fs-subject-display">${escChat(ts.subject || 'Study Timer')}${ts.status==='break'?' · On Break':''}</div>
+      <div id="fs-subject-display">${escChat(ts.subject || 'Study Timer')}${isOnBreak?' · On Break':''}</div>
       <div id="fs-time-display" ${abortHold}>${displayText}</div>
+      ${isOnBreak ? `<div id="fs-break-sub">STUDY SO FAR: ${fmtHMS(computeElapsedSeconds(ts))}</div>` : ''}
     </div>
     <div class="fs-control-bar">
+      ${actionBtns}
       <button onclick="toggleFullscreenOrientation()">⤢ Rotate</button>
       <button onclick="exitFullscreenTimer()">✕ Exit</button>
     </div>`;
 }
 // Tries the real Screen Orientation lock first; if the API's missing or the lock request is
 // rejected (both common — it's frequently unavailable outside an installed/standalone PWA),
-// falls back to just visually rotating the clock text via the fs-rotated CSS class instead
-// of leaving the person stuck in the wrong orientation.
+// falls back to visually rotating the entire overlay via the fs-rotated CSS class.
+//
+// ─── KEY BUG FIX ───────────────────────────────────────────────────────────────
+// The old code applied the fs-rotated CSS class (a 90° software rotation) even when
+// screen.orientation.lock() SUCCEEDED and the screen physically rotated. That meant the
+// content got double-rotated: physically to landscape PLUS a CSS 90° on top → everything
+// appeared sideways/upside-down. The CSS class must only be applied in the CATCH branch
+// (when the physical API is unavailable or denied and the phone stays portrait).
+//
+// _fsWantsLandscape tracks the intended orientation independently of which path was taken,
+// so a second tap always goes the right direction whether the API worked or not.
+// ───────────────────────────────────────────────────────────────────────────────
 async function toggleFullscreenOrientation(){
   const root = document.getElementById('fullscreen-timer-root');
-  const currentlyRotated = root && root.classList.contains('fs-rotated');
+  _fsWantsLandscape = !_fsWantsLandscape; // flip intent first so both branches read the new value
   try{
     if(!screen.orientation || !screen.orientation.lock) throw new Error('Screen Orientation API unsupported');
-    await screen.orientation.lock(currentlyRotated ? 'portrait-primary' : 'landscape');
-    if(root) root.classList.toggle('fs-rotated', !currentlyRotated);
+    await screen.orientation.lock(_fsWantsLandscape ? 'landscape' : 'portrait-primary');
+    // Physical rotation succeeded — the screen is now landscape (or back to portrait).
+    // Do NOT apply fs-rotated: doing so on top of a physical landscape would re-rotate the
+    // content 90° inside an already-landscape viewport, making it appear wrong again.
+    if(root) root.classList.remove('fs-rotated');
   }catch(e){
-    if(root) root.classList.toggle('fs-rotated');
+    // API unavailable or permission denied — phone stays physically in portrait.
+    // Apply (or remove) the CSS rotation as a visual-only fallback so the overlay still
+    // looks landscape when the user asked for it.
+    if(root) root.classList.toggle('fs-rotated', _fsWantsLandscape);
   }
 }
 
@@ -10069,10 +10130,15 @@ function startTimerTick(){
       if(bEl) bEl.textContent = fmtHMS(computeBreakSeconds(ts));
       const sEl = document.getElementById('timer-studied-so-far');
       if(sEl) sEl.textContent = fmtHMS(computeElapsedSeconds(ts));
-      // Fullscreen overlay mirror (Task 6) — same text, only touched when that overlay is
-      // actually open (null everywhere else, so this is a no-op the rest of the time).
+      // Fullscreen overlay mirror — patch the live clock without touching innerHTML.
+      // During a break on a regular timer the main displayText is study elapsed, but the
+      // FS overlay shows break time as the primary clock (study elapsed goes to #fs-break-sub)
+      // — so we need the break-specific formula here too, matching renderFullscreenTimer().
       const fsEl = document.getElementById('fs-time-display');
-      if(fsEl) fsEl.textContent = displayText;
+      if(fsEl) fsEl.textContent = (ts.status==='break' && !isCountdown) ? fmtHMS(computeBreakSeconds(ts)) : displayText;
+      // "STUDY SO FAR" sub-line only exists in the DOM while on break (rendered by renderFullscreenTimer).
+      const fsSubEl = document.getElementById('fs-break-sub');
+      if(fsSubEl) fsSubEl.textContent = 'STUDY SO FAR: '+fmtHMS(computeElapsedSeconds(ts));
 
       if(isCountdown){
         if(ts.status==='running' && computeElapsedSeconds(ts) >= ts.countdownTargetMs/1000){
