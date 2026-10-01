@@ -4,11 +4,12 @@
 // The activate handler deletes any cache that doesn't match this string, so bumping it is
 // what makes the "new version available" flow in index.html actually pick up the change —
 // forgetting to bump it means devices keep serving the old cached copy indefinitely.
-// Bumped for the app-shell change that moved the intro video out of index.html (see
-// INTRO_VIDEO_SRC there) and externalised the FR case-scenario bank — index.html dropped
-// from ~4.1 MB to ~1.77 MB, so every device needs to pick the new shell up rather than
-// keep serving the old cached copy.
-const CACHE_VERSION = 'olympus-v113';
+// Bumped for v114: fixes diary week-strip dates showing one day too early (diaryWeekDates()
+// was calling todayStr() on midnight-constructed Date objects, causing the 5 AM boundary to
+// shift every date back by one day — now uses localDateStr() instead), and fixes the
+// fullscreen timer button being un-tappable in the running/break state (added z-index:2 so
+// it stays above the position:relative controls div that follows it in the DOM).
+const CACHE_VERSION = 'olympus-v114';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

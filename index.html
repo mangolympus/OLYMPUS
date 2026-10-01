@@ -7134,7 +7134,7 @@ function diaryWeekDates(){
   const mondayOffset = dow===0 ? -6 : 1-dow;
   const monday = new Date(base); monday.setDate(monday.getDate() + mondayOffset + (S.diaryWeekOffset||0)*7);
   const out = [];
-  for(let i=0;i<7;i++){ const d = new Date(monday); d.setDate(d.getDate()+i); out.push(todayStr(d)); }
+  for(let i=0;i<7;i++){ const d = new Date(monday); d.setDate(d.getDate()+i); out.push(localDateStr(d)); }
   return out;
 }
 function shiftDiaryWeek(dir){
@@ -10257,7 +10257,7 @@ function timerCardHtml(){
   // ticking clock text itself" per the spec. Pointer events cover touch and mouse alike.
   const abortHold = isStrict ? `onpointerdown="startAbortHold()" onpointerup="cancelAbortHold()" onpointerleave="cancelAbortHold()" onpointercancel="cancelAbortHold()" style="cursor:pointer;user-select:none"` : '';
   const icoExpand = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>';
-  const fullscreenBtn = `<button class="icon-btn" style="position:absolute;top:10px;right:10px;width:28px;height:28px" onclick="openFullscreenTimer()" aria-label="Full screen">${icoExpand}</button>`;
+  const fullscreenBtn = `<button class="icon-btn" style="position:absolute;top:10px;right:10px;width:28px;height:28px;z-index:2" onclick="openFullscreenTimer()" aria-label="Full screen">${icoExpand}</button>`;
 
   let controls = '';
   if(ls.status==='idle'){
