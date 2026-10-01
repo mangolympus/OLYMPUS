@@ -6,8 +6,25 @@
 <title>Olympus — CA Final Study Performance</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#050912">
+<!-- Performance: establish TCP+TLS connections to font and CDN origins before the
+     browser discovers the actual requests. preconnect for gstatic must be crossorigin
+     because font files are fetched as CORS anonymous requests. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<!-- Non-blocking font load — replaces the @import that was inside <style>, which is
+     the worst-case for font loading: the browser couldn't even discover the font URL
+     until after it had downloaded and parsed the entire CSS block.
+     media="print" makes this a low-priority load that doesn't block rendering;
+     onload flips it to "all" once the stylesheet arrives so it takes effect. The
+     <noscript> fallback covers the rare case where JS is disabled. -->
+<link rel="preload" as="style"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'">
+<noscript>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+</noscript>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root{
   /* Umang's neutral palette (default until applyTheme() switches it — see below) */
@@ -62,8 +79,13 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;
 
 /* MOTION BACKGROUND — strictly decorative, strictly behind everything. Never intercepts a
    tap (pointer-events:none) and never touches --umang/--chetna, so profile accent colors are
-   untouched no matter which theme is active. See applyBgTheme()/BG_THEMES in the script. */
-#bg-canvas{position:fixed;inset:0;pointer-events:none;z-index:-1;display:none}
+   untouched no matter which theme is active. See applyBgTheme()/BG_THEMES in the script.
+   will-change:transform promotes the canvas to its own compositor layer so the RAF repaints
+   don't trigger a full-document repaint each frame. contain:strict (layout + style + paint)
+   is safe here because nothing inside ever needs to influence or be influenced by outside
+   layout — it's a purely decorative element that's already isolated by position:fixed. */
+#bg-canvas{position:fixed;inset:0;pointer-events:none;z-index:-1;display:none;
+  will-change:transform;contain:strict}
 
 /* VIEW SWITCH TRANSITION */
 @keyframes viewFadeSlide{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
@@ -468,7 +490,13 @@ body.stats-mode header,
 body.stats-mode .bottomnav,
 body.stats-mode .fab{display:none!important}
 body.stats-mode{padding-bottom:0;overflow:hidden}
-#stats-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column}
+/* contain:strict on every full-screen overlay: position:fixed already isolates them
+   visually, and strict containment tells the browser their internal layout/paint/style
+   can never affect or be affected by anything outside — so opening/closing an overlay
+   doesn't trigger cross-tree layout recalculation for the main document. The overlays
+   switch between display:none and display:flex; contain:size (part of strict) requires
+   an explicit size, which inset:0 provides for fixed-position elements. */
+#stats-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;contain:strict}
 body.stats-mode #stats-root{display:flex}
 #stats-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 #stats-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
@@ -479,7 +507,7 @@ body.habits-mode header,
 body.habits-mode .bottomnav,
 body.habits-mode .fab{display:none!important}
 body.habits-mode{padding-bottom:0;overflow:hidden}
-#habits-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column}
+#habits-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;contain:strict}
 body.habits-mode #habits-root{display:flex}
 #habits-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 #habits-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
@@ -501,7 +529,7 @@ body.diary-mode header,
 body.diary-mode .bottomnav,
 body.diary-mode .fab{display:none!important}
 body.diary-mode{padding-bottom:0;overflow:hidden}
-#diary-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column}
+#diary-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;contain:strict}
 body.diary-mode #diary-root{display:flex}
 #diary-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 #diary-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
@@ -557,7 +585,7 @@ body.targets-mode header,
 body.targets-mode .bottomnav,
 body.targets-mode .fab{display:none!important}
 body.targets-mode{padding-bottom:0;overflow:hidden}
-#targets-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column}
+#targets-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;contain:strict}
 body.targets-mode #targets-root{display:flex}
 #targets-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 #targets-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
@@ -935,7 +963,7 @@ body.games-mode header,
 body.games-mode .bottomnav,
 body.games-mode .fab{display:none!important}
 body.games-mode{padding-bottom:0;overflow:hidden}
-#games-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column}
+#games-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;contain:strict}
 body.games-mode #games-root{display:flex}
 #games-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 #games-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
@@ -956,7 +984,7 @@ body.daily-challenges-mode header,
 body.daily-challenges-mode .bottomnav,
 body.daily-challenges-mode .fab{display:none!important}
 body.daily-challenges-mode{padding-bottom:0;overflow:hidden}
-#daily-challenges-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column}
+#daily-challenges-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;contain:strict}
 body.daily-challenges-mode #daily-challenges-root{display:flex}
 #daily-challenges-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
 #daily-challenges-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
@@ -1028,7 +1056,8 @@ body.fullscreen-timer-mode{padding-bottom:0;overflow:hidden}
 #fullscreen-timer-root{position:fixed;inset:0;z-index:70;background:#000;display:none;flex-direction:column;
   /* Bidirectional transition: both adding AND removing fs-rotated animate smoothly.
      Previously only the .fs-rotated rule had this, so snap-back was instant. */
-  transition:transform .25s ease}
+  transition:transform .25s ease;
+  contain:strict}
 body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
 #fullscreen-timer-root .fs-timer-body{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;text-align:center}
 #fs-time-display{font-size:min(20vw,96px);font-weight:800;font-variant-numeric:tabular-nums;color:#fff;letter-spacing:.01em;user-select:none}
@@ -1735,13 +1764,16 @@ button, a, .btn, .ptab, .icon-btn, .bottomnav button, .profile-pill button,
 html[data-mode="dark"] .trend-area-fill{ opacity:.25; }
 
 </style>
-<!-- Money (Umang-only) — invoice PDF export dependencies. These were present in the
-     original standalone app's <head> but got missed when it was merged in natively
-     (only the <body> markup and the main IIFE were carried over) — Export PDF has been
-     silently broken ever since (html2canvas/jsPDF undefined, and no qrcode function for
-     the UPI QR) until this was caught and fixed. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Money (Umang-only) — html2canvas and jsPDF previously loaded here as blocking
+     <script src> tags (~2 MB combined, fetched synchronously on every page load for
+     every user, even Chetna who can never reach the Money module). They are now loaded
+     on-demand the first time Export PDF is tapped — see ensurePdfLibsLoaded() inside
+     the money IIFE below. The QR code library (qrcode-generator) stays inline because
+     it is small, offline-critical, and genuinely needed at invoice-render time (not
+     just at export time), so lazy-loading it would require more restructuring than the
+     saving is worth. The preconnect hint for cdnjs added above in <head> means the
+     TCP+TLS connection is already established when the lazy load fires, so perceived
+     latency for the first export is minimised. -->
 <!-- QR Code Generator for JavaScript — Copyright (c) 2009 Kazuhiko Arase, MIT licensed.
      Bundled inline (minified) so UPI-payment QR codes on invoices work fully offline, with
      no third-party service ever seeing the payee UPI ID or amount.
@@ -1962,7 +1994,12 @@ const S = {
   pwaInstalled: false,
 };
 
-function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+// Monotonic counter prevents same-millisecond collisions (e.g. two addLogEntry() calls
+// in the same synchronous block both read the same Date.now() and the 4-char random
+// suffix isn't guaranteed unique). Counter is per-session only — ids are never compared
+// across sessions and never used for ordering, so no persistence is needed.
+let _uidSeq = 0;
+function uid(){ return Date.now().toString(36)+(++_uidSeq).toString(36)+Math.random().toString(36).slice(2,4); }
 function localDateStr(d){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
@@ -1987,8 +2024,22 @@ function todayStr(now){
 // ═══════════════════════════════════════════════════════════
 // MOTION: count-up numbers, confetti, milestone celebrations
 // ═══════════════════════════════════════════════════════════
+// Cache the matchMedia result — prefersReducedMotion() is called ~10 times per render
+// cycle (animateCountUps, triggerChartAnimations, scrollToTimerCard, etc.) and each
+// matchMedia().matches call forces a style recalculation. The OS-level preference
+// almost never changes mid-session, so one query is enough; the 'change' listener
+// invalidates the cache if it ever does change (e.g. accessibility settings opened).
+let _prefersReducedMotionCache = null;
+if(window.matchMedia){
+  try{
+    window.matchMedia('(prefers-reduced-motion: reduce)')
+      .addEventListener('change', e=>{ _prefersReducedMotionCache = e.matches; });
+  }catch(e){}
+}
 function prefersReducedMotion(){
-  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(_prefersReducedMotionCache === null)
+    _prefersReducedMotionCache = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  return _prefersReducedMotionCache;
 }
 function animateCountUps(container, instant){
   const els = (container||document).querySelectorAll('[data-countup]');
@@ -2046,7 +2097,12 @@ function fireConfetti(){
 function showMilestoneToast(text){
   const t = document.createElement('div');
   t.className = 'milestone-toast';
-  t.innerHTML = `🎉 <span>${text}</span>`;
+  // Use textContent for the user-supplied text so chapter names / target titles containing
+  // HTML characters (e.g. "<", "&") don't inject markup. The emoji prefix is a literal
+  // string constant so it's safe to set via innerHTML first; the span text is then written
+  // with textContent, which treats it as a plain string regardless of content.
+  t.innerHTML = '🎉 <span></span>';
+  t.querySelector('span').textContent = text;
   document.body.appendChild(t);
   setTimeout(()=>t.remove(), 3100);
 }
@@ -2532,7 +2588,7 @@ function doubtSolverBlock(){
 }
 async function askDoubt(){
   const q = document.getElementById('doubt-input')?.value.trim();
-  if(!q){ alert('Type a question first.'); return; }
+  if(!q){ showToast('Type a question first.'); return; }
   S.doubtLoading = true; S.doubtResult = null; S.doubtError = null;
   renderApp();
   try{
@@ -2564,7 +2620,7 @@ function summaryGeneratorBlock(paperId, chapterName){
 async function generateSummary(paperId){
   const topic = document.getElementById('summary-topic')?.value.trim();
   const notes = document.getElementById('summary-notes')?.value.trim();
-  if(!topic){ alert('Enter a chapter name or topic first.'); return; }
+  if(!topic){ showToast('Enter a chapter name or topic first.'); return; }
   S.summaryLoading = true; S.summaryResult = null; S.summaryError = null;
   renderApp();
   const paperName = paperId ? (paperById(paperId)?.name||'') : '';
@@ -2719,8 +2775,8 @@ function effectiveTodayTarget(profileId){
 function setTodaysTargetOverride(profileId, hours){
   const minimum = S.shared.targets[profileId]||4;
   const h = parseFloat(hours);
-  if(isNaN(h) || h<=0){ alert('Enter a number greater than 0.'); return; }
-  if(h < minimum){ alert(`Today's Target can't go below your Settings minimum of ${minimum}h. Lower the minimum in Settings first if you want that.`); return; }
+  if(isNaN(h) || h<=0){ showToast('Enter a number greater than 0.'); return; }
+  if(h < minimum){ showToast(`Today's Target can't go below your Settings minimum of ${minimum}h. Lower the minimum in Settings first if you want that.`); return; }
   if(!S.shared.dailyTargetOverride) S.shared.dailyTargetOverride = {};
   S.shared.dailyTargetOverride[profileId] = {date:todayStr(), hours:h};
   saveShared(); renderApp();
@@ -3021,16 +3077,47 @@ function buildDefaultLocal(){
 function migrateShared(data){
   if(data.examDate===undefined) data.examDate = '2027-05-02';
   if(!data.targets){ data.targets = {}; PROFILES.forEach(p=> data.targets[p.id] = 4); }
-  if(!data.papers){
-    data.papers = {};
-    PROFILES.forEach(p=>{ data.papers[p.id] = {}; PAPERS.forEach(pp=> data.papers[p.id][pp.id] = blankPaperStats()); });
-  }
+  // Ensure chapters/lectures/mockScores/papers each have a fully-populated
+  // [profileId][paperId] bucket for every profile×paper combination. The old migration
+  // only created the top-level object (e.g. data.chapters = {}) without filling in the
+  // per-profile entries, so chaptersFor()/lecturesFor() would throw "Cannot read
+  // properties of undefined (reading 'idt')" on any device that had the old migration
+  // but hadn't yet triggered a write that created those buckets. Running this on every
+  // migration is safe: the ?= guards are no-ops for buckets that already exist, and
+  // defaultChaptersFor/freshIdtLectures are only called for buckets that are actually
+  // missing, so existing user data is never clobbered.
   if(!data.chapters){ data.chapters = {}; }
   if(!data.lectures){ data.lectures = {}; }
   if(!data.mockScores){ data.mockScores = {}; }
+  if(!data.papers){
+    data.papers = {};
+  }
+  PROFILES.forEach(p=>{
+    if(!data.papers[p.id]){ data.papers[p.id] = {}; }
+    if(!data.chapters[p.id]){ data.chapters[p.id] = {}; }
+    if(!data.lectures[p.id]){ data.lectures[p.id] = {}; }
+    if(!data.mockScores[p.id]){ data.mockScores[p.id] = {}; }
+    PAPERS.forEach(pp=>{
+      if(!data.papers[p.id][pp.id])   data.papers[p.id][pp.id]    = blankPaperStats();
+      if(!data.chapters[p.id][pp.id]) data.chapters[p.id][pp.id]  = defaultChaptersFor(pp.id);
+      if(!data.mockScores[p.id][pp.id]) data.mockScores[p.id][pp.id] = [];
+      if(!data.lectures[p.id][pp.id]){
+        data.lectures[p.id][pp.id] = pp.id==='idt' ? freshIdtLectures(p.id)
+                                    : pp.id==='dt'  ? freshDtLectures(p.id)
+                                    : [];
+      }
+    });
+  });
   if(!data.notes){ data.notes = {}; PAPERS.forEach(pp=> data.notes[pp.id]=[]); }
   if(!data.tasks){ data.tasks = {}; }
   if(!data.logs){ data.logs = {}; }
+  // Ensure every profile has a tasks[] and logs[] array, matching the pattern above for
+  // chapters/lectures. manualTasksFor() already uses || [] as a fallback, but write actions
+  // (push, filter) that target S.shared.tasks[profileId] directly need the array to exist.
+  PROFILES.forEach(p=>{
+    if(!data.tasks[p.id]) data.tasks[p.id] = [];
+    if(!data.logs[p.id])  data.logs[p.id]  = [];
+  });
   if(!data.questions){ data.questions = []; }
   if(!data.qStats){ data.qStats = {}; }
   // mcqScenarios: case-scenario narrative text, keyed by scenario id, shared by several
@@ -3317,7 +3404,7 @@ async function loadShared(){
   try{
     const res = await storageGet('olympusData', true);
     if(res && res.value) return migrateShared(JSON.parse(res.value));
-  }catch(e){}
+  }catch(e){ console.warn('loadShared failed, starting fresh:', e); }
   const fresh = buildDefaultShared();
   await saveShared(fresh);
   return fresh;
@@ -3376,7 +3463,7 @@ async function loadLocal(){
       if(!parsed.pushedNotifKeys) parsed.pushedNotifKeys = {};
       return parsed;
     }
-  }catch(e){}
+  }catch(e){ console.warn('loadLocal failed, starting fresh:', e); }
   const fresh = buildDefaultLocal();
   await saveLocal(fresh);
   return fresh;
@@ -3391,12 +3478,17 @@ async function saveLocal(data){
 // ═══════════════════════════════════════════════════════════
 function profileById(id){ return PROFILES.find(p=>p.id===id); }
 function paperById(id){ return PAPERS.find(p=>p.id===id); }
-function stats(profileId, paperId){ return S.shared.papers[profileId][paperId]; }
-function chaptersFor(profileId, paperId){ return S.shared.chapters[profileId][paperId]; }
-function chapterById(profileId, paperId, chId){ return chaptersFor(profileId,paperId).find(c=>c.id===chId); }
-function lecturesFor(profileId, paperId){ return S.shared.lectures[profileId][paperId]; }
-function mockScoresFor(profileId, paperId){ return S.shared.mockScores[profileId][paperId]; }
-function notesFor(paperId){ return S.shared.notes[paperId]; }
+// All four data-accessor functions use optional chaining so that migrated saves whose
+// per-profile/per-paper sub-objects weren't yet populated (migrateShared only creates the
+// top-level key, not every [profileId][paperId] bucket) return a safe empty value instead
+// of throwing "Cannot read properties of undefined." chapterById adds its own guard so a
+// missing chapter array produces undefined rather than crashing .find().
+function stats(profileId, paperId){ return S.shared.papers?.[profileId]?.[paperId]; }
+function chaptersFor(profileId, paperId){ return S.shared.chapters?.[profileId]?.[paperId] ?? []; }
+function chapterById(profileId, paperId, chId){ return (chaptersFor(profileId,paperId)||[]).find(c=>c.id===chId); }
+function lecturesFor(profileId, paperId){ return S.shared.lectures?.[profileId]?.[paperId] ?? []; }
+function mockScoresFor(profileId, paperId){ return S.shared.mockScores?.[profileId]?.[paperId] ?? []; }
+function notesFor(paperId){ return S.shared.notes?.[paperId] ?? []; }
 
 function paperComponents(profileId, paperId){
   const chs = chaptersFor(profileId, paperId) || [];
@@ -3602,9 +3694,11 @@ function habitStreak(profileId, habitId){
 // walking backward the same way streak()/habitStreak() do.
 function habitPerfectDayStreak(profileId){
   let n=0; let d = new Date(todayStr()+'T00:00:00');
-  while(true){
-    const score = habitDailyScore(profileId, localDateStr(d));
-    if(score !== 100) break;
+  // Bounded at 1095 days (3 years) as a safety ceiling — the streak can never realistically
+  // exceed this for a CA Final study tracker, and it makes the loop's exit condition explicit
+  // rather than relying on habitDailyScore() always returning < 100 for some past date.
+  for(let i=0; i<1095; i++){
+    if(habitDailyScore(profileId, localDateStr(d)) !== 100) break;
     n++; d.setDate(d.getDate()-1);
   }
   return n;
@@ -3792,7 +3886,19 @@ function switchView(v){
   S._justNavigated=true; renderNav(); renderApp();
   if(enteringChat) enterChat();
 }
-function setViewingProfile(id){ if(!confirmLeaveTest()) return; S.viewingProfile = id; S._justNavigated=true; renderNav(); renderApp(); }
+function setViewingProfile(id){
+  if(!confirmLeaveTest()) return;
+  // Reset the planner date filter when switching profiles so the new profile's planner
+  // always opens on today rather than inheriting whatever date the previous viewer had
+  // scrolled to. selectedCalDay follows the same reset so the calendar highlight matches.
+  if(id !== S.viewingProfile){
+    S.plannerDateFilter = todayStr();
+    S.selectedCalDay = todayStr();
+  }
+  S.viewingProfile = id;
+  S._justNavigated = true;
+  renderNav(); renderApp();
+}
 
 function renderApp(){
   const root = document.getElementById('app-root');
@@ -5346,6 +5452,32 @@ function moneyPageHtml(){
   // instant the page has parsed its CSS — there's no network fetch to race against.
   // This wait just confirms the browser has decoded and applied them before the
   // html2canvas capture, in case a browser is unusually slow to parse embedded font data.
+  // Lazy-loads html2canvas and jsPDF the first time Export PDF is triggered. Both
+  // libraries together are ~2 MB of JavaScript that previously blocked every page
+  // load for every user. Now they're fetched in parallel only when actually needed,
+  // using the preconnect to cdnjs that was added to <head> to reduce perceived wait.
+  // Subsequent export taps skip straight through (both guards return immediately).
+  let _pdfLibsLoaded = false;
+  let _pdfLibsLoadingPromise = null;
+  function ensurePdfLibsLoaded(){
+    if(_pdfLibsLoaded) return Promise.resolve();
+    if(_pdfLibsLoadingPromise) return _pdfLibsLoadingPromise;
+    function loadScript(src){
+      return new Promise((resolve, reject)=>{
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = ()=>resolve();
+        s.onerror = ()=>reject(new Error('Failed to load '+src));
+        document.head.appendChild(s);
+      });
+    }
+    _pdfLibsLoadingPromise = Promise.all([
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
+    ]).then(()=>{ _pdfLibsLoaded = true; });
+    return _pdfLibsLoadingPromise;
+  }
+
   async function waitForInvoiceFonts(){
     if(!(document.fonts && document.fonts.ready)) return; // very old browser fallback: skip, rely on CSS alone
     const specs = [
@@ -5362,6 +5494,8 @@ function moneyPageHtml(){
   }
 
   async function exportInvoicePdf(inv){
+    // Load html2canvas + jsPDF on first use (see ensurePdfLibsLoaded above).
+    await ensurePdfLibsLoaded();
     const root = $('money-pdf-root');
     root.innerHTML = buildPdfHtml(inv);
     await waitForInvoiceFonts();
@@ -6897,7 +7031,7 @@ function addImprovementToTomorrowPlan(){
   flushDiaryReflectionSave(); // commit whatever's currently typed before reading it
   const refl = ensureDiaryReflection(profileId, dateStr);
   const text = (refl.improvement||'').trim();
-  if(!text){ alert('Write something in "One improvement for tomorrow" first.'); return; }
+  if(!text){ showToast('Write something in "One improvement for tomorrow" first.'); return; }
   const tmrw = diaryTomorrowDate(dateStr);
   if(refl.carriedTaskId){
     const existing = manualTasksFor(profileId).find(t=>t.id===refl.carriedTaskId);
@@ -7726,23 +7860,24 @@ function onTargetTypeChange(){
   }
 }
 function setTargetUnitToggle(unit){
-  document.getElementById('mtc-unit-percent').classList.toggle('active', unit==='percent');
-  document.getElementById('mtc-unit-count').classList.toggle('active', unit==='count');
-  document.getElementById('mtc-unit-toggle').dataset.unit = unit;
+  document.getElementById('mtc-unit-percent')?.classList.toggle('active', unit==='percent');
+  document.getElementById('mtc-unit-count')?.classList.toggle('active', unit==='count');
+  const tog = document.getElementById('mtc-unit-toggle');
+  if(tog) tog.dataset.unit = unit;
 }
 function submitCreateTarget(profileId){
-  const title = document.getElementById('mtc-title').value.trim();
-  const paperId = document.getElementById('mtc-paper').value;
-  const type = document.getElementById('mtc-type').value;
-  const targetValue = Number(document.getElementById('mtc-value').value);
-  const unit = document.getElementById('mtc-unit-toggle').dataset.unit || 'percent';
+  const title = document.getElementById('mtc-title')?.value.trim();
+  const paperId = document.getElementById('mtc-paper')?.value;
+  const type = document.getElementById('mtc-type')?.value;
+  const targetValue = Number(document.getElementById('mtc-value')?.value);
+  const unit = document.getElementById('mtc-unit-toggle')?.dataset.unit || 'percent';
   const startDate = document.getElementById('mtc-start').value || todayStr();
   const deadline = document.getElementById('mtc-deadline').value;
   const priority = document.getElementById('mtc-priority').value;
-  if(!title){ alert('Give this target a name.'); return; }
-  if(!targetValue || targetValue<=0){ alert('Enter a target value greater than 0.'); return; }
-  if(!deadline){ alert('Pick a deadline.'); return; }
-  if(deadline < startDate){ alert('Deadline must be after the start date.'); return; }
+  if(!title){ showToast('Give this target a name.'); return; }
+  if(!targetValue || targetValue<=0){ showToast('Enter a target value greater than 0.'); return; }
+  if(!deadline){ showToast('Pick a deadline.'); return; }
+  if(deadline < startDate){ showToast('Deadline must be after the start date.'); return; }
   createTarget(profileId, {title, paperId, type, unit, targetValue, startDate, deadline, priority});
   S.targetsView = 'dashboard';
   renderTargetsPopup();
@@ -8136,6 +8271,15 @@ const STUDY_STICKERS = ['📚','🔥','💪','🎉','✅','❌','😴','☕','�
 // ── Utilities ─────────────────────────────────────────────────
 function escChat(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// safeUrl: for user-entered URLs placed in href= attributes. escChat alone is insufficient
+// because it doesn't block "javascript:alert(1)" or "data:text/html,..." — both bypass HTML
+// encoding and execute when clicked. This allows only http/https/mailto schemes and falls
+// back to '#' for anything else so the link is inert rather than executable.
+function safeUrl(url){
+  const s = String(url==null?'':url).trim();
+  if(/^https?:\/\//i.test(s) || /^mailto:/i.test(s)) return escChat(s);
+  return '#';
 }
 function nowISO(){ return new Date().toISOString(); }
 function otherProfileId(id){ return id==='umang' ? 'chetna' : 'umang'; }
@@ -9486,7 +9630,7 @@ function cancelReply(){ S._chatReplyTo = null; renderChatPage(); }
 function editChatMessage(id){
   const msg = findMsg(id);
   if(!msg || msg.from !== S.local.myProfile) return;
-  if(!isLiveMsg(id)){ closeChatSheet(); alert('Archived messages can\'t be edited.'); renderChatPage(); return; }
+  if(!isLiveMsg(id)){ closeChatSheet(); showToast('Archived messages can\'t be edited.'); renderChatPage(); return; }
   closeChatSheet(); S._chatReplyTo = null; S._chatEditing = id; S._chatDraft = msg.text||'';
   renderChatPage(); focusComposer();
 }
@@ -9514,13 +9658,13 @@ function forwardMessage(id){
 }
 function pinChatMessage(id){
   const msg = findMsg(id); if(!msg) return;
-  if(!isLiveMsg(id)){ closeChatSheet(); alert('Archived messages can\'t be pinned.'); renderChatPage(); return; }
+  if(!isLiveMsg(id)){ closeChatSheet(); showToast('Archived messages can\'t be pinned.'); renderChatPage(); return; }
   msg.pinned = !msg.pinned; msg.updatedAt = nowISO();
   closeChatSheet(); saveShared(); renderChatPage();
 }
 function starChatMessage(id){
   const msg = findMsg(id); if(!msg) return;
-  if(!isLiveMsg(id)){ closeChatSheet(); alert('Archived messages can\'t be starred.'); renderChatPage(); return; }
+  if(!isLiveMsg(id)){ closeChatSheet(); showToast('Archived messages can\'t be starred.'); renderChatPage(); return; }
   const me = S.local.myProfile; if(!msg.starredBy) msg.starredBy = {};
   msg.starredBy[me] = !msg.starredBy[me]; msg.updatedAt = nowISO();
   closeChatSheet(); saveShared(); renderChatPage();
@@ -9528,7 +9672,7 @@ function starChatMessage(id){
 function deleteChatMessage(id){
   const msg = findMsg(id); closeChatSheet();
   if(!msg || msg.from !== S.local.myProfile){ renderChatPage(); return; }
-  if(!isLiveMsg(id)){ alert('Archived messages can\'t be deleted.'); renderChatPage(); return; }
+  if(!isLiveMsg(id)){ showToast('Archived messages can\'t be deleted.'); renderChatPage(); return; }
   if(!confirm('Delete this message? This cannot be undone.')){ renderChatPage(); return; }
   msg.deleted = true; msg.text=''; msg.stickerId=null; msg.gifUrl=null; msg.poll=null;
   msg.reactions = {}; msg.pinned=false; msg.updatedAt = nowISO();
@@ -9536,7 +9680,7 @@ function deleteChatMessage(id){
 }
 function reactToMessage(id, emoji){
   const msg = findMsg(id); if(!msg || msg.deleted){ closeChatSheet(); renderChatPage(); return; }
-  if(!isLiveMsg(id)){ closeChatSheet(); alert('Archived messages can\'t be reacted to.'); renderChatPage(); return; }
+  if(!isLiveMsg(id)){ closeChatSheet(); showToast('Archived messages can\'t be reacted to.'); renderChatPage(); return; }
   const me = S.local.myProfile;
   if(!msg.reactions) msg.reactions = {};
   const hadThis = (msg.reactions[emoji]||[]).includes(me);
@@ -9569,7 +9713,7 @@ function deleteSelectedMessages(){
   // Only own messages; only live (non-archived) ones — archive mutations via findMsg would
   // mutate the in-memory archive object but saveShared() doesn't persist sharedArchive.
   const mine = ids.filter(id=>{ const m=findMsg(id); return m && m.from===me && isLiveMsg(id); });
-  if(mine.length===0){ alert('You can only delete your own non-archived messages.'); return; }
+  if(mine.length===0){ showToast('You can only delete your own non-archived messages.'); return; }
   if(!confirm(`Delete ${mine.length} message${mine.length>1?'s':''}?`)) return;
   mine.forEach(id=>{
     const m = findMsg(id);
@@ -10115,7 +10259,12 @@ function startTimerTick(){
     // "studying now" card and needs the same per-second patching, not just the Timer page.
     // A live Strict Countdown is the one exception that must keep ticking on ANY page — its
     // auto-completion and break-nag can't depend on the Timer tab staying open.
-    if(S.view!=='timer' && S.view!=='home' && !myCountdownActive){ stopTimerTick(); return; }
+    // Stop ticking on pages that have no timer DOM elements to update. 'chat' and 'money'
+    // were previously missing from this list, so the interval kept firing every second
+    // for the duration of a chat session even though nothing was being updated.
+    // Strict Countdown bypasses this via myCountdownActive so completion/nag still fire.
+    const TIMER_VIEWS = new Set(['timer', 'home']);
+    if(!TIMER_VIEWS.has(S.view) && !myCountdownActive){ stopTimerTick(); return; }
     let anyActive = false;
     const ts = myLiveStatus();
     if(ts.startTime){
@@ -10269,7 +10418,7 @@ function startTimerFromPicker(){
 }
 function quickStartFromPlan(paperId, category, itemId){
   const me = S.local.myProfile; if(!me) return;
-  if(myLiveStatus().status!=='idle'){ alert('Finish or stop your current session first.'); return; }
+  if(myLiveStatus().status!=='idle'){ showToast('Finish or stop your current session first.'); return; }
   let itemLabel = null;
   if(category==='lectures'){
     const l = lecturesFor(me, paperId).find(x=>x.id===itemId);
@@ -11533,19 +11682,20 @@ function addLogEntry(profileId, entry){
   checkMinHoursCelebration(profileId);
 }
 function addLog(profileId){
-  const date = document.getElementById('lg-date').value || todayStr();
-  const paperId = document.getElementById('lg-paper').value;
-  const chapterId = document.getElementById('lg-chapter').value || null;
-  const rawTime = document.getElementById('lg-hours').value.trim();
-  if(!rawTime){ alert('Enter the time studied, e.g. 2:30 for 2h 30m.'); return; }
+  const date = document.getElementById('lg-date')?.value || todayStr();
+  const paperId = document.getElementById('lg-paper')?.value;
+  const chapterId = document.getElementById('lg-chapter')?.value || null;
+  const rawTime = (document.getElementById('lg-hours')?.value||'').trim();
+  if(!rawTime){ showToast('Enter the time studied, e.g. 2:30 for 2h 30m.'); return; }
   const m = rawTime.match(/^(\d+):(\d{1,2})$/);
-  if(!m || parseInt(m[2],10) > 59){ alert('Use h:mm format, e.g. 2:30 for 2h 30m (minutes must be 00-59).'); return; }
+  if(!m || parseInt(m[2],10) > 59){ showToast('Use h:mm format, e.g. 2:30 for 2h 30m (minutes 00–59).'); return; }
   const hours = parseDurationToHours(rawTime);
-  if(!hours || hours<=0){ alert('Enter a time greater than 0, e.g. 2:30 for 2h 30m.'); return; }
+  if(!hours || hours<=0){ showToast('Enter a time greater than 0.'); return; }
   addLogEntry(profileId, {date, paperId, chapterId, hours});
+  // Use closeQuickLog so the _activeSearchModal tracker is cleared in sync with the DOM.
+  closeQuickLog();
   renderApp();
-  const modalRoot = document.getElementById('search-modal-root');
-  if(modalRoot) modalRoot.innerHTML='';
+  showToast(`✓ ${rawTime} logged`);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -11878,7 +12028,11 @@ function wsTabsFor(paperId){
 }
 function viewWorkspace(){
   const vp = S.viewingProfile;
-  const paper = paperById(S.workspacePaper);
+  // paperById() returns undefined when S.workspacePaper is null (fresh state) or holds a
+  // stale id that no longer matches any PAPERS entry. Fall back to the first paper rather
+  // than crashing on paper.id in the next line.
+  const paper = paperById(S.workspacePaper) || PAPERS[0];
+  if(paper && S.workspacePaper !== paper.id) S.workspacePaper = paper.id; // keep state in sync
   const isMe = vp === S.local.myProfile;
   const comp = paperComponents(vp, paper.id);
   const idx = PAPERS.findIndex(p=>p.id===paper.id);
@@ -12001,7 +12155,7 @@ function toggleTopicFlag(profileId, paperId, chId, topicId, key){
 function addTopic(profileId, paperId, chId){
   const input = document.getElementById('new-topic-'+chId);
   const name = input.value.trim();
-  if(!name){ alert('Enter a topic name.'); return; }
+  if(!name){ showToast('Enter a topic name.'); return; }
   const c = chapterById(profileId, paperId, chId); if(!c) return;
   if(!c.topics) c.topics = [];
   c.topics.push({id:uid(), name, lecDone:false, rev1:false, rev2:false, practice:false});
@@ -12014,7 +12168,7 @@ function deleteTopic(profileId, paperId, chId, topicId){
 }
 function addChapterWs(profileId, paperId){
   const name = document.getElementById('new-ch-name').value.trim();
-  if(!name){ alert('Enter a chapter name.'); return; }
+  if(!name){ showToast('Enter a chapter name.'); return; }
   chaptersFor(profileId,paperId).push({id:uid(), name, lecDone:false, rev1:false, rev2:false, practice:false, autoRevScheduled:false, topics:[]});
   saveShared(); renderApp();
 }
@@ -12181,12 +12335,12 @@ function saveLectureEdit(profileId, paperId, lecId){
   const l = lecturesFor(profileId, paperId).find(x=>x.id===lecId);
   if(!l) return;
   const num = (document.getElementById('lec-edit-num').value||'').trim();
-  if(!num){ alert('Lecture number cannot be empty.'); return; }
+  if(!num){ showToast('Lecture number cannot be empty.'); return; }
   const oldNum = l.num;
   l.num = num;
-  l.topic = (document.getElementById('lec-edit-topic').value||'').trim();
-  l.duration = (document.getElementById('lec-edit-dur').value||'').trim();
-  l.section = (document.getElementById('lec-edit-section').value||'').trim();
+  l.topic = (document.getElementById('lec-edit-topic')?.value||'').trim();
+  l.duration = (document.getElementById('lec-edit-dur')?.value||'').trim();
+  l.section = (document.getElementById('lec-edit-section')?.value||'').trim();
   // Linked Planner tasks carry the lecture's number/topic in their title — keep them current.
   refreshLinkedLectureTaskTitles(profileId, paperId, l);
   // Mirror num/topic/duration/section changes to the other profile for DT (definition sync, same
@@ -12294,7 +12448,7 @@ function addLecture(profileId, paperId){
   const num = document.getElementById('nl-num').value.trim();
   const topic = document.getElementById('nl-topic').value.trim();
   let duration = document.getElementById('nl-duration').value.trim();
-  if(!num){ alert('Enter a lecture number.'); return; }
+  if(!num){ showToast('Enter a lecture number.'); return; }
   // DT lectures follow a known pattern (confirmed by the user): every x.1 lecture is 1:30,
   // every x.2 is 1:00. Only fills this in when the field was left blank — never overrides a
   // duration the user actually typed, and only for DT (the pattern hasn't been confirmed for
@@ -12339,7 +12493,7 @@ function wsNotes(paperId, editable){
       </div>
       <div style="font-size:13px;font-weight:700;margin-bottom:4px">${escChat(n.title)}</div>
       ${n.type==='link'
-        ? `<a href="${escChat(n.content)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--active-accent,var(--umang));word-break:break-all">${escChat(n.content)} ↗</a>`
+        ? `<a href="${safeUrl(n.content)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--active-accent,var(--umang));word-break:break-all">${escChat(n.content)} ↗</a>`
         : `<div style="font-size:12px;color:var(--text-muted);white-space:pre-wrap">${escChat(n.content)}</div>`}
     </div>`).join('')
   }
@@ -12362,16 +12516,22 @@ function updateNoteContentPlaceholder(){
   box.placeholder = type==='link' ? 'Paste the Google Drive share link here…' : 'Content...';
 }
 function addNote(paperId){
-  const type = document.getElementById('nn-type').value;
-  const title = document.getElementById('nn-title').value.trim();
-  const content = document.getElementById('nn-content').value.trim();
-  if(!title || !content){ alert('Add a title and some content.'); return; }
-  if(type==='link' && !/^https?:\/\//i.test(content)){ alert('Paste a full Drive link starting with https://'); return; }
-  notesFor(paperId).push({id:uid(), type, title, content});
+  const type    = document.getElementById('nn-type')?.value    || 'text';
+  const title   = (document.getElementById('nn-title')?.value   || '').trim();
+  const content = (document.getElementById('nn-content')?.value || '').trim();
+  if(!title || !content){ showToast('Add a title and some content.'); return; }
+  if(type==='link' && !/^https?:\/\//i.test(content)){ showToast('Paste a full URL starting with https://'); return; }
+  // Ensure the per-paper notes array exists before pushing (notesFor now returns [] for
+  // missing entries, so we must write back to S.shared.notes, not the returned reference).
+  if(!S.shared.notes) S.shared.notes = {};
+  if(!S.shared.notes[paperId]) S.shared.notes[paperId] = [];
+  S.shared.notes[paperId].push({id:uid(), type, title, content});
   saveShared(); renderApp();
+  showToast('✓ Note saved');
 }
 function deleteNote(paperId, noteId){
-  S.shared.notes[paperId] = notesFor(paperId).filter(n=>n.id!==noteId);
+  if(!S.shared.notes?.[paperId]) return;
+  S.shared.notes[paperId] = S.shared.notes[paperId].filter(n=>n.id!==noteId);
   saveShared(); renderApp();
 }
 
@@ -12565,7 +12725,7 @@ function checkPracticeAnswer(){
 }
 function nextPractice(){ S.practice.idx++; S.practice.selected=null; S.practice.checked=false; renderApp(); }
 function finishPractice(){
-  const p=S.practice; alert(`Practice complete!\n\nScore: ${p.score} / ${p.queue.length} (${Math.round(p.score/p.queue.length*100)}%)`);
+  const p=S.practice; showToast(`Practice complete!\n\nScore: ${p.score} / ${p.queue.length} (${Math.round(p.score/p.queue.length*100)}%)`);
   S.practice=null; renderApp();
 }
 function exitPractice(){ if(confirm('Exit this round? Progress in it will be lost.')){ S.practice=null; renderApp(); } }
@@ -12650,7 +12810,7 @@ function addMockScore(profileId, paperId){
   const date = document.getElementById('nm-date').value || todayStr();
   const label = document.getElementById('nm-label').value.trim();
   const score = parseFloat(document.getElementById('nm-score').value);
-  if(isNaN(score)){ alert('Enter a score.'); return; }
+  if(isNaN(score)){ showToast('Enter a score.'); return; }
   mockScoresFor(profileId,paperId).push({id:uid(), date, label, score});
   saveShared(); renderApp();
 }
@@ -12671,7 +12831,7 @@ function startTest(profileId, paperId){
   let pool = S.sharedMcqBank.questions.filter(q=>q.paperId===paperId);
   if(chapter!=='all') pool = pool.filter(q=>q.chapterName===chapter);
   if(difficulty!=='any') pool = pool.filter(q=>(q.difficulty||'medium')===difficulty);
-  if(pool.length===0){ alert('No questions match those filters.'); return; }
+  if(pool.length===0){ showToast('No questions match those filters.'); return; }
   pool = pool.slice().sort(()=>Math.random()-0.5).slice(0, Math.min(count, pool.length));
   S.testSession = {
     profileId, paperId, questions: pool,
@@ -13003,12 +13163,12 @@ function addManualTask(profileId){
   const notes = document.getElementById('nt-notes') ? document.getElementById('nt-notes').value.trim() : '';
   if(category==='custom'){
     const title = document.getElementById('nt-custom-title').value.trim();
-    if(!title){ alert('Enter a task.'); return; }
+    if(!title){ showToast('Enter a task.'); return; }
     S.shared.tasks[profileId].push({id:uid(), title, date, done:false, linkType:null, priority, notes});
   } else {
     const itemSelect = document.getElementById('nt-item');
     const refId = itemSelect.value;
-    if(!refId){ alert('Nothing pending to pick for that selection.'); return; }
+    if(!refId){ showToast('Nothing pending to pick for that selection.'); return; }
     const paper = paperById(paperId);
     const catLabel = TASK_CATEGORIES.find(c=>c.id===category).label;
     const itemLabel = itemSelect.options[itemSelect.selectedIndex].text;
@@ -13205,15 +13365,15 @@ function saveEditTask(profileId, taskId){
   const titleInput = document.getElementById('et-title');
   if(titleInput){
     const title = titleInput.value.trim();
-    if(!title){ alert('Task title cannot be empty.'); return; }
+    if(!title){ showToast('Task title cannot be empty.'); return; }
     t.title = title;
   }
   const newDate = document.getElementById('et-date').value || t.date;
   if(newDate !== t.date) delete t.rolledFrom; // user picked this date on purpose — the auto-shift note no longer applies
   t.date = newDate;
   syncLectureTargetDateFromTask(profileId, t, newDate);
-  t.priority = document.getElementById('et-priority').value;
-  t.notes = document.getElementById('et-notes').value.trim();
+  t.priority = document.getElementById('et-priority')?.value || t.priority;
+  t.notes = (document.getElementById('et-notes')?.value||'').trim();
   saveShared();
   S.plannerEditingTaskId = null;
   renderApp();
@@ -13346,8 +13506,25 @@ async function loadArchiveForDate(profileId, iso){
   renderApp();
 }
 function deleteLog(profileId, logId){
-  S.shared.logs[profileId] = logsFor(profileId).filter(l=>l.id!==logId);
-  saveShared(); renderApp();
+  // Filter only the LIVE array, not the merged live+archive result from logsFor().
+  // Previously logsFor() was used here which returns base.concat(archive); writing that
+  // filtered array back to S.shared.logs[profileId] pulled archive entries into live logs
+  // while they were still in S.sharedArchive, causing every archive entry to appear twice
+  // the next time logsFor() merged them.
+  const liveArr = S.shared.logs[profileId] || [];
+  const inLive = liveArr.some(l=>l.id===logId);
+  if(inLive){
+    S.shared.logs[profileId] = liveArr.filter(l=>l.id!==logId);
+    saveShared();
+  } else if(S.sharedArchive && S.sharedArchive.logs && S.sharedArchive.logs[profileId]){
+    // Entry is in the archive — remove it there (archive is saved separately on Drive,
+    // but we can at least strip it from the in-memory copy so it doesn't reappear).
+    S.sharedArchive.logs[profileId] = S.sharedArchive.logs[profileId].filter(l=>l.id!==logId);
+    // Note: the archive file on Drive is not immediately re-saved here (it's large and
+    // drive-saved on its own schedule), so the entry reappears until the next archive load.
+    // A full archive save is intentionally out of scope for a delete action — see loadArchive.
+  }
+  renderApp();
 }
 // Compact log form pre-filled with a specific date (used in day-detail panel)
 function logFormForDate(profileId, dateStr){
@@ -13382,11 +13559,11 @@ function renderDayLogChapterOptions(profileId, dateStr){
 }
 function addDayLog(profileId, dateStr){
   const rawTime = document.getElementById(`dlg-hours-${dateStr}`)?.value.trim();
-  if(!rawTime){ alert('Enter time, e.g. 2:30'); return; }
+  if(!rawTime){ showToast('Enter time, e.g. 2:30'); return; }
   const m = rawTime.match(/^(\d+):(\d{1,2})$/);
-  if(!m || parseInt(m[2],10) > 59){ alert('Use h:mm format, e.g. 2:30'); return; }
+  if(!m || parseInt(m[2],10) > 59){ showToast('Use h:mm format, e.g. 2:30'); return; }
   const hours = parseDurationToHours(rawTime);
-  if(!hours || hours<=0){ alert('Enter time greater than 0'); return; }
+  if(!hours || hours<=0){ showToast('Enter time greater than 0'); return; }
   const paperId = document.getElementById(`dlg-paper-${dateStr}`)?.value;
   const chapterId = document.getElementById(`dlg-chapter-${dateStr}`)?.value || null;
   if(!S.shared.logs[profileId]) S.shared.logs[profileId] = [];
@@ -13436,18 +13613,19 @@ function editLogFormHtml(profileId, logId){
 }
 function saveEditLog(profileId, logId){
   const log = logsFor(profileId).find(l=>l.id===logId); if(!log) return;
-  const rawTime = document.getElementById('el-hours').value.trim();
+  const rawTime = (document.getElementById('el-hours')?.value||'').trim();
   const m = rawTime.match(/^(\d+):(\d{1,2})$/);
-  if(!m || parseInt(m[2],10) > 59){ alert('Use h:mm format, e.g. 2:30 for 2h 30m (minutes must be 00-59).'); return; }
+  if(!m || parseInt(m[2],10) > 59){ showToast('Use h:mm format, e.g. 2:30 for 2h 30m (minutes 00–59).'); return; }
   const hours = parseDurationToHours(rawTime);
-  if(!hours || hours<=0){ alert('Enter a time greater than 0, e.g. 2:30 for 2h 30m.'); return; }
-  log.date = document.getElementById('el-date').value || log.date;
-  log.paperId = document.getElementById('el-paper').value;
-  log.chapterId = document.getElementById('el-chapter').value || null;
-  log.hours = hours;
+  if(!hours || hours<=0){ showToast('Enter a time greater than 0.'); return; }
+  log.date    = document.getElementById('el-date')?.value    || log.date;
+  log.paperId = document.getElementById('el-paper')?.value   || log.paperId;
+  log.chapterId = document.getElementById('el-chapter')?.value || null;
+  log.hours   = hours;
   saveShared();
   S.editingLogId = null;
   renderApp();
+  showToast('✓ Log updated');
 }
 function calNav(dir){
   const now = new Date();
@@ -13576,7 +13754,7 @@ function saveHabitForm(){
   const me = S.local.myProfile;
   const draft = S._habitFormDraft; if(!draft) return;
   const name = (draft.name||'').trim();
-  if(!name){ alert('Give the habit a name first.'); return; }
+  if(!name){ showToast('Give the habit a name first.'); return; }
   const icon = (draft.icon||'').trim();
   const type = draft.type || 'boolean';
   const targetValue = type==='time' ? (draft.targetValue||'') : null;
@@ -14937,13 +15115,13 @@ function importProfileDataInto(ev, expectedProfileId){
     try{
       const parsed = JSON.parse(reader.result);
       if(parsed.kind !== 'olympus-profile-export' || !parsed.profileId || !parsed.data){
-        alert('This doesn\'t look like a profile export from this app (wrong file?).');
+        showToast('This doesn\'t look like a valid profile export file.');
         return;
       }
       if(parsed.profileId !== expectedProfileId){
         const wrongProf = profileById(parsed.profileId);
         const rightProf = profileById(expectedProfileId);
-        alert(`This file contains ${wrongProf?wrongProf.name:parsed.profileId}'s data, not ${rightProf.name}'s.\n\nUse the "Import ${wrongProf?wrongProf.nick:parsed.profileId}'s Data" button instead — this one only accepts ${rightProf.nick}'s files.`);
+        showToast(`This file contains ${wrongProf?wrongProf.name:parsed.profileId}'s data, not ${rightProf.name}'s.\n\nUse the "Import ${wrongProf?wrongProf.nick:parsed.profileId}'s Data" button instead — this one only accepts ${rightProf.nick}'s files.`);
         return;
       }
       const profileId = expectedProfileId;
@@ -14963,7 +15141,7 @@ function importProfileDataInto(ev, expectedProfileId){
       if(statusBox) statusBox.textContent = `✓ Imported ${prof.name}'s data from ${dateLabel}.`;
     }catch(e){
       console.error(e);
-      alert('That file could not be read as a valid profile export.');
+      showToast('That file could not be read as a valid profile export.');
     }
   };
   reader.readAsText(file);
@@ -15142,7 +15320,7 @@ function profileInfoPromptBlock(profileId){
 // ---- AI Coach (Stats page) ----
 async function generateAiInsights(){
   const vp = S.viewingProfile;
-  if(vp !== S.local.myProfile){ alert('Switch to your own profile first — insights are personal.'); return; }
+  if(vp !== S.local.myProfile){ showToast('Switch to your own profile first — insights are personal.'); return; }
   S.aiLoading = true; S.aiError = null; renderApp();
   try{
     const summary = buildProfileSummaryForAI(vp);
@@ -15176,7 +15354,7 @@ function aiInsightsBlock(){
 // ---- AI Daily Plan (Planner tab) ----
 async function generateAiDailyPlan(){
   const vp = S.viewingProfile;
-  if(vp !== S.local.myProfile){ alert('Switch to your own profile first.'); return; }
+  if(vp !== S.local.myProfile){ showToast('Switch to your own profile first.'); return; }
   S.aiPlanLoading = true; S.aiPlanError = null; renderApp();
   try{
     const summary = buildProfileSummaryForAI(vp);
@@ -15237,7 +15415,7 @@ function addAiPlanToTasks(){
   const vp = S.local.myProfile;
   plan.items.forEach(item=> S.shared.tasks[vp].push({id:uid(), title:item, date:todayStr(), done:false}));
   saveShared();
-  alert('Added to your To-Do list below.');
+  showToast('Added to your To-Do list below.');
   renderApp();
 }
 
@@ -15250,7 +15428,32 @@ const QUICK_LINKS = [
   {name:'Gemini', url:'https://gemini.google.com/'},
   {name:'Claude', url:'https://claude.ai/'},
 ];
+// ── Modal mode tracker ─────────────────────────────────────────────────────
+// Tracks which modal is currently occupying #search-modal-root so that:
+//  1. The Escape key can dismiss it without guessing.
+//  2. A second openSearch/openQuickLog call doesn't leave the wrong close
+//     function wired to the result (previously both just cleared innerHTML,
+//     which worked, but any future back-button integration would break).
+let _activeSearchModal = null; // 'search' | 'quicklog' | null
+
+// Global Escape key handler — closes whichever lightweight overlay is open.
+// All the full-screen overlays (stats, habits, diary, etc.) already handle
+// Escape via their own history.back() path; this only covers the ones that
+// don't use pushState.
+document.addEventListener('keydown', (e)=>{
+  if(e.key !== 'Escape') return;
+  if(_activeSearchModal === 'search')   { closeSearch();   return; }
+  if(_activeSearchModal === 'quicklog') { closeQuickLog(); return; }
+  // Close the AI info modal if open
+  const aiOverlay = document.querySelector('.ai-modal-overlay');
+  if(aiOverlay){ aiOverlay.remove(); return; }
+  // Close the profile picker modal if open
+  const profileModal = document.getElementById('profile-modal-root');
+  if(profileModal && profileModal.innerHTML) { profileModal.innerHTML = ''; return; }
+});
+
 function openSearch(){
+  _activeSearchModal = 'search';
   document.getElementById('search-modal-root').innerHTML = `
   <div class="search-overlay" onclick="if(event.target===this) closeSearch()">
     <div class="search-card">
@@ -15266,7 +15469,7 @@ function openSearch(){
     </div>
   </div>`;
 }
-function closeSearch(){ document.getElementById('search-modal-root').innerHTML=''; }
+function closeSearch(){ _activeSearchModal = null; document.getElementById('search-modal-root').innerHTML=''; }
 function searchEmptyState(){ return `<div style="padding:20px;text-align:center;color:var(--text-faint);font-size:12px">Type to search across your papers, chapters and revision notes.</div>`; }
 function runSearch(q){
   const box = document.getElementById('search-results');
@@ -15298,16 +15501,21 @@ function runSearch(q){
 // QUICK LOG (FAB)
 // ═══════════════════════════════════════════════════════════
 function openQuickLog(){
-  const vp = S.viewingProfile;
+  // Always log for the LOGGED-IN user (myProfile), not the currently-viewed profile.
+  // The FAB is shown on the Timer page where you can be viewing the other person's session —
+  // using viewingProfile here would silently add hours to the wrong person's record.
+  const me = S.local.myProfile;
+  if(!me) return;
+  _activeSearchModal = 'quicklog';
   document.getElementById('search-modal-root').innerHTML = `
   <div class="search-overlay" onclick="if(event.target===this) closeQuickLog()" style="align-items:center">
     <div class="search-card" style="max-height:none">
-      <div style="padding:16px 16px 4px;font-weight:800;font-size:14px">Quick log — ${profileById(vp).nick}</div>
-      <div style="padding:14px 16px 16px">${logForm(vp)}</div>
+      <div style="padding:16px 16px 4px;font-weight:800;font-size:14px">Quick log — ${escChat(profileById(me).nick)}</div>
+      <div style="padding:14px 16px 16px">${logForm(me)}</div>
     </div>
   </div>`;
 }
-function closeQuickLog(){ document.getElementById('search-modal-root').innerHTML=''; }
+function closeQuickLog(){ _activeSearchModal = null; document.getElementById('search-modal-root').innerHTML=''; }
 
 // ═══════════════════════════════════════════════════════════
 // SYNC
@@ -15754,7 +15962,7 @@ function syncBadgeHtml(){
 // dance needed the way Google's ~1hr tokens required: either it's still valid, in which case
 // it's used as-is, or it's expired, in which case the login screen shows again.
 function saveAppSession(session){
-  try{ localStorage.setItem(APP_SESSION_KEY, JSON.stringify(session)); } catch(e){}
+  try{ localStorage.setItem(APP_SESSION_KEY, JSON.stringify(session)); } catch(e){ console.warn('Session persist failed:', e); }
 }
 function loadAppSession(){
   try{
@@ -15887,7 +16095,8 @@ async function submitPasswordLogin(profile){
 }
 
 async function init(){
-  document.getElementById('brand-logo').src = LOGO_DATA_URI;
+  const brandLogo = document.getElementById('brand-logo');
+  if(brandLogo) brandLogo.src = LOGO_DATA_URI;
   if(!isHosted()){
     // Local file mode — skip login entirely, same as before
     await initAfterLogin();
@@ -16343,7 +16552,7 @@ async function togglePushNotifications(){
 async function subscribeToPush(){
   const me = S.local.myProfile; if(!me) return;
   const support = pushSupportInfo();
-  if(!support.supported){ alert(support.reason); return; }
+  if(!support.supported){ showToast(support.reason); return; }
   try{
     // Requested only from this deliberate tap (togglePushNotifications), never on page load.
     const permission = await Notification.requestPermission();
@@ -16359,7 +16568,7 @@ async function subscribeToPush(){
     renderApp();
   }catch(err){
     console.error('Push subscription failed:', err);
-    alert('Could not enable notifications — please try again.');
+    showToast('Could not enable notifications — please try again.');
     renderApp();
   }
 }

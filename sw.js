@@ -5,6 +5,99 @@
 // what makes the "new version available" flow in index.html actually pick up the change —
 // forgetting to bump it means devices keep serving the old cached copy indefinitely.
 //
+// Bumped for v117 — comprehensive audit pass (18 bugs fixed):
+//
+// CRITICAL
+//   1. FAB Quick Log logged to the wrong person: openQuickLog() used viewingProfile instead
+//      of myProfile. On the Timer page you can be viewing the other person, so tapping the
+//      FAB would silently add hours to their record. Fixed to always log for myProfile.
+//   2. chaptersFor/lecturesFor/mockScoresFor/stats crashed on migrated data: all four did a
+//      raw double-bracket access with no null guard. Converted to optional chaining + ?? [].
+//   3. migrateShared created top-level keys but never filled per-profile/per-paper buckets:
+//      a device migrating old data got an empty shell that chaptersFor() crashed on. Added a
+//      full PROFILES×PAPERS initialisation loop that populates every missing bucket safely.
+//   4. viewWorkspace crashed when S.workspacePaper was null/stale: paperById(null) returns
+//      undefined, then paper.id throws immediately. Falls back to PAPERS[0].
+//
+// SERIOUS
+//   5. No Escape key handling anywhere: added a global keydown listener that dispatches
+//      Escape to whichever lightweight modal is currently open (search, quicklog, AI info,
+//      profile picker). Full-screen overlays already handle Escape via history.back().
+//   6. search-modal-root shared by Search and Quick Log with no mode tracking: added
+//      _activeSearchModal = 'search' | 'quicklog' | null so the Escape handler and close
+//      functions always know which modal is active.
+//   7. Timer tick interval firing on Chat and Money pages: the stop guard only checked for
+//      timer and home views. Extended to stop on all non-timer views (except Strict Countdown
+//      which still needs to fire for completion/nag regardless of current page).
+//
+// MEDIUM
+//   8. uid() collision in same millisecond: two addLogEntry() calls in one synchronous block
+//      both read the same Date.now(). Added a monotonic _uidSeq counter as a third component.
+//   9. plannerDateFilter not reset on profile switch: Umang's Tuesday filter silently carried
+//      over to Chetna's planner. setViewingProfile() now resets to todayStr() on change.
+//  10. deleteLog archive duplication bug: deleteLog used logsFor() (which returns merged
+//      live+archive), then wrote the filtered result back to the live array — pulling all
+//      archive entries into live logs while they were still in S.sharedArchive, causing
+//      duplication. Fixed to filter only the live array; archive entries handled separately.
+//  11. Note link href XSS via javascript: protocol: escChat() escapes HTML but not JS
+//      schemes. Added safeUrl() that only passes http/https/mailto through, so a note
+//      with content="javascript:..." renders as inert href="#" instead.
+//  12. notesFor() null-deref: same raw bracket access as chaptersFor. Fixed with ?. + ?? [].
+//      addNote/deleteNote updated to write back to S.shared.notes directly (not the [] copy).
+//  13. habitPerfectDayStreak while(true): bounded with a 1095-day (3-year) safety ceiling.
+//  14. saveEditLog/addLog form elements: all getElementById calls now use optional chaining.
+//  15. mtc-unit-toggle, lec-edit-topic/dur/section, et-priority, et-notes: all form element
+//      accesses guarded with optional chaining to prevent crash if form not in DOM.
+//  16. migrateShared tasks/logs per-profile init: added PROFILES.forEach bucket creation
+//      matching the chapters/lectures fix above.
+//
+// MINOR
+//  17. brand-logo src assignment without null guard: wrapped in if(brandLogo) check.
+//  18. alert() → showToast(): replaced all 36 operational alert() calls with showToast()
+//      for consistent non-blocking UX. loadShared/loadLocal silent catch blocks now
+//      console.warn so data failures are visible during debugging.
+//
+// Bumped for v116 — performance pass (6 improvements):
+//
+// 1. NON-BLOCKING GOOGLE FONTS: The @import inside <style> was render-blocking — the
+//    browser couldn't discover the font URL until the entire CSS block was parsed and
+//    the @import network request completed, holding up the first paint. Replaced with
+//    <link rel="preload" as="style" onload="this.rel='stylesheet'"> placed before the
+//    <style> block, converting font loading from a blocking serial step to a parallel
+//    one. Added a <noscript> fallback for the rare no-JS case.
+//
+// 2. PRECONNECT HINTS: Added <link rel="preconnect"> for fonts.googleapis.com,
+//    fonts.gstatic.com (crossorigin), and cdnjs.cloudflare.com. DNS resolution + TCP
+//    handshake + TLS negotiation for all three origins now happens speculatively while
+//    HTML is still being parsed, shaving 100–400ms off the first requests to each.
+//
+// 3. LAZY-LOADED html2canvas + jsPDF (~2 MB combined): Both were <script src> tags
+//    that loaded synchronously on every page load for every user — including Chetna,
+//    who can never reach the Money module, and sessions that never export a PDF. They
+//    are now fetched in parallel only when exportInvoicePdf() is first called, via
+//    ensurePdfLibsLoaded() in the money IIFE. The preconnect for cdnjs (change 2)
+//    means the first export doesn't pay a full connection-setup cost. Every subsequent
+//    export is instant (libraries are already in the page).
+//
+// 4. CACHED prefersReducedMotion(): The helper was calling matchMedia() on every
+//    invocation and it is called ~10 times per render cycle (animateCountUps,
+//    triggerChartAnimations, scrollToTimerCard, etc.), each call causing a style
+//    recalculation. The result is now cached after the first query and a 'change'
+//    listener invalidates the cache if the OS accessibility preference actually changes.
+//
+// 5. will-change + contain:strict on #bg-canvas: The animated RAF canvas is now
+//    promoted to its own GPU compositor layer (will-change:transform) so per-frame
+//    repaints don't trigger main-thread document repaint. contain:strict tells the
+//    browser the canvas can never affect or be affected by the rest of the document
+//    layout — a safe assertion for a purely decorative position:fixed element.
+//
+// 6. contain:strict on all 8 full-screen overlay roots (#stats-root, #habits-root,
+//    #diary-root, #targets-root, #games-root, #daily-challenges-root,
+//    #fullscreen-timer-root, and the chat page): They are all position:fixed;inset:0
+//    and completely isolated from document flow. Strict containment tells the browser
+//    their internal layout/paint/style changes can never affect the main document tree,
+//    skipping cross-tree recalculations whenever an overlay opens or closes.
+//
 // Bumped for v115 — fullscreen timer overhaul (8 bugs fixed):
 //
 // 1. ROTATION DOUBLE-ROTATION BUG (critical): toggleFullscreenOrientation() was applying
@@ -47,7 +140,7 @@
 //    size used min(20vw,96px) where vw = portrait width (narrow), but the visual "width"
 //    after rotation is the portrait HEIGHT. An fs-rotated-specific rule now uses
 //    clamp(40px,18vh,96px) so the clock fills the rotated visual width correctly.
-const CACHE_VERSION = 'olympus-v115';
+const CACHE_VERSION = 'olympus-v117';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
