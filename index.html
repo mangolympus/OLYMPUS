@@ -606,6 +606,11 @@ body.targets-mode #targets-root{display:flex}
 .mt-fill{height:100%;border-radius:5px;background:var(--mt-color,var(--active-accent,var(--umang)));box-shadow:0 0 7px color-mix(in srgb, var(--mt-color,var(--active-accent,var(--umang))) 60%, transparent);transition:width .5s cubic-bezier(.22,.8,.4,1)}
 .mt-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--text-muted)}
 .mt-meta b{color:var(--text);font-variant-numeric:tabular-nums}
+.mt-bar{position:relative}
+.mt-tick{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--text);opacity:.55}
+.mt-big{font-size:12.5px;color:var(--text-muted);margin-top:2px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.mt-big b{font-size:24px;font-weight:800;line-height:1;color:var(--mt-color,var(--text));font-variant-numeric:tabular-nums}
+.mt-big small{font-size:10.5px;color:var(--text-faint)}
 .mt-explain{font-size:11px;color:var(--mt-color,var(--text-muted));margin-top:6px;line-height:1.4}
 /* Section headers — reused verbatim across Needs Attention / Active / History */
 .mt-section-title{font-weight:800;font-size:11px;margin:2px 0 8px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between}
@@ -668,7 +673,7 @@ body.targets-mode #targets-root{display:flex}
   --dur-fast:.15s;
   --dur-med:.28s;
   --dur-slow:.4s;
-  background:var(--card);
+  background:transparent; /* v118: was var(--card), which showed as a lighter slab around the (darker) --bg header block */
   font-family:'Plus Jakarta Sans',system-ui,sans-serif;
   color:var(--ink);
   display:flex;
@@ -729,18 +734,18 @@ body.targets-mode #targets-root{display:flex}
   }
 .money-view select{appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2393a0bf' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:34px;}
 .money-view input:focus, .money-view textarea:focus, .money-view select:focus{border-color:var(--blue-500); background:var(--card);}
-.money-view .flow-btn-row{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;}
+.money-view .flow-btn-row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;}
 .money-view .flow-btn{
-    border:none; border-radius:16px; padding:18px 14px; display:flex; flex-direction:column; align-items:center; gap:3px;
+    border:none; border-radius:14px; padding:11px 14px; min-height:58px; display:grid; grid-template-columns:auto 1fr; column-gap:11px; align-items:center; text-align:left;
     cursor:pointer; box-shadow:var(--shadow); color:#fff;
     transition:transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
   }
 .money-view .flow-btn:active{transform:scale(.96); box-shadow:0 1px 4px rgba(0,0,0,.3);}
 .money-view .flow-btn.flow-in{background:linear-gradient(135deg,#0f5132,#22b573);}
 .money-view .flow-btn.flow-out{background:linear-gradient(135deg,#6b1224,#c2273f);}
-.money-view .flow-ico{width:34px;height:34px;border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; margin-bottom:2px;}
-.money-view .flow-label{font-family:'Plus Jakarta Sans',sans-serif; font-weight:800; font-size:15px;}
-.money-view .flow-sub{font-size:11px; opacity:.85;}
+.money-view .flow-ico{width:34px;height:34px;border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; grid-row:1 / span 2;}
+.money-view .flow-label{font-family:'Plus Jakarta Sans',sans-serif; font-weight:800; font-size:15px; line-height:1.15; align-self:end;}
+.money-view .flow-sub{font-size:11px; opacity:.85; align-self:start;}
 .money-view .seg-control{display:flex; background:var(--input-bg); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:14px;}
 .money-view .money-source-btn-row{display:flex; gap:8px;}
 .money-view .money-source-btn{flex:1; padding:11px 8px; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); font-weight:700; font-size:13.5px; cursor:pointer; transition:background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);}
@@ -752,11 +757,13 @@ body.targets-mode #targets-root{display:flex}
    correctly on resize) for no real benefit, since Olympus's header has always rendered at a
    consistent height in practice. If header{} 's padding or its tallest child ever changes,
    update this number too. */
-.money-view .money-sticky-header{position:sticky; top:60px; z-index:10; background:var(--bg); padding-top:12px; padding-bottom:10px;}
-.money-view .money-corner-row{display:flex; justify-content:flex-end; margin-bottom:10px;}
-.money-view .money-icon-btn{width:34px; height:34px; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
-.money-view .money-subnav-row{display:flex; gap:10px; margin:14px 0;}
-.money-view .money-subnav-btn{flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:13px 8px; border-radius:12px; border:1px solid var(--border); background:var(--input-bg); color:var(--ink); font-weight:700; font-size:13.5px; cursor:pointer;}
+/* v118: the whole top block used to be position:sticky (~380px frozen, i.e. nearly half a phone screen, on a --bg slab that
+   stopped at the page padding). Now it scrolls away normally; only the search bar stays pinned, full-bleed, below the app header. */
+.money-view .money-top-block{padding-top:12px; padding-bottom:4px;}
+.money-view .money-search-sticky{position:sticky; top:60px; z-index:10; background:var(--bg); margin:0 -16px 8px; padding:8px 16px 2px;}
+.money-view .money-icon-btn{flex:0 0 46px; width:46px; height:auto; align-self:stretch; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.money-view .money-subnav-row{display:flex; gap:10px; margin:12px 0 8px;}
+.money-view .money-subnav-btn{flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:11px 8px; border-radius:12px; border:1px solid var(--border); background:var(--input-bg); color:var(--ink); font-weight:700; font-size:13.5px; cursor:pointer;}
 .money-view .money-back-btn{display:flex; align-items:center; gap:6px; font-weight:700; font-size:14px; color:var(--ink); background:none; border:none; padding:10px 0; margin-bottom:6px; cursor:pointer;}
 .money-view .seg-btn{flex:1; border:none; background:transparent; padding:9px; border-radius:9px; font-weight:700; font-size:13px; color:var(--muted); cursor:pointer; position:relative; transition:color var(--dur-fast) var(--ease-out);}
 .money-view .seg-btn.active{background:var(--card); color:var(--navy-800); box-shadow:0 1px 3px rgba(0,0,0,.3); transition:background var(--dur-med) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-med) var(--ease-out);}
@@ -866,7 +873,7 @@ body.targets-mode #targets-root{display:flex}
     display:flex;align-items:center;justify-content:center;margin:0 auto 14px;
   }
 .money-view .search-bar{
-    display:flex; align-items:center; gap:8px; background:var(--card); border:1.5px solid var(--border); border-radius:12px; padding:9px 12px; margin-bottom:12px;
+    display:flex; align-items:center; gap:8px; background:var(--card); border:1.5px solid var(--border); border-radius:12px; padding:9px 12px; margin-bottom:0;
   }
 .money-view .search-bar input{border:none; padding:0; background:transparent;}
 .money-view .search-bar input:focus{background:transparent;}
@@ -3496,7 +3503,10 @@ function paperComponents(profileId, paperId){
   const pct = key => total ? Math.round(chs.filter(c=>c[key]).length/total*100) : 0;
   const usesLectureTracker = LECTURE_TRACKER_PAPERS.includes(paperId);
   let lecPct, lecDone, lecTotal;
-  if(usesLectureTracker){
+  // A tracker paper with NO lectures entered yet (Audit, until some are added) keeps using the chapter 'Lec'
+  // flags, so its prep score doesn't silently drop to 0%; it switches over as soon as the first lecture exists.
+  const trackerInUse = usesLectureTracker && (lecturesFor(profileId, paperId) || []).length > 0;
+  if(trackerInUse){
     const lecs = lecturesFor(profileId, paperId) || [];
     lecTotal = lecs.length;
     lecDone = lecs.filter(l=>l.status==='done').length;
@@ -3510,7 +3520,7 @@ function paperComponents(profileId, paperId){
   const scores = mockScoresFor(profileId, paperId) || [];
   const mockAvg = scores.length ? Math.round(scores.reduce((s,x)=>s+Number(x.score||0),0)/scores.length) : 0;
   const prepScore = Math.round((lecPct+rev1Pct+rev2Pct+practicePct+mockAvg)/5);
-  return {lecPct, rev1Pct, rev2Pct, practicePct, mockAvg, prepScore, total, done:lecDone, lecTotal, usesLectureTracker};
+  return {lecPct, rev1Pct, rev2Pct, practicePct, mockAvg, prepScore, total, done:lecDone, lecTotal, usesLectureTracker:trackerInUse};
 }
 function overallPrep(profileId){
   const comps = PAPERS.map(p=>paperComponents(profileId,p.id));
@@ -3998,13 +4008,7 @@ function moneyPageHtml(){
   <!-- PAGE 1: TRANSACTIONS -->
   <main class="page active" id="money-page-transactions">
 
-    <div class="money-sticky-header">
-      <div class="money-corner-row">
-        <button class="money-icon-btn" onclick="moneySwitchTab('settings')" type="button" aria-label="Settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </button>
-      </div>
-
+    <div class="money-top-block">
       <div class="flow-btn-row">
         <button class="flow-btn flow-in" id="money-btn-open-inflow" type="button">
           <div class="flow-ico">
@@ -4023,20 +4027,20 @@ function moneyPageHtml(){
       </div>
 
       <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
-        <div class="stat-card" style="padding:12px;">
+        <div class="stat-card" style="padding:10px 12px;">
           <div class="lbl">HDFC</div>
           <div class="val" id="money-bal-hdfc" style="font-size:15.5px;">₹0.00</div>
         </div>
-        <div class="stat-card" style="padding:12px;">
+        <div class="stat-card" style="padding:10px 12px;">
           <div class="lbl">SBI</div>
           <div class="val" id="money-bal-sbi" style="font-size:15.5px;">₹0.00</div>
         </div>
-        <div class="stat-card" style="padding:12px;">
+        <div class="stat-card" style="padding:10px 12px;">
           <div class="lbl">Cash</div>
           <div class="val" id="money-bal-cash" style="font-size:15.5px;">₹0.00</div>
         </div>
       </div>
-      <div class="hint" style="margin:-4px 0 0;">Balances reflect only what you log here — add an opening entry if you'd like them to match your real account balances.</div>
+      <div class="hint" style="margin:0; font-size:11px; line-height:1.4;">Balances reflect only what you log here — add an opening entry if you'd like them to match your real account balances.</div>
 
       <div class="money-subnav-row">
         <button class="money-subnav-btn" onclick="moneySwitchTab('dashboard')" type="button">
@@ -4047,13 +4051,17 @@ function moneyPageHtml(){
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
           Invoices
         </button>
+        <button class="money-icon-btn" onclick="moneySwitchTab('settings')" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
       </div>
 
-      <div class="search-bar">
+      </div>
+
+    <div class="money-search-sticky"><div class="search-bar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--muted);" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="money-txn-search" placeholder="Search by category, source or remarks">
-      </div>
-    </div>
+      </div></div>
 
     <div id="money-transactions-list"></div>
   </main>
@@ -7684,34 +7692,71 @@ function planThisTarget(profileId, targetId){
 
 // ── Card renderer — shared by Needs Attention / Active / History / Home widget. `compact`
 // drops the explain line and pace detail for tight spaces (Home widget). ───────────────────
+// v119: a target's progress in its NATIVE count (lectures / chapters), not just the % the target happens to be set in.
+// "toGoal" = how many more are needed for the target to flip to completed; "paperLeft" = how many are still pending
+// in the whole paper. The goal count uses the same round-half-up rule targetStatusData() applies to percent
+// targets (a 75% target is met at 74.5%), so this never disagrees with the status badge. null for overall/custom.
+function targetCountInfo(profileId, target){
+  if(target.type==='overall' || target.type==='custom') return null;
+  const {done, total} = targetTotalAndDone(profileId, target);
+  if(!total) return null;
+  const noun = (target.type==='lectures' && paperComponents(profileId, target.paperId).usesLectureTracker) ? 'lectures' : 'chapters';
+  const raw = target.unit==='percent' ? Math.ceil(total*(target.targetValue-0.5)/100 - 1e-9) : target.targetValue;
+  const goal = Math.min(total, Math.max(0, raw));
+  return {noun, done, total, goal, toGoal: Math.max(0, goal-done), paperLeft: Math.max(0, total-done)};
+}
+function countWord(n, noun){ return `${n} ${n===1 ? noun.replace(/s$/,'') : noun}`; }
+function fmtRate(x){ return (Math.round(x*10)/10).toString(); }
+// "~1.5 lectures/day" when the pace is a day-or-more worth, else "1 lecture every 8 days" (a 0.1/day figure reads badly).
+function fmtNeed(perDay, noun){
+  if(!(perDay>0)) return '0/day';
+  if(perDay>=1) return '~'+fmtRate(perDay)+(noun?' '+noun:'')+'/day';
+  return '1'+(noun?' '+noun.replace(/s$/,''):'')+' every '+Math.max(1,Math.floor(1/perDay))+' days';
+}
 function mtCardHtml(profileId, target, opts){
   opts = opts || {};
   const sd = targetStatusData(profileId, target);
+  const info = targetCountInfo(profileId, target);
   const paper = target.paperId ? paperById(target.paperId) : null;
   const unitLabel = target.unit==='percent' ? '%' : '';
   const deadlineLabel = new Date(target.deadline+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-  const barPct = Math.min(100, Math.round(sd.currentValue/targetCeilingValue(profileId,target)*100));
+  const ceil = targetCeilingValue(profileId,target);
+  const barPct = Math.min(100, Math.round(sd.currentValue/ceil*100));
+  const tickPct = Math.round(Math.min(sd.goal,ceil)/ceil*100);
   const style = `--mt-color:${sd.meta.color};--mt-tint:${sd.meta.tint}`;
+  const completed = sd.status==='COMPLETED', overdue = sd.status==='OVERDUE';
+  const dl = Math.max(0, sd.daysLeft);
+  // Rate figures in the same unit as the headline (items/day when we have a count, else the target's own unit).
+  const needPerDay = info ? (sd.daysLeft>0 ? info.toGoal/sd.daysLeft : info.toGoal) : sd.requiredPace;
+  const pacePerDay = info ? (target.unit==='percent' ? sd.currentPace/100*info.total : sd.currentPace) : sd.currentPace;
+  const rateUnit = info ? ' '+info.noun+'/day' : unitLabel+'/day';
+  let big = '';
+  if(!completed){
+    big = info
+      ? `<div class="mt-big"><b>${info.toGoal}</b> ${info.toGoal===1?info.noun.replace(/s$/,''):info.noun} ${overdue?'still pending':'to go'}<small>${target.unit==='percent'?`to reach ${target.targetValue}%`:`to hit your goal of ${target.targetValue}`}${info.paperLeft!==info.toGoal?` · ${info.paperLeft} pending in paper`:''}</small></div>`
+      : `<div class="mt-big"><b>${Math.ceil(sd.remaining)}${unitLabel}</b> to go<small>of ${target.targetValue}${unitLabel}</small></div>`;
+  }
   let explain = '';
-  if(!opts.compact && sd.status!=='COMPLETED'){
-    if(sd.status==='OVERDUE') explain = `Deadline passed ${-sd.daysLeft} day${-sd.daysLeft===1?'':'s'} ago, ${Math.ceil(sd.remaining)}${unitLabel} still remaining.`;
-    else explain = `You need about ${sd.requiredPace.toFixed(1)}${unitLabel}/day to reach this — recent pace is about ${Math.max(0,sd.currentPace).toFixed(1)}${unitLabel}/day.`;
-  } else if(sd.status==='COMPLETED'){
+  if(!opts.compact && !completed){
+    if(overdue) explain = `Deadline passed ${-sd.daysLeft} day${-sd.daysLeft===1?'':'s'} ago, ${info?countWord(info.toGoal,info.noun):Math.ceil(sd.remaining)+unitLabel} still pending.`;
+    else explain = `You need ${info?fmtNeed(needPerDay,info.noun):fmtRate(needPerDay)+unitLabel+'/day'} to reach this — recent pace is ${fmtRate(Math.max(0,pacePerDay))}${rateUnit}.`;
+  } else if(completed){
     explain = `Completed ${target.completedAt===target.deadline?'on time':(target.completedAt<target.deadline?'early':'late')}.`;
   }
   return `<div class="card mt-card" style="${style};margin-bottom:10px" onclick="openTargetDetail('${target.id}')">
     <div class="mt-head">
       <div>
         <div class="mt-title">${escChat(target.title)}</div>
-        <div class="mt-sub">${paper?paper.code+' · '+paper.nick:'General'}${target.priority==='high'?' · High priority':''}</div>
+        <div class="mt-sub">${paper?paper.code+' · '+paper.nick:'General'}${target.priority==='high'?' · High priority':''} · due ${deadlineLabel}</div>
       </div>
-      <span class="mt-badge">${sd.status==='OVERDUE'?'⚠ ':''}${sd.meta.label}</span>
+      <span class="mt-badge">${overdue?'⚠ ':''}${sd.meta.label}</span>
     </div>
-    <div class="mt-bar"><div class="mt-fill" style="width:${barPct}%"></div></div>
+    ${big}
+    <div class="mt-bar"><div class="mt-fill" style="width:${barPct}%"></div>${!completed && tickPct<99 ? `<i class="mt-tick" style="left:${tickPct}%"></i>` : ''}</div>
     <div class="mt-meta">
-      <span><b>${sd.currentValue}${unitLabel}</b> / ${target.targetValue}${unitLabel}</span>
-      ${sd.status!=='COMPLETED'?`<span><b>${sd.daysLeft>=0?sd.daysLeft:0}</b> day${sd.daysLeft===1?'':'s'} left</span>`:`<span>by ${deadlineLabel}</span>`}
-      ${sd.status!=='COMPLETED'?`<span><b>${Math.ceil(sd.remaining)}${unitLabel}</b> remaining</span>`:''}
+      <span><b>${info?info.done:sd.currentValue}${info?'':unitLabel}</b> / ${info?info.total+' '+info.noun+' done':target.targetValue+unitLabel}</span>
+      ${!completed?`<span>${overdue?`<b>${-sd.daysLeft}</b> day${-sd.daysLeft===1?'':'s'} overdue`:`<b>${dl}</b> day${dl===1?'':'s'} left`}</span>`:`<span>by ${deadlineLabel}</span>`}
+      ${!completed && !overdue && info && info.toGoal>0 ? `<span>need <b>${fmtNeed(needPerDay,info.noun)}</b></span>` : ''}
     </div>
     ${explain?`<div class="mt-explain">${explain}</div>`:''}
   </div>`;
@@ -7932,6 +7977,7 @@ function targetDetailHtml(profileId, targetId){
       ${statsKpi(t.targetValue, 'Goal', {suffix:unitLabel})}
       ${statsKpi(Math.ceil(sd.remaining), 'Remaining', {suffix:unitLabel})}
       ${statsKpi(Math.max(0,sd.daysLeft), 'Days left')}
+      ${(()=>{ const ci = targetCountInfo(profileId,t); return (ci && !t.completedAt) ? statsKpi(ci.toGoal, ci.noun.charAt(0).toUpperCase()+ci.noun.slice(1)+' to goal')+statsKpi(ci.paperLeft, 'Pending in paper') : ''; })()}
     </div>
   </div>
   ${sd.status!=='COMPLETED'?`
@@ -10934,13 +10980,11 @@ function viewHome(){
   const todayH = hoursOnDate(vp, todayStr());
   const remaining = Math.max(0, target-todayH);
 
-  return `
-  ${adminAnnouncementBannerHtml()}
-  ${isMe ? renderNotifBanners(vp) : ''}
-  ${homeDateHeaderHtml()}
-  ${dailyQuoteBoxHtml()}
-  ${isMe ? timerHomeTeaser() : ''}
-  ${isMe ? partnerHomeStatusCard() : ''}
+  const blocks = {
+    quote: ()=> dailyQuoteBoxHtml(),
+    timer: ()=> isMe ? timerHomeTeaser() : '',
+    partner: ()=> isMe ? partnerHomeStatusCard() : '',
+    countdown: ()=> `
   <div class="section-title">Countdown</div>
   <div class="top-row">
     <div class="card countdown-card">
@@ -10957,19 +11001,15 @@ function viewHome(){
       ${isMe && isOverridden ? `<div style="margin-top:6px;text-align:right"><span onclick="event.stopPropagation();clearTodaysTargetOverride('${vp}')" style="font-size:10px;color:var(--text-faint);text-decoration:underline;cursor:pointer">Reset to ${S.shared.targets[vp]||4}h minimum</span></div>` : ''}
     </div>
   </div>
-
-  ${isMe ? homeDailyChallengesCard(vp) : ''}
-
-  ${targetsNeedsAttentionWidgetHtml(vp, isMe)}
-
-  <div class="section-title"><span>Features</span></div>
-  ${featuresGridHtml()}
-
-  <div class="section-title">Papers</div>
-  ${homePaperGridHtml(vp)}
-
-  ${homeLectureCompletionBlock(vp)}
-
+  `,
+    habits: ()=> isMe ? homeDailyChallengesCard(vp) : '',
+    targets: ()=> targetsNeedsAttentionWidgetHtml(vp, isMe),
+    features: ()=> `<div class="section-title"><span>Features</span></div>
+  ${featuresGridHtml()}`,
+    papers: ()=> `<div class="section-title">Papers</div>
+  ${homePaperGridHtml(vp)}`,
+    lectures: ()=> homeLectureCompletionBlock(vp),
+    hours: ()=> `
   <div class="section-title"><span>Study Hours</span>
     <span style="display:flex;align-items:center;gap:6px;font-weight:600">
       <button class="icon-btn" style="width:24px;height:24px" onclick="navWeek(-1)">‹</button>
@@ -10982,9 +11022,19 @@ function viewHome(){
     <div class="week-bars">${weekBars(vp, S.homeWeekOffset||0)}</div>
     <div class="week-dates">${weekDatesRow(S.homeWeekOffset||0)}</div>
   </div>
-
-  <div class="section-title">Inter-Profile Comparison</div>
-  ${comparisonBlock()}
+  `,
+    compare: ()=> `<div class="section-title">Inter-Profile Comparison</div>
+  ${comparisonBlock()}`,
+  };
+  // Which cards show, and in what order, is the VIEWER's own choice (Settings → Display), so it
+  // stays the same while peeking at the partner's Home.
+  const lay = homeLayoutFor(S.local.myProfile);
+  const body = lay.order.filter(k=>!lay.hidden[k]).map(k=> blocks[k] ? blocks[k]() : '').join('\n');
+  return `
+  ${adminAnnouncementBannerHtml()}
+  ${isMe ? renderNotifBanners(vp) : ''}
+  ${homeDateHeaderHtml()}
+  ${body}
   `;
 }
 
@@ -11001,7 +11051,7 @@ function sbRow(label, val){
 // its Workspace page, this only removes the switcher from the Home summary.
 function homeLectureCompletionBlock(profileId){
   // Chetna sees Paper 5 — IDT here specifically; Umang keeps Paper 4 — DT, unchanged.
-  const paperId = profileId === 'chetna' ? 'idt' : 'dt';
+  const paperId = homeLecturePaperFor(profileId); // Settings → Display; defaults to the original DT (Umang) / IDT (Chetna)
   const paper = paperById(paperId);
   const lecs = lecturesFor(profileId, paperId);
   const done = lecs.filter(l=>l.status==='done').length;
@@ -11018,7 +11068,8 @@ function homeLectureCompletionBlock(profileId){
         <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:inline-block"></span>Pending — <b>${pending}</b></div>
       </div>
     </div>
-    <button class="btn btn-accent" style="width:100%" onclick="openWorkspaceFor('${profileId}','${paperId}','lectures')">Go to ${paper.code} · ${paper.nick} Lectures Page →</button>
+    ${lecs.length===0?`<div style="font-size:11.5px;color:var(--text-faint);margin:-4px 0 10px">No ${paper.nick} lectures added yet — add them on the Lectures page.</div>`:''}
+    <button class="btn btn-accent" style="width:100%" onclick="openWorkspaceFor('${profileId}','${paperId}','lectures')">${lecs.length===0?'Add':'Go to'} ${paper.code} · ${paper.nick} Lectures Page →</button>
   </div>`;
 }
 function raceTrackSVG(profileId, done, total, pct){
@@ -11204,8 +11255,8 @@ function weeklyTrendData(profileId, weeks){
   }
   return buckets;
 }
-// Lecture completion, by actual Date of Completion — combined across DT + IDT (the only two
-// papers with a real Lecture Tracker).
+// Lecture completion, by actual Date of Completion — combined across every paper with a real
+// Lecture Tracker (LECTURE_TRACKER_PAPERS: Audit, DT, IDT).
 function allLecturesCombined(profileId){
   return LECTURE_TRACKER_PAPERS.flatMap(pid => lecturesFor(profileId, pid));
 }
@@ -12022,7 +12073,9 @@ const WS_TABS_BASE = [
   {id:'notes', label:'Revision'}, {id:'practice', label:'Practice'},
   {id:'mock', label:'Mock Tests'},
 ];
-const LECTURE_TRACKER_PAPERS = ['dt','idt']; // only these two have a Lectures tab
+// v119: Paper 3 (Audit) added -- no pre-seeded schedule, lectures are added by hand (per profile, independent,
+// NOT mirrored like DT). Drives the Workspace Lectures tab, Timer/Planner pickers, Stats, Home picker, targets.
+const LECTURE_TRACKER_PAPERS = ['audit','dt','idt'];
 function wsTabsFor(paperId){
   return WS_TABS_BASE.filter(t => t.id!=='lectures' || LECTURE_TRACKER_PAPERS.includes(paperId));
 }
@@ -14448,7 +14501,7 @@ function statsOverview(vp, prof){
   `;
 }
 
-// Lecture pipeline — DT/IDT only, since they're the only papers with a real Lecture Tracker.
+// Lecture pipeline — every LECTURE_TRACKER_PAPERS paper (Audit, DT, IDT).
 // Rendered as its own block so the overview degrades cleanly if neither has lectures loaded.
 function statsLecturePipelineBlock(vp, accent){
   const paces = LECTURE_TRACKER_PAPERS.map(pid=>({pid, paper:PAPERS.find(p=>p.id===pid), pace:statsLecturePace(vp,pid)}))
@@ -14482,7 +14535,7 @@ function statsLecturePipelineBlock(vp, accent){
           ${p.overdue>0 ? `<span style="color:var(--bad)"><b class="mono">${p.overdue}</b> overdue</span>` : ''}
           <span>${p.eta ? `finishes ~<b class="mono" style="color:var(--text-muted)">${p.eta}</b>` : (p.remaining===0 ? 'complete' : 'pace unknown — no recent completions')}</span>
         </div>
-        <div style="margin-top:9px">${trendChartSVG(weeklyLectureTrendDataForPaper(vp, x.pid, 6), 74, x.pid==='dt'?'var(--purple)':'var(--green)', '')}</div>
+        <div style="margin-top:9px">${trendChartSVG(weeklyLectureTrendDataForPaper(vp, x.pid, 6), 74, ({dt:'var(--purple)', idt:'var(--green)', audit:'var(--amber)'})[x.pid]||'var(--green)', '')}</div>
       </div>`;
     }).join('')}
   </div>`;
@@ -14806,6 +14859,7 @@ const SETTINGS_SECTIONS = [
   {key:'account', title:'Account & Sync', sub:'Sign-in, sync status', icon:'<path d="M17.5 16a4 4 0 000-8 5.5 5.5 0 00-10.6-1.7A4.5 4.5 0 007.5 16h10z"/>', render:'settingsSectionAccount'},
   {key:'notifications', title:'Notifications', sub:'Push alerts & in-app reminders', icon:'<path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>', render:'settingsSectionNotifications'},
   {key:'appearance', title:'Appearance', sub:'Dark mode, background theme', icon:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor" stroke="none"/>', render:'settingsSectionAppearance'},
+  {key:'display', title:'Display', sub:'Home page cards & lecture paper', icon:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>', render:'settingsSectionDisplay'},
   {key:'ai', title:'AI Personalization', sub:'Helps Coach, Chat & Doubt Solver tailor to you', icon:'<path d="M12 2l1.7 5.8L19 9l-5.3 1.2L12 16l-1.7-5.8L5 9l5.3-1.2z"/>', render:'settingsSectionAI'},
   {key:'data', title:'Data & Backup', sub:'Export / import your progress', icon:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/>', render:'settingsSectionData'},
   {key:'admin', title:'Admin Tools', sub:'Privacy & app announcements', icon:'<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>', render:'settingsSectionAdmin', umangOnly:true},
@@ -15019,6 +15073,87 @@ function notifToggleRow(key, label){
   return `<div class="settings-row"><div class="settings-row-lbl">${label}</div>
     <div class="toggle ${on?'on':''}" onclick="toggleNotifPref('${key}')"></div></div>`;
 }
+// ── Home page cards: which ones show, in what order, and which paper Lecture Completion uses ──
+// Stored per profile in S.shared.prefs[profile] (homeOrder / homeHidden / homeLecturePaper) -- prefs
+// is already a SINGLE_OWNER_SHARED_KEYS entry, so these sync across devices without a new key.
+const HOME_KPIS = [
+  {key:'quote',     label:'Daily motivation quote'},
+  {key:'timer',     label:'Study timer shortcut',      ownOnly:true},
+  {key:'partner',   label:"Partner's live status",     ownOnly:true},
+  {key:'countdown', label:"Exam countdown & today's target"},
+  {key:'habits',    label:'Daily Challenges',          ownOnly:true},
+  {key:'targets',   label:'Targets needing attention'},
+  {key:'features',  label:'Features shortcuts'},
+  {key:'papers',    label:'Papers'},
+  {key:'lectures',  label:'Lecture Completion'},
+  {key:'hours',     label:'Study Hours (weekly chart)'},
+  {key:'compare',   label:'Inter-Profile Comparison'},
+];
+function homeLayoutFor(profileId){
+  const pr = (S.shared.prefs && S.shared.prefs[profileId]) || {};
+  const known = HOME_KPIS.map(k=>k.key);
+  const saved = Array.isArray(pr.homeOrder) ? pr.homeOrder.filter(k=>known.includes(k)) : [];
+  const order = saved.concat(known.filter(k=>!saved.includes(k))); // new cards added later land at the end
+  return {order, hidden: pr.homeHidden || {}};
+}
+function homeLecturePaperFor(profileId){
+  const pr = (S.shared.prefs && S.shared.prefs[S.local.myProfile]) || {};
+  if(pr.homeLecturePaper && LECTURE_TRACKER_PAPERS.includes(pr.homeLecturePaper)) return pr.homeLecturePaper;
+  return profileId === 'chetna' ? 'idt' : 'dt'; // the original defaults
+}
+function homePrefsMut(){
+  const me = S.local.myProfile; if(!me) return null;
+  if(!S.shared.prefs) S.shared.prefs = {};
+  if(!S.shared.prefs[me]) S.shared.prefs[me] = {countBreakTime:false, autoRevisionEnabled:true};
+  return S.shared.prefs[me];
+}
+function setHomeLecturePaper(id){
+  const pr = homePrefsMut(); if(!pr || !LECTURE_TRACKER_PAPERS.includes(id)) return;
+  pr.homeLecturePaper = id; saveShared(); renderApp();
+}
+function toggleHomeKpi(key){
+  const pr = homePrefsMut(); if(!pr) return;
+  pr.homeHidden = Object.assign({}, pr.homeHidden || {});
+  if(pr.homeHidden[key]) delete pr.homeHidden[key]; else pr.homeHidden[key] = true;
+  saveShared(); renderApp();
+}
+function moveHomeKpi(key, dir){
+  const pr = homePrefsMut(); if(!pr) return;
+  const order = homeLayoutFor(S.local.myProfile).order.slice();
+  const i = order.indexOf(key), j = i + dir;
+  if(i<0 || j<0 || j>=order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  pr.homeOrder = order; saveShared(); renderApp();
+}
+function resetHomeLayout(){
+  const pr = homePrefsMut(); if(!pr) return;
+  delete pr.homeOrder; delete pr.homeHidden; delete pr.homeLecturePaper;
+  saveShared(); renderApp();
+}
+function settingsSectionDisplay(){
+  const me = S.local.myProfile;
+  const lay = homeLayoutFor(me);
+  const paperId = homeLecturePaperFor(me);
+  const opts = LECTURE_TRACKER_PAPERS.map(id=>{ const pp = paperById(id); return `<option value="${id}" ${id===paperId?'selected':''}>${pp.code} — ${pp.nick}</option>`; }).join('');
+  const arrow = (key, dir, dis) => `<button class="icon-btn" style="width:28px;height:28px;font-size:11px;${dis?'opacity:.25;pointer-events:none':''}" onclick="moveHomeKpi('${key}',${dir})" aria-label="Move ${dir<0?'up':'down'}">${dir<0?'▲':'▼'}</button>`;
+  return `
+  <div class="card settings-group">
+    <div class="settings-row" style="gap:12px"><div><div class="settings-row-lbl">Lecture Completion paper</div><div class="settings-row-sub">Which paper's lectures the Home card tracks</div></div>
+      <select style="border:1px solid var(--border);border-radius:6px;padding:6px 9px;background:var(--surface2);color:var(--text);font-size:13px" onchange="setHomeLecturePaper(this.value)">${opts}</select></div>
+  </div>
+  <div class="card settings-group" style="margin-top:12px">
+    <div style="padding:12px 14px 4px"><div class="settings-row-lbl" style="font-weight:700">Home page cards</div><div class="settings-row-sub">Switch a card off to hide it, and use the arrows to change the order.</div></div>
+    <div style="padding:0 14px">
+    ${lay.order.map((k,i)=>{
+      const d = HOME_KPIS.find(x=>x.key===k); const on = !lay.hidden[k];
+      return `<div class="settings-row" style="gap:10px"><div style="min-width:0;flex:1"><div class="settings-row-lbl">${d.label}</div>${d.ownOnly?'<div class="settings-row-sub">Shows on your own Home only</div>':''}</div>
+        <div style="display:flex;align-items:center;gap:6px">${arrow(k,-1,i===0)}${arrow(k,1,i===lay.order.length-1)}<div class="toggle ${on?'on':''}" onclick="toggleHomeKpi('${k}')"></div></div></div>`;
+    }).join('')}
+    </div>
+    <div style="padding:10px 14px 14px"><button class="btn" style="width:100%" onclick="resetHomeLayout()">Reset Home to default</button></div>
+  </div>`;
+}
+
 // Same visual pattern as notifToggleRow, but for the newer S.shared-backed per-profile
 // preferences (countBreakTime, autoRevisionEnabled) — these travel with the profile across
 // devices rather than staying device-local like notification prefs.

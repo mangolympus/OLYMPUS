@@ -140,7 +140,10 @@
 //    size used min(20vw,96px) where vw = portrait width (narrow), but the visual "width"
 //    after rotation is the portrait HEIGHT. An fs-rotated-specific rule now uses
 //    clamp(40px,18vh,96px) so the clock fills the rotated visual width correctly.
-const CACHE_VERSION = 'olympus-v117';
+// v118: Money top block no longer frozen/mismatched (compact, only search pinned); new Settings → Display
+// (Home cards on/off + order, Lecture Completion paper picker).
+// v119: Audit (Paper 3) lecture tracker; Targets/Needs Attention cards now show pending lectures/chapters.
+const CACHE_VERSION = 'olympus-v119';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
