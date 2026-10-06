@@ -734,18 +734,19 @@ body.targets-mode #targets-root{display:flex}
   }
 .money-view select{appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2393a0bf' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:34px;}
 .money-view input:focus, .money-view textarea:focus, .money-view select:focus{border-color:var(--blue-500); background:var(--card);}
-.money-view .flow-btn-row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;}
+.money-view .flow-btn-row{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;}
 .money-view .flow-btn{
-    border:none; border-radius:14px; padding:11px 14px; min-height:58px; display:grid; grid-template-columns:auto 1fr; column-gap:11px; align-items:center; text-align:left;
+    border:none; border-radius:18px; padding:16px 16px; min-height:88px; display:grid; grid-template-columns:auto 1fr; column-gap:14px; align-items:center; text-align:left;
     cursor:pointer; box-shadow:var(--shadow); color:#fff;
     transition:transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
   }
 .money-view .flow-btn:active{transform:scale(.96); box-shadow:0 1px 4px rgba(0,0,0,.3);}
 .money-view .flow-btn.flow-in{background:linear-gradient(135deg,#0f5132,#22b573);}
 .money-view .flow-btn.flow-out{background:linear-gradient(135deg,#6b1224,#c2273f);}
-.money-view .flow-ico{width:34px;height:34px;border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; grid-row:1 / span 2;}
-.money-view .flow-label{font-family:'Plus Jakarta Sans',sans-serif; font-weight:800; font-size:15px; line-height:1.15; align-self:end;}
-.money-view .flow-sub{font-size:11px; opacity:.85; align-self:start;}
+.money-view .flow-ico svg{width:24px;height:24px;}
+.money-view .flow-ico{width:48px;height:48px;border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; grid-row:1 / span 2;}
+.money-view .flow-label{font-family:'Plus Jakarta Sans',sans-serif; font-weight:800; font-size:20px; line-height:1.15; align-self:end;}
+.money-view .flow-sub{font-size:12.5px; opacity:.85; align-self:start; margin-top:2px;}
 .money-view .seg-control{display:flex; background:var(--input-bg); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:14px;}
 .money-view .money-source-btn-row{display:flex; gap:8px;}
 .money-view .money-source-btn{flex:1; padding:11px 8px; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); font-weight:700; font-size:13.5px; cursor:pointer; transition:background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);}
@@ -757,10 +758,10 @@ body.targets-mode #targets-root{display:flex}
    correctly on resize) for no real benefit, since Olympus's header has always rendered at a
    consistent height in practice. If header{} 's padding or its tallest child ever changes,
    update this number too. */
-/* v118: the whole top block used to be position:sticky (~380px frozen, i.e. nearly half a phone screen, on a --bg slab that
-   stopped at the page padding). Now it scrolls away normally; only the search bar stays pinned, full-bleed, below the app header. */
-.money-view .money-top-block{padding-top:12px; padding-bottom:4px;}
-.money-view .money-search-sticky{position:sticky; top:60px; z-index:10; background:var(--bg); margin:0 -16px 8px; padding:8px 16px 2px;}
+/* v120: Inflow/Outflow, balances, Dashboard/Invoices and search are ONE frozen block pinned under the app header while the
+   transaction list scrolls beneath it. Full-bleed (-16px margins cancel the page padding) with a solid --bg so rows never
+   show through; kept compact (hint line removed, tight gaps) so it doesn't eat the screen. */
+.money-view .money-sticky-all{position:sticky; top:60px; z-index:10; background:var(--bg); margin:0 -16px 10px; padding:12px 16px 10px; box-shadow:0 8px 10px -8px rgba(0,0,0,.6);}
 .money-view .money-icon-btn{flex:0 0 46px; width:46px; height:auto; align-self:stretch; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer;}
 .money-view .money-subnav-row{display:flex; gap:10px; margin:12px 0 8px;}
 .money-view .money-subnav-btn{flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:11px 8px; border-radius:12px; border:1px solid var(--border); background:var(--input-bg); color:var(--ink); font-weight:700; font-size:13.5px; cursor:pointer;}
@@ -2027,6 +2028,20 @@ function todayStr(now){
   if(d.getHours() < 5) d.setDate(d.getDate()-1);
   return localDateStr(d);
 }
+
+// v121 audit helpers -- every "which day is it / which month is it" question goes through the 5 AM study day.
+// studyDayOf(x): the study day an arbitrary timestamp (ISO string / ms / Date) belongs to. A bare 'YYYY-MM-DD' is
+// already a study-day key and is returned unchanged. (Replaces `iso.slice(0,10)`, which reads the UTC date: in IST
+// that is a day early from 05:00 to 05:29 and says nothing about the 5 AM rule.)
+function studyDayOf(x){
+  if(typeof x==='string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
+  return todayStr(new Date(x));
+}
+// Noon of the current STUDY day -- for month/year/weekday maths that must not flip at midnight (noon dodges DST edges).
+function studyNow(){ return new Date(todayStr()+'T12:00:00'); }
+// 'YYYY-MM' from LOCAL parts. Never use toISOString().slice(0,7): it converts to UTC first, so a local 1st-of-month
+// midnight lands in the PREVIOUS month for anyone east of UTC (IST included).
+function monthKeyOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 
 // ═══════════════════════════════════════════════════════════
 // MOTION: count-up numbers, confetti, milestone celebrations
@@ -3642,7 +3657,7 @@ function isHabitDoneOn(profileId, dateStr, habitId){
 // archive dates too — more bookkeeping than an MVP habit tracker needs; flagging as a known
 // simplification rather than presenting it as exact.
 function habitDailyScore(profileId, dateStr){
-  const eligible = activeHabitsFor(profileId).filter(h=> !h.createdAt || h.createdAt.slice(0,10) <= dateStr);
+  const eligible = activeHabitsFor(profileId).filter(h=> !h.createdAt || studyDayOf(h.createdAt) <= dateStr);
   if(!eligible.length) return null; // no habits existed yet that day — distinct from "0% done"
   const done = eligible.filter(h=>isHabitDoneOn(profileId, dateStr, h.id)).length;
   return Math.round((done/eligible.length)*100);
@@ -3687,7 +3702,7 @@ function isHabitLate(profileId, dateStr, habitId){
 // just scoped to one habit's completion dates instead of study-log dates.
 function habitStreak(profileId, habitId){
   const h = habitById(profileId, habitId);
-  const createdDate = h && h.createdAt ? h.createdAt.slice(0,10) : null;
+  const createdDate = h && h.createdAt ? studyDayOf(h.createdAt) : null;
   let n=0; let d = new Date(todayStr()+'T00:00:00');
   if(h && h.type==='auto-target'){
     while((!createdDate || localDateStr(d)>=createdDate) && isHabitDoneOn(profileId, localDateStr(d), habitId)){
@@ -3748,7 +3763,7 @@ function longestSession(profileId){
   return logsFor(profileId).reduce((max,l)=>Math.max(max,Number(l.hours||0)),0);
 }
 function daysUntilExam(){
-  const d = new Date(S.shared.examDate+'T00:00:00'); const now=new Date(); now.setHours(0,0,0,0);
+  const d = new Date(S.shared.examDate+'T00:00:00'); const now=new Date(todayStr()+'T00:00:00'); // study day, not calendar midnight
   return Math.ceil((d-now)/86400000);
 }
 function radarMetrics(profileId){
@@ -4008,7 +4023,7 @@ function moneyPageHtml(){
   <!-- PAGE 1: TRANSACTIONS -->
   <main class="page active" id="money-page-transactions">
 
-    <div class="money-top-block">
+    <div class="money-sticky-all">
       <div class="flow-btn-row">
         <button class="flow-btn flow-in" id="money-btn-open-inflow" type="button">
           <div class="flow-ico">
@@ -4040,7 +4055,6 @@ function moneyPageHtml(){
           <div class="val" id="money-bal-cash" style="font-size:15.5px;">₹0.00</div>
         </div>
       </div>
-      <div class="hint" style="margin:0; font-size:11px; line-height:1.4;">Balances reflect only what you log here — add an opening entry if you'd like them to match your real account balances.</div>
 
       <div class="money-subnav-row">
         <button class="money-subnav-btn" onclick="moneySwitchTab('dashboard')" type="button">
@@ -4056,12 +4070,12 @@ function moneyPageHtml(){
         </button>
       </div>
 
-      </div>
-
-    <div class="money-search-sticky"><div class="search-bar">
+      <div class="search-bar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--muted);" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="money-txn-search" placeholder="Search by category, source or remarks">
-      </div></div>
+      </div>
+
+      </div>
 
     <div id="money-transactions-list"></div>
   </main>
@@ -5679,8 +5693,8 @@ function moneyPageHtml(){
     const total = invoices.reduce((s,i)=>s+i.total,0);
     const count = invoices.length;
     const avg = count? total/count : 0;
-    const now = new Date();
-    const curKey = now.toISOString().slice(0,7);
+    const now = studyNow();
+    const curKey = monthKeyOf(now);
     const thisMonth = invoices.filter(i=>monthKey(i.date)===curKey).reduce((s,i)=>s+i.total,0);
 
     $('money-stat-revenue').textContent = fmt(total);
@@ -5695,7 +5709,7 @@ function moneyPageHtml(){
     const months = [];
     for(let k=5;k>=0;k--){
       const d = new Date(now.getFullYear(), now.getMonth()-k, 1);
-      months.push({ key: d.toISOString().slice(0,7), label: d.toLocaleDateString('en-IN',{month:'short'}) });
+      months.push({ key: monthKeyOf(d), label: d.toLocaleDateString('en-IN',{month:'short'}) });
     }
     const sums = months.map(m => invoices.filter(i=>monthKey(i.date)===m.key).reduce((s,i)=>s+i.total,0));
     const max = Math.max(...sums, 1);
@@ -8350,7 +8364,7 @@ function fmtDateSeparator(dateStr){
   const y = new Date(todayStr()+'T00:00:00'); y.setDate(y.getDate()-1);
   if(dateStr === localDateStr(y)) return 'Yesterday';
   const d = new Date(dateStr+'T00:00:00');
-  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const sameYear = d.getFullYear() === studyNow().getFullYear();
   return d.toLocaleDateString('en-IN', sameYear ? {weekday:'long', day:'numeric', month:'short'} : {day:'numeric', month:'short', year:'numeric'});
 }
 // Lightweight markdown-lite: **bold**, *italic*, __underline__, `code`. Escapes first so
@@ -11265,8 +11279,7 @@ function lecturesCompletedInRange(profileId, days){
   return allLecturesCombined(profileId).filter(l=> l.completionDate && new Date(l.completionDate+'T00:00:00') >= cutoff).length;
 }
 function lecturesCompletedThisMonth(profileId){
-  const now = new Date();
-  const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const ym = monthKeyOf(studyNow());
   return allLecturesCombined(profileId).filter(l=> l.completionDate && l.completionDate.startsWith(ym)).length;
 }
 function weeklyLectureTrendData(profileId, weeks){
@@ -13432,7 +13445,7 @@ function saveEditTask(profileId, taskId){
   renderApp();
 }
 function calendarGrid(profileId, isMe){
-  const now = new Date();
+  const now = studyNow();
   const year = S.calYear ?? now.getFullYear();
   const month = S.calMonth ?? now.getMonth();
   const first = new Date(year, month, 1);
@@ -13681,7 +13694,7 @@ function saveEditLog(profileId, logId){
   showToast('✓ Log updated');
 }
 function calNav(dir){
-  const now = new Date();
+  const now = studyNow();
   let year = S.calYear ?? now.getFullYear(), month = S.calMonth ?? now.getMonth();
   month += dir;
   if(month<0){ month=11; year--; } if(month>11){ month=0; year++; }
@@ -15197,7 +15210,7 @@ function resetProfile(){
 function setTarget(v){ S.shared.targets[S.local.myProfile] = parseFloat(v)||4; saveShared(); }
 function setExamDate(v){ S.shared.examDate = v; saveShared(); renderApp(); }
 function ddmmyyStr(){
-  const d = new Date();
+  const d = studyNow();
   return `${String(d.getDate()).padStart(2,'0')}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getFullYear()).slice(-2)}`;
 }
 async function exportProfileData(profileId){
