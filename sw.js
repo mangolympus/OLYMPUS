@@ -145,7 +145,9 @@
 // v119: Audit (Paper 3) lecture tracker; Targets/Needs Attention cards now show pending lectures/chapters.
 // v120: Money page top section (Inflow/Outflow, balances, Dashboard/Invoices, search) fully frozen; bigger Inflow/Outflow; removed balances hint.
 // v121: 5 AM study-day audit -- exam countdown, this-month lecture count, planner calendar default month, habit start dates, Money invoice month keys, backup filename.
-const CACHE_VERSION = 'olympus-v121';
+// v122: partner live-timer visibility -- stays visible until the owner stops it, explicit stop signal, push-triggered refresh,
+// verified timer saves (re-writes if the partner's upload clobbered it).
+const CACHE_VERSION = 'olympus-v122';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

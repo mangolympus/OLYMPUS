@@ -3598,10 +3598,7 @@ function hoursOnDate(profileId, dateStr){
 function todayHoursLive(profileId){
   const logged = hoursOnDate(profileId, todayStr());
   const ts = S.shared.timerState && S.shared.timerState[profileId];
-  if(ts && ts.startTime){
-    const staleMs = Date.now() - (ts.lastHeartbeat||ts.startTime);
-    if(staleMs <= 4*60*1000) return logged + computeElapsedSeconds(ts)/3600;
-  }
+  if(timerStateIsLive(ts)) return logged + computeElapsedSeconds(ts)/3600;
   return logged;
 }
 function totalHours(profileId){ return logsFor(profileId).reduce((s,l)=>s+Number(l.hours||0),0); }
@@ -8507,7 +8504,9 @@ function startBackgroundPoll(){
       if(remote){
         let changed = false;
         if(remote.chat && mergeChatFromRemote(remote)) changed = true;
-        if(mergeTimerStateFromRemote(remote)) changed = true;
+        // Partner's timer AND their logged sessions come from the same read, so when a session ends the live card, their
+        // 'Last session ended at' line and today's hours all update together instead of the hours dipping until the next sync.
+        if(refreshOtherProfileDataFromRemote(migrateShared(remote))) changed = true;
         if(changed){
           renderNav();
           // Timer page needs to reflect the other profile's freshly-polled live status too,
@@ -8554,12 +8553,80 @@ function mergeTimerStateFromRemote(remoteShared){
   const localOther = S.shared.timerState[other];
   const remoteTime = remoteOther.lastHeartbeat || 0;
   const localTime = (localOther && localOther.lastHeartbeat) || -1;
-  if(remoteTime > localTime){
+  const sig = t => t ? [t.status,t.startTime,t.lastBreakStart,t.accumulatedBreakMs,t.breakReason,t.itemId,t.countdownTargetMs].join('|') : '';
+  const differs = sig(remoteOther) !== sig(localOther);
+  // v122: a plain `remote > local` heartbeat comparison ignored the partner STOPPING (legacy stopped states carried a null
+  // heartbeat), so this device kept showing -- and re-uploading -- their old running session. Their slice is theirs alone,
+  // so a remote 'idle' state over a cached running one is accepted when it's at least as new, or is a legacy null-stamped one.
+  const remoteIsStop = !remoteOther.startTime && !!(localOther && localOther.startTime);
+  if(remoteTime > localTime || (differs && remoteTime === localTime) || (remoteIsStop && (remoteTime >= localTime || remoteTime === 0))){
+    if(!differs && remoteTime === localTime) return false;
     S.shared.timerState[other] = remoteOther;
     return true;
   }
   return false;
 }
+// Called whenever a merge changed what the partner's timer looks like, from any path (poll, push, pre-save refresh).
+function onPartnerTimerChanged(){
+  const me = S.local && S.local.myProfile; if(!me) return;
+  const info = otherLiveStatusInfo(otherProfileId(me));
+  if(info.state==='studying' || info.state==='break') startTimerTick();
+  if(S.view==='home' || S.view==='timer') renderApp();
+}
+// The shared file is one blob that each phone reads, then re-uploads whole. If the partner's phone reads it just BEFORE
+// my timer change lands and uploads just AFTER, their upload silently puts my OLD timer state back (a stopped session
+// would reappear as running; a new one would vanish). So after every timer state change, look at Drive a few seconds
+// later and, if my slice isn't what I wrote, write it again (a few attempts at most).
+let _timerVerifyToken = 0;
+async function driveSyncSaveTimerChange(){
+  await driveSyncSaveNow();
+  verifyOwnTimerOnDrive(0);
+}
+function verifyOwnTimerOnDrive(attempt){
+  if(!S.appSession || !isHosted()) return;
+  const tok = ++_timerVerifyToken;
+  setTimeout(async ()=>{
+    if(tok !== _timerVerifyToken) return; // a newer timer change has its own check
+    const me = S.local && S.local.myProfile; if(!me) return;
+    try{
+      const remote = await driveSyncLoad();
+      if(tok !== _timerVerifyToken || !remote || !remote.timerState) return;
+      const sig = t => t ? [t.status,t.startTime,t.lastBreakStart,t.accumulatedBreakMs,t.breakReason,t.itemId,t.countdownTargetMs].join('|') : '';
+      if(sig(remote.timerState[me]) !== sig(S.shared.timerState[me]) && attempt < 3){
+        await driveSyncSaveNow();
+        verifyOwnTimerOnDrive(attempt+1);
+      }
+    }catch(e){ console.warn('Timer verify failed', e); }
+  }, 6000);
+}
+let _partnerRefreshBusy = false;
+// Immediate (not waiting for the 30s poll) pull of the partner's timer: used when a push arrives and when the app comes
+// back to the foreground. Skips the Drive re-upload the poll does -- it only needs to persist locally.
+async function refreshPartnerTimerNow(){
+  if(_partnerRefreshBusy || !S.appSession || !isHosted() || !(S.local && S.local.myProfile)) return;
+  _partnerRefreshBusy = true;
+  try{
+    const remote = await driveSyncLoad();
+    if(remote && refreshOtherProfileDataFromRemote(migrateShared(remote))){ saveShared(null, {skipDrivePush:true}); renderNav(); onPartnerTimerChanged(); }
+  }catch(e){ console.warn('Partner timer refresh failed', e); }
+  finally{ _partnerRefreshBusy = false; }
+}
+// The partner's Drive write can land a few seconds after their push does, so look a few times.
+function refreshPartnerTimerSoon(delays){ (delays || [0, 3000, 8000, 15000]).forEach(ms=> setTimeout(refreshPartnerTimerNow, ms)); }
+function pushOwnHeartbeat(now){
+  const me = S.local && S.local.myProfile;
+  const ts = me && S.shared.timerState && S.shared.timerState[me];
+  if(!(ts && ts.startTime)) return;
+  ts.lastHeartbeat = Date.now();
+  if(now) driveSyncSaveNow(); else saveShared();
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(!(S.appSession && S.local && S.local.myProfile)) return;
+  // Leaving: send one last "still going" stamp before the browser freezes the page. Returning: send a fresh one
+  // and pull the partner's latest straight away.
+  pushOwnHeartbeat(document.hidden);
+  if(!document.hidden) refreshPartnerTimerSoon([0, 4000]);
+});
 function chatStatusInfo(otherId){
   const chat = S.shared.chat;
   const now = Date.now();
@@ -8615,7 +8682,7 @@ function refreshOtherProfileDataFromRemote(freshRemote){
       S.shared[key][other] = freshRemote[key][other];
     }
   });
-  mergeTimerStateFromRemote(freshRemote); // separate, timestamp-guarded merge — see its own comment above
+  return mergeTimerStateFromRemote(freshRemote); // separate, timestamp-guarded merge — see its own comment above
 }
 function mergeChatFromRemote(remoteShared){
   if(!remoteShared || !remoteShared.chat) return false;
@@ -10140,26 +10207,28 @@ function timerStart(paperId, category, itemId, itemLabel, countdownTargetMs){
     countdownTargetMs,
   };
   S.local.lastTimerSelection = {paperId, category, itemId, itemLabel};
-  driveSyncSaveNow();
+  const _startSave = driveSyncSaveTimerChange();
   saveLocal();
   startTimerTick();
   renderApp();
   updateTimerNotification(S.shared.timerState[me]);
-  notifyPartnerSessionStarted(me); // fire-and-forget, same convention as checkAchievementBadges' AI call
+  // v122: the push used to fire immediately, racing the Drive write -- the partner's phone buzzed, opened the app, read Drive
+  // BEFORE the running state had landed and showed 'last session ended...'. Now it waits for the save (capped at 12s).
+  Promise.race([Promise.resolve(_startSave).catch(()=>{}), new Promise(r=>setTimeout(r,12000))]).then(()=>notifyPartnerSessionStarted(me));
 }
 function timerPause(){
   const ts = myLiveStatus();
   if(ts.status!=='running') return;
   ts.status = 'break'; ts.lastBreakStart = Date.now(); ts.breakReason = null; ts.lastHeartbeat = Date.now();
   _lastCountdownNagTime = ts.lastBreakStart; // first Strict Countdown nag fires 5 min after THIS break starts
-  driveSyncSaveNow(); renderApp();
+  driveSyncSaveTimerChange(); renderApp();
   updateTimerNotification(ts);
 }
 function setBreakReason(reason){
   const ts = myLiveStatus();
   if(ts.status!=='break') return;
   ts.breakReason = reason; ts.lastHeartbeat = Date.now();
-  driveSyncSaveNow(); renderApp();
+  driveSyncSaveTimerChange(); renderApp();
   updateTimerNotification(ts);
 }
 function timerResume(){
@@ -10168,7 +10237,7 @@ function timerResume(){
   const brk = ts.lastBreakStart ? Date.now()-ts.lastBreakStart : 0;
   ts.accumulatedBreakMs = (ts.accumulatedBreakMs||0) + Math.max(0,brk);
   ts.status = 'running'; ts.lastBreakStart = null; ts.breakReason = null; ts.lastHeartbeat = Date.now();
-  driveSyncSaveNow(); renderApp();
+  driveSyncSaveTimerChange(); renderApp();
   updateTimerNotification(ts);
 }
 // Handles both a manual Stop (normal sessions only — the UI never offers this button for a
@@ -10205,8 +10274,8 @@ function timerStop(){
     addLogEntry(me, {date:todayStr(new Date(startTime)), paperId, chapterId:(category && category!=='lectures')?itemId:null, category, itemLabel, hours,
       startTime:new Date(startTime).toISOString(), endTime:nowISO(), source: wasStrictCountdown?'strict-countdown':'timer'});
   }
-  S.shared.timerState[me] = blankTimerState();
-  driveSyncSaveNow();
+  S.shared.timerState[me] = stoppedTimerState();
+  driveSyncSaveTimerChange();
   renderApp();
   if(wasStrictCountdown) celebrateMilestone(`Strict Countdown complete — ${fmtHMS(countdownTargetMs/1000)} done!`);
   // A real, focused session on a specific item just happened — offer to mark it done rather
@@ -10243,8 +10312,8 @@ function timerDiscard(){
   stopTimerTick();
   clearTimerNotification();
   if(S.fullscreenTimerOpen) closeFullscreenTimer();
-  S.shared.timerState[me] = blankTimerState();
-  driveSyncSaveNow(); renderApp();
+  S.shared.timerState[me] = stoppedTimerState();
+  driveSyncSaveTimerChange(); renderApp();
 }
 // ═══════════════════════════════════════════════════════════
 // STRICT COUNTDOWN — a general (no specific paper/chapter) timed session with the "no-quit"
@@ -10282,8 +10351,8 @@ function abortStrictCountdown(){
   stopTimerTick();
   clearTimerNotification();
   if(S.fullscreenTimerOpen) closeFullscreenTimer();
-  S.shared.timerState[me] = blankTimerState();
-  driveSyncSaveNow(); renderApp();
+  S.shared.timerState[me] = stoppedTimerState();
+  driveSyncSaveTimerChange(); renderApp();
 }
 // Local (not the SW-based persistent) notification — a one-shot nag, not a status display,
 // so it doesn't need showNotification()'s replace-in-place semantics via the SW. Only fires
@@ -10372,6 +10441,8 @@ function startTimerTick(){
       // rendered them together; keeping them distinct costs nothing and avoids that footgun.
       const hEl = document.getElementById('home-other-timer-elapsed-display');
       if(hEl) hEl.textContent = fmtHMS(computeElapsedSeconds(otherInfo.ls)) + ' so far';
+    } else if(document.getElementById('other-timer-elapsed-display') || document.getElementById('home-other-timer-elapsed-display')){
+      renderApp(); // a live card is still on screen but the session is no longer live -- redraw instead of leaving a frozen clock
     }
     // Head-to-Head's "Today's Hours" comes from todayHoursLive() (logged total + whatever's
     // currently running), so it needs the same per-second patching — otherwise it'd only
@@ -10502,14 +10573,31 @@ function scrollToTimerCard(){
 function mostRecentLogEnd(profileId){
   return logsFor(profileId).filter(l=>l.endTime).reduce((latest,l)=> (!latest || l.endTime>latest.endTime) ? l : latest, null);
 }
+// ── v122: keeping the partner's running timer visible ────────────────────────────────────────────────
+// The old rule ("no heartbeat for 4 min => not studying") could never work for the main real-world case: the person
+// studying locks their phone, the browser freezes the page, heartbeats stop, and a few minutes later the OTHER phone
+// decided the session was over -- the live card vanished (or froze) and only the finished log showed up at Stop.
+// A running session is now live until its owner actually stops it (Stop/Discard writes an explicit 'stopped' state
+// that wins the merge). The clock is computed from startTime, not from the heartbeat, so it keeps ticking while the
+// owner's phone is locked.
+// Visible to the partner for exactly as long as the owner's timer is running -- no silence timeout, no countdown cut-off. The
+// only guard left is an absurd-length sanity cap so a session that was somehow never stopped can't show forever.
+const TIMER_MAX_SESSION_MS = 24*60*60*1000;
+function timerStateIsLive(ts){
+  if(!ts || !ts.startTime) return false;
+  return (Date.now() - ts.startTime) <= TIMER_MAX_SESSION_MS;
+}
+// The state a finished/discarded session leaves behind. Unlike blankTimerState() it carries a fresh lastHeartbeat, which
+// is what lets the partner's device recognise it as NEWER than the running state it last saw (a null stamp lost that
+// comparison, so the "stopped" update was ignored and a ghost running session lingered or got re-uploaded).
+function stoppedTimerState(){ const t = blankTimerState(); t.lastHeartbeat = Date.now(); return t; }
 function otherLiveStatusInfo(otherId){
   const ts = S.shared.timerState && S.shared.timerState[otherId];
-  const isLive = !!(ts && ts.startTime);
-  const staleMs = isLive ? Date.now() - (ts.lastHeartbeat||ts.startTime) : Infinity;
-  // >4 min since their device last heartbeat-updated this — likely crashed/closed without
+  const isLive = timerStateIsLive(ts);
+    // >4 min since their device last heartbeat-updated this — likely crashed/closed without
   // properly stopping, so treat it the same as not currently studying rather than trusting
   // a session that may not actually still be running.
-  if(isLive && staleMs <= 4*60*1000){
+  if(isLive){
     const paper = ts.paperId ? paperById(ts.paperId) : null;
     const focus = [paper?paper.code:null, ts.category?TIMER_CATEGORY_LABELS[ts.category]:null, ts.itemLabel].filter(Boolean).join(' — ');
     if(ts.status==='break') return {state:'break', text:`On a break${ts.breakReason?' · '+ts.breakReason:''}`, focus, ls:ts};
@@ -10970,7 +11058,7 @@ function homePaperGridHtml(profileId){
     return `<button onclick="openWorkspaceFor('${profileId}','${p.id}')"
       style="
         display:flex;flex-direction:column;align-items:center;justify-content:center;
-        gap:10px;aspect-ratio:1;border-radius:18px;padding:16px 8px;
+        gap:9px;min-width:0;border-radius:18px;padding:14px 6px;
         background:${tBg};border:1.5px solid ${tBdr};
         box-shadow:0 2px 14px rgba(0,0,0,.07);
         cursor:pointer;-webkit-tap-highlight-color:transparent;
@@ -10982,7 +11070,9 @@ function homePaperGridHtml(profileId){
       <div style="font-size:12.5px;font-weight:800;color:var(--text);letter-spacing:-.01em;line-height:1">${p.nick}</div>
     </button>`;
   });
-  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:6px">${cards.join('')}</div>`;
+  // v122: was repeat(3,1fr) + aspect-ratio:1 -- the square's min width came from its own content height (~125px), so three
+  // columns needed ~403px inside a 368px page and the whole Home page could be dragged sideways on a 400px phone.
+  return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:6px">${cards.join('')}</div>`;
 }
 function viewHome(){
   const vp = S.viewingProfile;
@@ -16037,7 +16127,8 @@ async function performDriveSave(){
         const migratedRemote = migrateShared(remote); // same shape S.shared expects — see doSync()/initAfterLogin()
         const chatChanged = mergeChatFromRemote(migratedRemote);
         if(chatChanged && S.view==='chat' && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly();
-        refreshOtherProfileDataFromRemote(migratedRemote);
+        const timerChanged = refreshOtherProfileDataFromRemote(migratedRemote);
+        if(timerChanged) onPartnerTimerChanged(); // this merge used to be silent, so the next poll saw 'nothing new' and never redrew
       }
     } catch(e){ console.warn('Pre-save refresh failed, proceeding with local copy:', e); }
     await yieldToMain();
@@ -16579,6 +16670,7 @@ if('serviceWorker' in navigator){
       // A push just arrived — poll chat immediately so the other person's message
       // appears without waiting for the next 3-second polling tick.
       if(typeof pollChatUpdates === 'function') pollChatUpdates();
+      refreshPartnerTimerSoon(); // 'X started studying' is a timer push -- fetch their live state now, not at the next 30s poll
     }
   });
 }
