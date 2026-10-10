@@ -152,7 +152,8 @@
 // on their own and link to the right Timer page; partner KPI card added; partner log changes now redraw; study-day rollover redraw.
 // v124: Home motivation rebuilt from scratch -- one partner-voice, uplifting message per profile per study day (no more hold-to-refresh),
 // real-numbers context + anti-repeat history, warm offline fallback with quiet AI retries, 'dailyQuote' now single-owner synced, regenerates at 5 AM rollover.
-const CACHE_VERSION = 'olympus-v124';
+// v125: motivation card simplified -- removed the sparkle icon and the "For <name> · <weekday>" line; just the message.
+const CACHE_VERSION = 'olympus-v125';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
