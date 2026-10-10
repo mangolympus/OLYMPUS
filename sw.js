@@ -147,7 +147,10 @@
 // v121: 5 AM study-day audit -- exam countdown, this-month lecture count, planner calendar default month, habit start dates, Money invoice month keys, backup filename.
 // v122: partner live-timer visibility -- stays visible until the owner stops it, explicit stop signal, push-triggered refresh,
 // verified timer saves (re-writes if the partner's upload clobbered it).
-const CACHE_VERSION = 'olympus-v122';
+// v123: today's hours / KPIs / Head-to-Head / Home target + weekly bars + comparison / trends / sessions list all read ONE live-aware
+// source (logs + the running session, for both profiles) and tick every second; Home timer cards (own + partner) are live, appear/disappear
+// on their own and link to the right Timer page; partner KPI card added; partner log changes now redraw; study-day rollover redraw.
+const CACHE_VERSION = 'olympus-v123';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

@@ -1604,6 +1604,23 @@ button, a, .btn, .ptab, .icon-btn, .bottomnav button, .profile-pill button,
 }
 .profile-pill button.on-umang,
 .profile-pill button.on-chetna{ color:#fff !important; }
+/* v123: on a phone <=420px wide the header (logo + search + refresh + sync badge + profile pill) was a few px wider than the
+   screen, so the right-hand name in the Mangu | Chinnu pill got clipped. Slightly tighter gaps/padding fix it with no layout change. */
+@media (max-width:420px){
+  .header-actions{ gap:5px; }
+  .profile-pill button{ padding:6px 10px; }
+}
+/* On the narrowest phones the sync badge keeps its icon (tap it on error for the reason, hover/title for the status) and drops the
+   word, which is what frees the room for the whole Mangu | Chinnu pill to fit on screen. */
+@media (max-width:400px){
+  .sync-badge .sync-label{ display:none; }
+  .sync-badge{ padding:3px 7px; gap:0; }
+  .header-actions .icon-btn{ width:30px; height:30px; }
+  .brand{ gap:8px; }
+}
+@media (max-width:380px){
+  .profile-pill button{ padding:6px 8px; }
+}
 
 /* ── 12. CARD ARCHITECTURE — card-header / card-body / card-footer shells ─── */
 .card-header{
@@ -3589,17 +3606,67 @@ function hoursOnDate(profileId, dateStr){
   const total = logsFor(profileId).filter(l=>l.date===dateStr).reduce((s,l)=>s+Number(l.hours||0),0);
   return Number.isFinite(total) ? total : 0;
 }
-// Today's logged hours plus whatever's currently ticking on an active, not-yet-stopped
-// session — a running session only gets written to logs (and so counted by hoursOnDate)
-// once it's actually stopped, so without this, Head-to-Head would show a flat 0 (or
-// yesterday's already-logged total) for whoever's mid-session right now, only updating
-// once they hit Stop. Same 4-minute staleness window as otherLiveStatusInfo, so a
-// crashed/never-stopped session doesn't inflate this forever.
-function todayHoursLive(profileId){
-  const logged = hoursOnDate(profileId, todayStr());
+// ═══ v123: ONE live-aware source of truth for hours / sessions / streak ═══════════════════════════════════════
+// A running session is only written to the logs when its owner presses Stop, so any figure built from logs alone
+// lags behind the clock the owner is looking at. Every DISPLAYED "today / this week / sessions / streak" figure
+// (Timer KPIs, Head-to-Head, Home target + weekly bars + comparison, trends, statistics) goes through the helpers
+// below: logs PLUS the running session, filed under the study day it STARTED (the exact day timerStop() will log it
+// to) and counted by the exact rule timerStop() uses (strict countdown = capped at its target; break time only when
+// the owner's countBreakTime pref is on). So a figure is identical a moment before and after Stop -- no jump, no
+// double count. hoursOnDate()/hoursInRange()/streak() stay logged-only ON PURPOSE: achievements, habit
+// auto-completion and the stop path itself must never count an unfinished session.
+let _frameNow = 0; // one instant shared by everything computed in a single render / tick pass, so no two figures disagree by a second
+function withFrame(fn){
+  const outer = _frameNow;
+  if(!outer) _frameNow = Date.now();
+  try{ return fn(); } finally{ if(!outer) _frameNow = 0; }
+}
+let _timerStopping = false; // true only while timerStop() writes the log, so the finished session is never counted twice
+function liveSessionHours(ts, profileId){
+  if(ts.countdownTargetMs>0) return Math.min(computeElapsedSeconds(ts), ts.countdownTargetMs/1000)/3600;
+  const prefs = (S.shared.prefs && S.shared.prefs[profileId]) || {};
+  const secs = prefs.countBreakTime ? Math.max(0, ((_frameNow || Date.now()) - ts.startTime)/1000) : computeElapsedSeconds(ts);
+  return secs/3600;
+}
+function liveSessionInfo(profileId){
+  if(!profileId) return null;
+  if(_timerStopping && profileId===(S.local && S.local.myProfile)) return null;
   const ts = S.shared.timerState && S.shared.timerState[profileId];
-  if(timerStateIsLive(ts)) return logged + computeElapsedSeconds(ts)/3600;
-  return logged;
+  if(!timerStateIsLive(ts)) return null;
+  // Already filed as a log (a stop whose log reached this phone before its timer state): never count it twice.
+  const startIso = new Date(ts.startTime).toISOString();
+  if(((S.shared.logs && S.shared.logs[profileId]) || []).some(l=>l.startTime===startIso)) return null;
+  return {ts, date: todayStr(new Date(ts.startTime)), hours: liveSessionHours(ts, profileId), paperId: ts.paperId||null, category: ts.category||null};
+}
+function liveHoursOnDate(profileId, dateStr){
+  const base = hoursOnDate(profileId, dateStr);
+  const L = liveSessionInfo(profileId);
+  return (L && L.date===dateStr) ? base + L.hours : base;
+}
+function todayHoursLive(profileId){ return liveHoursOnDate(profileId, todayStr()); }
+function liveHoursInRange(profileId, days){
+  const base = hoursInRange(profileId, days);
+  const L = liveSessionInfo(profileId);
+  if(!L) return base;
+  const cutoff = new Date(todayStr()+'T00:00:00'); cutoff.setDate(cutoff.getDate()-(days-1));
+  return (L.date >= localDateStr(cutoff) && L.date <= todayStr()) ? base + L.hours : base;
+}
+function liveTotalHours(profileId){
+  const L = liveSessionInfo(profileId);
+  return totalHours(profileId) + (L ? L.hours : 0);
+}
+function liveSessionsOnDate(profileId, dateStr){
+  const n = ((S.shared.logs && S.shared.logs[profileId]) || []).filter(l=>l.date===dateStr).length;
+  const L = liveSessionInfo(profileId);
+  return n + ((L && L.date===dateStr) ? 1 : 0);
+}
+function liveStreak(profileId){
+  const dates = new Set(logsFor(profileId).map(l=>l.date));
+  const L = liveSessionInfo(profileId);
+  if(L) dates.add(L.date);
+  let n=0; let d = new Date(todayStr()+'T00:00:00');
+  while(dates.has(localDateStr(d))){ n++; d.setDate(d.getDate()-1); }
+  return n;
 }
 function totalHours(profileId){ return logsFor(profileId).reduce((s,l)=>s+Number(l.hours||0),0); }
 function streak(profileId){
@@ -3922,8 +3989,11 @@ function setViewingProfile(id){
   renderNav(); renderApp();
 }
 
-function renderApp(){
+let _renderedStudyDay = ''; // the study day the screen was last drawn for (see the rollover check below)
+function renderApp(){ return withFrame(_renderAppImpl); } // one shared "now" for every number drawn in this pass
+function _renderAppImpl(){
   const root = document.getElementById('app-root');
+  _renderedStudyDay = todayStr();
   applyTheme();
   if(S.view==='home') root.innerHTML = viewHome();
   else if(S.view==='timer') root.innerHTML = viewTimerPage();
@@ -3970,7 +4040,24 @@ function renderApp(){
   // buttons and status text would remain stale — still showing "Pause" after a pause from a
   // notification tap, for example — until the user exited and re-entered fullscreen.
   if(S.fullscreenTimerOpen && typeof renderFullscreenTimer === 'function') renderFullscreenTimer();
+  ensureTimerTickIfLive();
 }
+// v123: whatever redraws the screen (poll, push, visibility, navigation), a live session on either phone must have the
+// 1s tick running -- before, only certain cards started it, so e.g. a reload straight onto Home left the clocks frozen.
+function ensureTimerTickIfLive(){
+  const me = S.local && S.local.myProfile;
+  if(!me || !S.shared || !S.shared.timerState) return;
+  const mine = S.shared.timerState[me];
+  const theirs = S.shared.timerState[otherProfileId(me)];
+  const strict = !!(mine && mine.countdownTargetMs>0 && timerStateIsLive(mine));
+  if(strict || ((S.view==='home' || S.view==='timer') && (timerStateIsLive(mine) || timerStateIsLive(theirs)))) startTimerTick();
+}
+// The study day changes at 5 AM. A screen left open across it (nothing live, so no tick) redraws itself on the new day.
+function renderIfStudyDayChanged(){
+  if(!(S.appSession && S.local && S.local.myProfile)) return;
+  if(_renderedStudyDay && todayStr() !== _renderedStudyDay && ['home','timer','planner'].includes(S.view)) renderApp();
+}
+setInterval(()=>{ if(!document.hidden) renderIfStudyDayChanged(); }, 20000);
 function openWorkspace(paperId, tab){
   if(!confirmLeaveTest()) return;
   S.workspacePaper = paperId; S.workspaceTab = tab||'chapters'; S.view='workspace'; S.practice=null;
@@ -8625,7 +8712,7 @@ document.addEventListener('visibilitychange', ()=>{
   // Leaving: send one last "still going" stamp before the browser freezes the page. Returning: send a fresh one
   // and pull the partner's latest straight away.
   pushOwnHeartbeat(document.hidden);
-  if(!document.hidden) refreshPartnerTimerSoon([0, 4000]);
+  if(!document.hidden){ refreshPartnerTimerSoon([0, 4000]); renderIfStudyDayChanged(); }
 });
 function chatStatusInfo(otherId){
   const chat = S.shared.chat;
@@ -8676,13 +8763,24 @@ function refreshOtherProfileDataFromRemote(freshRemote){
   const me = S.local.myProfile;
   if(!me || !freshRemote) return;
   const other = otherProfileId(me);
+  // v123: tell the caller whether the partner's LOGGED hours / target changed, not just their timer -- otherwise a finished
+  // session (or a manual log) on their phone updated the data silently and the screen kept showing the old totals until
+  // the next unrelated redraw.
+  const slice = ()=>{
+    const L = (S.shared.logs && S.shared.logs[other]) || [];
+    let h = 0, c = 0;
+    for(const l of L){ h += Number(l.hours||0); c = (c*31 + (l.date ? l.date.charCodeAt(9)*7 + l.date.charCodeAt(8) : 0)) | 0; }
+    return L.length+':'+h.toFixed(4)+':'+c+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other]]);
+  };
+  const before = slice();
   SINGLE_OWNER_SHARED_KEYS.forEach(key=>{
     if(freshRemote[key] && freshRemote[key][other] !== undefined){
       if(!S.shared[key]) S.shared[key] = {};
       S.shared[key][other] = freshRemote[key][other];
     }
   });
-  return mergeTimerStateFromRemote(freshRemote); // separate, timestamp-guarded merge — see its own comment above
+  const timerChanged = mergeTimerStateFromRemote(freshRemote); // separate, timestamp-guarded merge — see its own comment above
+  return timerChanged || before !== slice();
 }
 function mergeChatFromRemote(remoteShared){
   if(!remoteShared || !remoteShared.chat) return false;
@@ -10057,7 +10155,7 @@ function computeNotifications(profileId){
   }
   if(prefs.dailyTarget){
     const target = effectiveTodayTarget(profileId);
-    const done = hoursOnDate(profileId, todayStr());
+    const done = todayHoursLive(profileId); // v123: counts a session that is running right now
     const hour = new Date().getHours();
     // Evening OR the 12 AM–5 AM tail end of the study day (still "today" under the 5 AM
     // boundary) — otherwise this nudge would go silent for exactly the hours when the
@@ -10178,7 +10276,7 @@ function myLiveStatus(){
 }
 function computeElapsedSeconds(ts){
   if(!ts || !ts.startTime) return 0;
-  const now = Date.now();
+  const now = _frameNow || Date.now();
   let breakMs = ts.accumulatedBreakMs||0;
   if(ts.status==='break' && ts.lastBreakStart) breakMs += now-ts.lastBreakStart;
   return Math.max(0, (now-ts.startTime)/1000 - breakMs/1000);
@@ -10186,7 +10284,7 @@ function computeElapsedSeconds(ts){
 function computeBreakSeconds(ts){
   if(!ts) return 0;
   let ms = ts.accumulatedBreakMs||0;
-  if(ts.status==='break' && ts.lastBreakStart) ms += Date.now()-ts.lastBreakStart;
+  if(ts.status==='break' && ts.lastBreakStart) ms += (_frameNow || Date.now())-ts.lastBreakStart;
   return Math.max(0, ms/1000);
 }
 function fmtHMS(totalSeconds){
@@ -10271,8 +10369,11 @@ function timerStop(){
     // it happened to be stopped. Logged entries keep ISO-string start/end times regardless
     // of the epoch-ms timerState format — that's the permanent record's own established
     // shape (see todaysSessionsSection/fmtMsgTime), unrelated to this rewrite.
-    addLogEntry(me, {date:todayStr(new Date(startTime)), paperId, chapterId:(category && category!=='lectures')?itemId:null, category, itemLabel, hours,
-      startTime:new Date(startTime).toISOString(), endTime:nowISO(), source: wasStrictCountdown?'strict-countdown':'timer'});
+    _timerStopping = true; // v123: while the log is being written, the session must not ALSO be counted as the live one
+    try{
+      addLogEntry(me, {date:todayStr(new Date(startTime)), paperId, chapterId:(category && category!=='lectures')?itemId:null, category, itemLabel, hours,
+        startTime:new Date(startTime).toISOString(), endTime:nowISO(), source: wasStrictCountdown?'strict-countdown':'timer'});
+    } finally { _timerStopping = false; }
   }
   S.shared.timerState[me] = stoppedTimerState();
   driveSyncSaveTimerChange();
@@ -10371,6 +10472,55 @@ function fireStrictCountdownNag(){
     });
   }catch(e){ console.warn('Nag notification failed:', e); }
 }
+// ═══ v123: live regions ═══════════════════════════════════════════════════════════════════════════════════════
+// Anything that must follow a running session (or the partner's phone) is drawn through liveRegion(name, arg): the
+// builder produces the HTML, the first render embeds it in a display:contents wrapper, and the 1s tick re-runs the
+// SAME builder. If the structure is unchanged only elements marked data-live-tick="..." get their text replaced
+// in place (so taps are never swallowed by a re-created node); if the structure changed (partner started / stopped,
+// a bar crossed a rounding step, a session was logged) the region is rebuilt. One builder per figure = the Timer page,
+// Home, Head-to-Head and the cards can never show different numbers. Tick text must contain no markup/entities.
+function liveHash(s){ let h = 5381; for(let i=0;i<s.length;i++) h = ((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36); }
+const LIVE_BUILDERS = {
+  kpi:         pid => todaysKpiSection(pid),
+  h2h:         ()  => timerComparisonBlockSafe(),
+  sessions:    pid => todaysSessionsSection(pid),
+  trend:       ()  => timerTrendSection(),
+  partnerRow:  pid => timerPartnerRowHtml(pid),
+  partnerCard: pid => timerPartnerCardHtml(pid),
+  homeLive:    pid => homeLiveCardHtml(pid),
+  homeTarget:  pid => homeTargetInnerHtml(pid),
+  homeWeek:    pid => homeWeekInnerHtml(pid),
+  cmp:         key => homeCmpRow(key),
+};
+const _liveLast = {};
+let _ptrDownAt = 0; // a finger/mouse is mid-press: don't swap nodes under it (the click would be lost)
+document.addEventListener('pointerdown', ()=>{ _ptrDownAt = Date.now(); }, true);
+['pointerup','pointercancel'].forEach(ev=> document.addEventListener(ev, ()=>{ _ptrDownAt = 0; }, true));
+function liveSkeleton(html){ return html.replace(/(data-live-tick="[^"]*"[^>]*>)[^<]*/g, '$1'); }
+function liveRegion(name, arg){
+  arg = (arg==null) ? '' : String(arg);
+  let html = '';
+  try{ html = LIVE_BUILDERS[name](arg) || ''; }catch(e){ console.warn('live region failed:', name, e); }
+  _liveLast[name+'|'+arg] = liveSkeleton(html);
+  return `<div data-live-region="${name}" data-live-arg="${arg}" style="display:contents">${html}</div>`;
+}
+function patchLiveRegions(){
+  const nodes = document.querySelectorAll('[data-live-region]');
+  if(!nodes.length) return;
+  const pressing = _ptrDownAt && (Date.now()-_ptrDownAt) < 1500;
+  nodes.forEach(el=>{
+    const name = el.getAttribute('data-live-region'), arg = el.getAttribute('data-live-arg') || '';
+    const fn = LIVE_BUILDERS[name]; if(!fn) return;
+    let html; try{ html = fn(arg) || ''; }catch(e){ return; }
+    const key = name+'|'+arg, skel = liveSkeleton(html);
+    if(_liveLast[key] !== skel && !pressing){ el.innerHTML = html; _liveLast[key] = skel; return; }
+    const re = /data-live-tick="([^"]*)"[^>]*>([^<]*)/g; let m;
+    while((m = re.exec(html))){
+      const t = el.querySelector('[data-live-tick="'+m[1]+'"]');
+      if(t && t.textContent !== m[2]) t.textContent = m[2];
+    }
+  });
+}
 let _lastCountdownNagTime = 0;
 let _timerTickInterval = null;
 function startTimerTick(){
@@ -10381,98 +10531,59 @@ function startTimerTick(){
   // one is running, later calls are no-ops; it keeps ticking steadily until it stops itself
   // below (navigated away, or genuinely nothing left to tick).
   if(_timerTickInterval) return;
-  _timerTickInterval = setInterval(()=>{
-    const me = S.local.myProfile;
-    const myCountdownActive = me && S.shared.timerState && S.shared.timerState[me] && S.shared.timerState[me].countdownTargetMs>0 && S.shared.timerState[me].status!=='idle';
-    // Also runs on Home now (see partnerHomeStatusCard()) — Home shows the partner's live
-    // "studying now" card and needs the same per-second patching, not just the Timer page.
-    // A live Strict Countdown is the one exception that must keep ticking on ANY page — its
-    // auto-completion and break-nag can't depend on the Timer tab staying open.
-    // Stop ticking on pages that have no timer DOM elements to update. 'chat' and 'money'
-    // were previously missing from this list, so the interval kept firing every second
-    // for the duration of a chat session even though nothing was being updated.
-    // Strict Countdown bypasses this via myCountdownActive so completion/nag still fire.
-    const TIMER_VIEWS = new Set(['timer', 'home']);
-    if(!TIMER_VIEWS.has(S.view) && !myCountdownActive){ stopTimerTick(); return; }
-    let anyActive = false;
-    const ts = myLiveStatus();
-    if(ts.startTime){
-      anyActive = true;
-      const isCountdown = ts.countdownTargetMs>0;
-      const displayText = isCountdown
-        ? '-'+fmtHMS(Math.max(0, ts.countdownTargetMs/1000 - computeElapsedSeconds(ts)))
-        : fmtHMS(computeElapsedSeconds(ts));
-      const el = document.getElementById('timer-elapsed-display');
-      if(el) el.textContent = displayText;
-      const bEl = document.getElementById('timer-break-display');
-      if(bEl) bEl.textContent = fmtHMS(computeBreakSeconds(ts));
-      const sEl = document.getElementById('timer-studied-so-far');
-      if(sEl) sEl.textContent = fmtHMS(computeElapsedSeconds(ts));
-      // Fullscreen overlay mirror — patch the live clock without touching innerHTML.
-      // During a break on a regular timer the main displayText is study elapsed, but the
-      // FS overlay shows break time as the primary clock (study elapsed goes to #fs-break-sub)
-      // — so we need the break-specific formula here too, matching renderFullscreenTimer().
-      const fsEl = document.getElementById('fs-time-display');
-      if(fsEl) fsEl.textContent = (ts.status==='break' && !isCountdown) ? fmtHMS(computeBreakSeconds(ts)) : displayText;
-      // "STUDY SO FAR" sub-line only exists in the DOM while on break (rendered by renderFullscreenTimer).
-      const fsSubEl = document.getElementById('fs-break-sub');
-      if(fsSubEl) fsSubEl.textContent = 'STUDY SO FAR: '+fmtHMS(computeElapsedSeconds(ts));
+  _timerTickInterval = setInterval(()=> withFrame(timerTickBody), 1000);
+}
+function timerTickBody(){
+  const me = S.local.myProfile;
+  const myCountdownActive = me && S.shared.timerState && S.shared.timerState[me] && S.shared.timerState[me].countdownTargetMs>0 && S.shared.timerState[me].status!=='idle';
+  // Runs on Timer AND Home (both show live timers + live hours). A live Strict Countdown is the one exception that
+  // must keep ticking on ANY page — its auto-completion and break-nag can't depend on the Timer tab staying open.
+  // 'chat' and 'money' etc. have nothing to update, so the interval stops there.
+  const TIMER_VIEWS = new Set(['timer', 'home']);
+  if(!TIMER_VIEWS.has(S.view) && !myCountdownActive){ stopTimerTick(); return; }
+  // The study day rolls over at 5 AM; a screen left open across it must redraw so "today" is the new day.
+  if(_renderedStudyDay && todayStr()!==_renderedStudyDay) renderApp();
+  let anyActive = false;
+  const ts = myLiveStatus();
+  if(ts.startTime){
+    anyActive = true;
+    const isCountdown = ts.countdownTargetMs>0;
+    const displayText = isCountdown
+      ? '-'+fmtHMS(Math.max(0, ts.countdownTargetMs/1000 - computeElapsedSeconds(ts)))
+      : fmtHMS(computeElapsedSeconds(ts));
+    const el = document.getElementById('timer-elapsed-display');
+    if(el) el.textContent = displayText;
+    const bEl = document.getElementById('timer-break-display');
+    if(bEl) bEl.textContent = fmtHMS(computeBreakSeconds(ts));
+    const sEl = document.getElementById('timer-studied-so-far');
+    if(sEl) sEl.textContent = fmtHMS(computeElapsedSeconds(ts));
+    // Fullscreen overlay mirror — patch the live clock without touching innerHTML.
+    // During a break on a regular timer the main displayText is study elapsed, but the
+    // FS overlay shows break time as the primary clock (study elapsed goes to #fs-break-sub)
+    // — so we need the break-specific formula here too, matching renderFullscreenTimer().
+    const fsEl = document.getElementById('fs-time-display');
+    if(fsEl) fsEl.textContent = (ts.status==='break' && !isCountdown) ? fmtHMS(computeBreakSeconds(ts)) : displayText;
+    // "STUDY SO FAR" sub-line only exists in the DOM while on break (rendered by renderFullscreenTimer).
+    const fsSubEl = document.getElementById('fs-break-sub');
+    if(fsSubEl) fsSubEl.textContent = 'STUDY SO FAR: '+fmtHMS(computeElapsedSeconds(ts));
 
-      if(isCountdown){
-        if(ts.status==='running' && computeElapsedSeconds(ts) >= ts.countdownTargetMs/1000){
-          timerStop(); // auto-completion — logs the target duration and fires the celebration
-        } else if(ts.status==='break'){
-          const since = Date.now() - Math.max(ts.lastBreakStart||0, _lastCountdownNagTime);
-          if(since >= 5*60*1000){ _lastCountdownNagTime = Date.now(); fireStrictCountdownNag(); }
-        }
+    if(isCountdown){
+      if(ts.status==='running' && computeElapsedSeconds(ts) >= ts.countdownTargetMs/1000){
+        timerStop(); // auto-completion — logs the target duration and fires the celebration
+      } else if(ts.status==='break'){
+        const since = Date.now() - Math.max(ts.lastBreakStart||0, _lastCountdownNagTime);
+        if(since >= 5*60*1000){ _lastCountdownNagTime = Date.now(); fireStrictCountdownNag(); }
       }
     }
-    // Also tick the OTHER profile's live elapsed display, if their session is currently
-    // running and visible on screen — same interval, so both people's clocks stay in sync
-    // without a second timer running.
-    const other = me ? otherProfileId(me) : null;
-    const otherInfo = other ? otherLiveStatusInfo(other) : null;
-    if(otherInfo && (otherInfo.state==='studying' || otherInfo.state==='break')){
-      anyActive = true;
-      const oEl = document.getElementById('other-timer-elapsed-display');
-      if(oEl) oEl.textContent = fmtHMS(computeElapsedSeconds(otherInfo.ls));
-      // Home's own partner-status card (see partnerHomeStatusCard()) — separate id from the
-      // Timer page's, since both could theoretically exist in the DOM if a future change ever
-      // rendered them together; keeping them distinct costs nothing and avoids that footgun.
-      const hEl = document.getElementById('home-other-timer-elapsed-display');
-      if(hEl) hEl.textContent = fmtHMS(computeElapsedSeconds(otherInfo.ls)) + ' so far';
-    } else if(document.getElementById('other-timer-elapsed-display') || document.getElementById('home-other-timer-elapsed-display')){
-      renderApp(); // a live card is still on screen but the session is no longer live -- redraw instead of leaving a frozen clock
-    }
-    // Head-to-Head's "Today's Hours" comes from todayHoursLive() (logged total + whatever's
-    // currently running), so it needs the same per-second patching — otherwise it'd only
-    // ever refresh on the next full re-render instead of ticking live like the rest of this
-    // page now does.
-    if(anyActive){
-      const compCard = document.getElementById('timer-comparison-card');
-      if(compCard){
-        const pA = PROFILES[0], pB = PROFILES[1];
-        const liveA = todayHoursLive(pA.id), liveB = todayHoursLive(pB.id);
-        const heroA = document.getElementById('comp-hero-'+pA.id);
-        if(heroA) heroA.textContent = formatHoursAsHM(liveA);
-        const heroB = document.getElementById('comp-hero-'+pB.id);
-        if(heroB) heroB.textContent = formatHoursAsHM(liveB);
-        const row = document.getElementById('comp-metric-today');
-        if(row){
-          const va = row.querySelector('[data-va]'), vb = row.querySelector('[data-vb]');
-          const barA = row.querySelector('[data-bar-a]'), barB = row.querySelector('[data-bar-b]');
-          const aWins = liveA>liveB, bWins = liveB>liveA;
-          if(va){ va.textContent = formatHoursAsHM(liveA); va.style.fontWeight = aWins?'800':'400'; va.style.color = aWins?'var(--umang)':'var(--text)'; }
-          if(vb){ vb.textContent = formatHoursAsHM(liveB); vb.style.fontWeight = bWins?'800':'400'; vb.style.color = bWins?'var(--chetna)':'var(--text)'; }
-          const max = Math.max(1, liveA, liveB);
-          const wA = Math.round(liveA/max*100), wB = Math.round(liveB/max*100);
-          if(barA){ barA.style.width = Math.round(wA/2)+'%'; barA.style.marginLeft = (50-Math.round(wA/2))+'%'; }
-          if(barB){ barB.style.width = Math.round(wB/2)+'%'; }
-        }
-      }
-    }
-    if(!anyActive) stopTimerTick();
-  }, 1000);
+  }
+  // The partner's live session keeps the loop alive too (their clock is computed from THEIR startTime, not heartbeats).
+  const other = me ? otherProfileId(me) : null;
+  if(other && timerStateIsLive(S.shared.timerState && S.shared.timerState[other])) anyActive = true;
+  // v123: every live figure on screen — partner/own cards, today's hours, KPIs, Head-to-Head, Home target/bars/comparison,
+  // sessions list, trends — is a "live region" rebuilt from the SAME helpers the full render uses (see liveRegion()).
+  // Run it BEFORE the stop check below so a session that just ended is drawn as ended, not left frozen.
+  patchLiveRegions();
+  if(!anyActive) stopTimerTick();
 }
 function stopTimerTick(){ if(_timerTickInterval){ clearInterval(_timerTickInterval); _timerTickInterval=null; } }
 
@@ -10591,21 +10702,72 @@ function timerStateIsLive(ts){
 // is what lets the partner's device recognise it as NEWER than the running state it last saw (a null stamp lost that
 // comparison, so the "stopped" update was ignored and a ghost running session lingered or got re-uploaded).
 function stoppedTimerState(){ const t = blankTimerState(); t.lastHeartbeat = Date.now(); return t; }
+// Is this profile's session live right now? (null = no.) One definition for every card on every page.
+function liveCardInfo(profileId){
+  const ts = S.shared.timerState && S.shared.timerState[profileId];
+  if(!timerStateIsLive(ts)) return null;
+  const paper = ts.paperId ? paperById(ts.paperId) : null;
+  const focus = ts.countdownTargetMs>0
+    ? 'Strict Countdown'
+    : [paper?paper.code:null, ts.category?TIMER_CATEGORY_LABELS[ts.category]:null, ts.itemLabel].filter(Boolean).join(' — ');
+  return {state: ts.status==='break' ? 'break' : 'studying', ts, focus};
+}
+// The big clock text for a live session: study elapsed, or the remaining time for a Strict Countdown.
+function liveClockText(ts){
+  if(ts.countdownTargetMs>0) return '-'+fmtHMS(Math.max(0, ts.countdownTargetMs/1000 - computeElapsedSeconds(ts)));
+  return fmtHMS(computeElapsedSeconds(ts));
+}
 function otherLiveStatusInfo(otherId){
-  const ts = S.shared.timerState && S.shared.timerState[otherId];
-  const isLive = timerStateIsLive(ts);
-    // >4 min since their device last heartbeat-updated this — likely crashed/closed without
-  // properly stopping, so treat it the same as not currently studying rather than trusting
-  // a session that may not actually still be running.
-  if(isLive){
-    const paper = ts.paperId ? paperById(ts.paperId) : null;
-    const focus = [paper?paper.code:null, ts.category?TIMER_CATEGORY_LABELS[ts.category]:null, ts.itemLabel].filter(Boolean).join(' — ');
-    if(ts.status==='break') return {state:'break', text:`On a break${ts.breakReason?' · '+ts.breakReason:''}`, focus, ls:ts};
-    return {state:'studying', text:`Studying now${focus?' — '+focus:''}`, focus, ls:ts};
+  const c = liveCardInfo(otherId);
+  if(c){
+    if(c.state==='break') return {state:'break', text:`On a break${c.ts.breakReason?' · '+c.ts.breakReason:''}`, focus:c.focus, ls:c.ts};
+    return {state:'studying', text:`Studying now${c.focus?' — '+c.focus:''}`, focus:c.focus, ls:c.ts};
   }
   const last = mostRecentLogEnd(otherId);
   if(last) return {state:'idle', text:`Last session ended at ${fmtMsgTime(last.endTime)}`};
   return {state:'idle', text:'No sessions logged yet'};
+}
+// Partner row at the bottom of YOUR Timer card (live region 'partnerRow').
+function timerPartnerRowHtml(pid){
+  const otherProf = profileById(pid);
+  if(!otherProf) return '';
+  const otherInfo = otherLiveStatusInfo(pid);
+  const live = otherInfo.state==='studying' || otherInfo.state==='break';
+  if(live) startTimerTick();
+  return `<div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <img src="${otherProf.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">
+      <div style="flex:1;font-size:12px;min-width:0">
+        <b>${escChat(otherProf.nick)}</b>
+        ${live?`
+          <span style="color:${otherInfo.state==='break'?'var(--amber)':'var(--good)'};font-weight:700">${otherInfo.state==='break'?'☕ On a break':'⏱ Studying'}</span>
+          <span style="font-variant-numeric:tabular-nums;font-weight:700;margin-left:4px" id="other-timer-elapsed-display" data-live-tick="elapsed">${liveClockText(otherInfo.ls)}</span>
+          ${otherInfo.focus?`<div style="color:var(--text-faint);font-size:11px">${escChat(otherInfo.focus)}</div>`:''}
+        `:`<span style="color:var(--text-faint)">${escChat(otherInfo.text)}</span>`}
+      </div>
+      ${isHosted() && S.shared.pushSubscriptions && S.shared.pushSubscriptions[otherProf.id] ? `<button class="btn btn-sm" style="flex-shrink:0" onclick="nudgePartner()" title="Nudge ${escChat(otherProf.nick)}">👋 Nudge</button>` : ''}
+    </div>`;
+}
+// Status card at the top of the PARTNER's Timer page (live region 'partnerCard').
+function timerPartnerCardHtml(vp){
+  const info = otherLiveStatusInfo(vp);
+  const prof = profileById(vp);
+  if(!prof) return '';
+  const live = info.state==='studying' || info.state==='break';
+  if(live) startTimerTick();
+  const borderColor = info.state==='studying' ? 'var(--good)' : info.state==='break' ? 'var(--amber)' : 'var(--border)';
+  return `<div class="card" style="border:1px solid ${borderColor}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <img src="${prof.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">
+        <div style="font-size:12.5px;min-width:0">
+          <b>${escChat(prof.nick)}</b>
+          ${live?
+            `<div style="color:${info.state==='break'?'var(--amber)':'var(--good)'};font-weight:700">${info.state==='break'?'☕ On a break':'⏱ Current Session (Running)'}</div>
+             ${info.focus?`<div style="color:var(--text-faint);font-size:11px">${escChat(info.focus)}</div>`:''}`
+            :`<div style="color:var(--text-faint)">${escChat(info.text)}</div>`}
+        </div>
+      </div>
+      ${live?`<div class="hero-num" id="other-timer-elapsed-display" data-live-tick="elapsed" style="font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:8px;text-align:center">${liveClockText(info.ls)}</div>`:''}
+    </div>`;
 }
 function timerCardHtml(){
   const me = S.local.myProfile;
@@ -10689,20 +10851,7 @@ function timerCardHtml(){
     ${controls}
     ${isUmangBlockedForViewer() ? `
     <div style="text-align:center;font-size:11px;color:var(--text-faint);margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">🪦 ${escChat(profileById('umang').nick)} is dead for you</div>
-    ` : `
-    <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-      <img src="${otherProf.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">
-      <div style="flex:1;font-size:12px;min-width:0">
-        <b>${escChat(otherProf.nick)}</b>
-        ${(otherInfo.state==='studying'||otherInfo.state==='break')?`
-          <span style="color:${otherInfo.state==='break'?'var(--amber)':'var(--good)'};font-weight:700">${otherInfo.state==='break'?'☕ On a break':'⏱ Studying'}</span>
-          <span style="font-variant-numeric:tabular-nums;font-weight:700;margin-left:4px" id="other-timer-elapsed-display">${fmtHMS(computeElapsedSeconds(otherInfo.ls))}</span>
-          ${otherInfo.focus?`<div style="color:var(--text-faint);font-size:11px">${escChat(otherInfo.focus)}</div>`:''}
-        `:`<span style="color:var(--text-faint)">${escChat(otherInfo.text)}</span>`}
-      </div>
-      ${isHosted() && S.shared.pushSubscriptions && S.shared.pushSubscriptions[otherProf.id] ? `<button class="btn btn-sm" style="flex-shrink:0" onclick="nudgePartner()" title="Nudge ${escChat(otherProf.nick)}">👋 Nudge</button>` : ''}
-    </div>
-    `}
+    ` : liveRegion('partnerRow', otherProf.id)}
   </div>`;
 }
 
@@ -10746,11 +10895,30 @@ function pendingPlanSection(){
 function todaysSessionsSection(profileId){
   const pid = profileId || S.local.myProfile;
   const sessions = (S.shared.logs[pid]||[]).filter(l=>l.date===todayStr() && (l.source==='timer' || l.source==='strict-countdown')).sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||''));
-  if(!sessions.length) return '';
-  const scrollStyle = sessions.length>3 ? 'max-height:156px;overflow-y:auto;-webkit-overflow-scrolling:touch' : '';
+  // v123: the running session is listed too (with a LIVE tag and a ticking duration) -- the "Sessions" KPI already counts it,
+  // so the list can't stay empty/shorter while the counters say otherwise.
+  const L = liveSessionInfo(pid);
+  const live = (L && L.date===todayStr()) ? L : null;
+  if(!sessions.length && !live) return '';
+  if(live) startTimerTick();
+  const scrollStyle = (sessions.length + (live?1:0))>3 ? 'max-height:156px;overflow-y:auto;-webkit-overflow-scrolling:touch' : '';
+  const liveRow = live ? (()=>{
+    const ts = live.ts;
+    const paper = ts.paperId ? paperById(ts.paperId) : null;
+    const catLabel = TIMER_CATEGORY_LABELS[ts.category] || '';
+    const title = ts.countdownTargetMs>0 ? 'Strict Countdown' : `${paper?paper.code:'General'}${catLabel?' · '+catLabel:''}${ts.itemLabel?' · '+escChat(ts.itemLabel):''}`;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:12px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600">${title} <span style="color:${ts.status==='break'?'var(--amber)':'var(--good)'};font-size:9.5px;font-weight:800;letter-spacing:.04em">● ${ts.status==='break'?'ON BREAK':'LIVE'}</span></div>
+          <div style="font-size:10px;color:var(--text-faint)">${fmtMsgTime(new Date(ts.startTime).toISOString())} – now</div>
+        </div>
+        <div data-live-tick="live-hours" style="font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0">${formatHoursAsHM(live.hours)}</div>
+      </div>`;
+  })() : '';
   return `
   <div class="section-title">Today's Sessions</div>
   <div class="card" style="padding:4px 0;${scrollStyle}">
+    ${liveRow}
     ${sessions.map(s=>{
       const paper = s.paperId ? paperById(s.paperId) : null;
       const catLabel = TIMER_CATEGORY_LABELS[s.category] || '';
@@ -10765,47 +10933,50 @@ function todaysSessionsSection(profileId){
     }).join('')}
   </div>`;
 }
-function timerHomeTeaser(){
-  const me = S.local.myProfile;
-  if(!me) return '';
-  const ls = myLiveStatus();
-  if(ls.status==='idle'){
-    return ''; // no idle prompt on Home anymore — the active-session card below still shows once one's running
-  }
-  const isBreak = ls.status==='break';
-  const paper = ls.paperId ? paperById(ls.paperId) : null;
-  const focus = [paper?paper.code:null, ls.category?TIMER_CATEGORY_LABELS[ls.category]:null].filter(Boolean).join(' · ');
-  return `<div class="card" style="cursor:pointer;display:flex;align-items:center;gap:10px;border:1px solid ${isBreak?'var(--amber)':'var(--good)'}" onclick="switchView('timer')">
-    <div style="width:36px;height:36px;border-radius:50%;background:${isBreak?'var(--amber-tint)':'color-mix(in srgb, var(--good) 15%, transparent)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">${isBreak?'☕':'⏱️'}</div>
-    <div style="flex:1;font-size:12.5px;min-width:0"><b>${isBreak?'On a break':'Studying now'}${focus?' — '+escChat(focus):''}</b><div style="color:var(--text-faint);font-size:11px">${fmtHMS(computeElapsedSeconds(ls))} so far — tap to open</div></div>
-    <span style="color:var(--text-faint)">›</span>
-  </div>`;
-}
-// Home never showed the OTHER profile's live studying status at all — only timerHomeTeaser()
-// above, which is strictly your own. That's the real gap behind "partner's timer doesn't
-// tick on Home": timerCardHtml() (Timer page) already ticks the partner's elapsed time live,
-// but Home had no partner card to tick in the first place. This fills that gap, reusing the
-// same otherLiveStatusInfo()/startTimerTick() machinery — see the widened view-guard in
-// startTimerTick() and the 'home-other-timer-elapsed-display' patch above.
-// Deliberately quiet when the partner's idle (no "last session ended…" clutter on Home —
-// that's what the Timer page is for); only appears when there's something actually live.
-function partnerHomeStatusCard(){
-  const me = S.local.myProfile;
-  if(!me || isUmangBlockedForViewer()) return '';
-  const other = otherProfileId(me);
-  const info = otherLiveStatusInfo(other);
-  if(info.state!=='studying' && info.state!=='break') return '';
-  const prof = profileById(other);
+// Home's live timer card. ONE builder for every case, drawn as live region 'homeLive':
+//   • on YOUR Home      -> your own running/break session (tap = your Timer page), and the partner's under it (tap = THEIR Timer page)
+//   • on the PARTNER's Home -> the partner's session (you are already viewing them, so tap = their Timer page)
+// It appears/disappears by itself the second a session starts or stops (the tick rebuilds the region), the clock ticks in
+// place, and a Strict Countdown shows the time LEFT. Quiet (renders nothing) when that person isn't studying.
+function homeLiveCardHtml(profileId){
+  const me = S.local && S.local.myProfile;
+  if(!me || !profileId) return '';
+  if(profileId==='umang' && profileId!==me && isUmangBlockedForViewer()) return '';
+  const c = liveCardInfo(profileId);
+  if(!c) return '';
   startTimerTick();
-  return `<div class="card" style="cursor:pointer;display:flex;align-items:center;gap:10px;border:1px solid ${info.state==='break'?'var(--amber)':'var(--good)'}" onclick="switchView('timer')">
-    <img src="${prof.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">
-    <div style="flex:1;font-size:12.5px;min-width:0">
-      <b>${escChat(prof.nick)} ${info.state==='break'?'is on a break':'is studying now'}</b>${info.focus?` — ${escChat(info.focus)}`:''}
-      <div style="color:var(--text-faint);font-size:11px" id="home-other-timer-elapsed-display">${fmtHMS(computeElapsedSeconds(info.ls))} so far</div>
-    </div>
+  const mine = profileId===me;
+  const prof = profileById(profileId);
+  const brk = c.state==='break';
+  const strict = c.ts.countdownTargetMs>0;
+  const clock = strict
+    ? `${fmtHMS(Math.max(0, c.ts.countdownTargetMs/1000 - computeElapsedSeconds(c.ts)))} left`
+    : `${fmtHMS(computeElapsedSeconds(c.ts))} so far`;
+  const title = mine ? (brk?'On a break':'Studying now') : `${escChat(prof.nick)} ${brk?'is on a break':'is studying now'}`;
+  const lead = mine
+    ? `<div style="width:36px;height:36px;border-radius:50%;background:${brk?'var(--amber-tint)':'color-mix(in srgb, var(--good) 15%, transparent)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">${brk?'☕':'⏱️'}</div>`
+    : `<img src="${prof.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`;
+  const onclick = mine ? `switchView('timer')` : `openPartnerTimerFromHome('${profileId}')`;
+  const reason = (brk && c.ts.breakReason) ? ` · ${escChat(c.ts.breakReason)}` : '';
+  return `<div class="card" style="cursor:pointer;display:flex;align-items:center;gap:10px;border:1px solid ${brk?'var(--amber)':'var(--good)'}" onclick="${onclick}">
+    ${lead}
+    <div style="flex:1;font-size:12.5px;min-width:0"><b>${title}</b>${c.focus?` — ${escChat(c.focus)}`:''}${reason}
+      <div style="color:var(--text-faint);font-size:11px"><span data-live-tick="elapsed" id="${mine?'home-own-timer-elapsed-display':'home-other-timer-elapsed-display'}">${clock}</span> — tap to open</div></div>
     <span style="color:var(--text-faint)">›</span>
   </div>`;
 }
+// Tap on the partner's live card: open THEIR Timer page (their live clock, KPIs, sessions) -- it used to open YOUR own Timer page.
+function openPartnerTimerFromHome(pid){
+  if(!confirmLeaveTest()) return;
+  if(pid !== S.viewingProfile){
+    S.plannerDateFilter = todayStr();
+    S.selectedCalDay = todayStr();
+    S.viewingProfile = pid;
+  }
+  switchView('timer');
+}
+function timerHomeTeaser(){ const me = S.local.myProfile; return me ? liveRegion('homeLive', me) : ''; }
+function partnerHomeStatusCard(){ const me = S.local.myProfile; return me ? liveRegion('homeLive', otherProfileId(me)) : ''; }
 // ═══════════════════════════════════════════════════════════
 // PROFILE BLOCKING (Umang-only — see Settings > Privacy). One-directional by design: only
 // umang gets the toggle, and it only ever hides HIS data from CHETNA — it has no effect on
@@ -10865,39 +11036,26 @@ function viewTimerPage(){
   const vp = S.viewingProfile;
   if(vp==='umang' && isUmangBlockedForViewer()) return blockedScreenHtml();
   const isMe = vp === S.local.myProfile;
+  // v123: every live figure below is a live region (see liveRegion()), so the clock, today's hours, KPIs, Head-to-Head,
+  // sessions list and trend always agree with each other and tick without a re-render -- for YOUR page and the partner's.
   if(!isMe){
-    const info = otherLiveStatusInfo(vp);
-    const prof = profileById(vp);
-    if(info.state==='studying' || info.state==='break') startTimerTick();
-    const borderColor = info.state==='studying' ? 'var(--good)' : info.state==='break' ? 'var(--amber)' : 'var(--border)';
     return `
     <div class="section-title">Study Timer</div>
-    <div class="card" style="border:1px solid ${borderColor}">
-      <div style="display:flex;align-items:center;gap:10px">
-        <img src="${prof.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">
-        <div style="font-size:12.5px;min-width:0">
-          <b>${escChat(prof.nick)}</b>
-          ${(info.state==='studying'||info.state==='break')?
-            `<div style="color:${info.state==='break'?'var(--amber)':'var(--good)'};font-weight:700">${info.state==='break'?'☕ On a break':'⏱ Current Session (Running)'}</div>
-             ${info.focus?`<div style="color:var(--text-faint);font-size:11px">${escChat(info.focus)}</div>`:''}`
-            :`<div style="color:var(--text-faint)">${escChat(info.text)}</div>`}
-        </div>
-      </div>
-      ${(info.state==='studying'||info.state==='break')?`<div class="hero-num" id="other-timer-elapsed-display" style="font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:8px;text-align:center">${fmtHMS(computeElapsedSeconds(info.ls))}</div>`:''}
-    </div>
+    ${liveRegion('partnerCard', vp)}
+    ${liveRegion('kpi', vp)}
     <div class="section-title">Head-to-Head</div>
-    ${timerComparisonBlockSafe()}
-    ${todaysSessionsSection(vp)}
-    ${timerTrendSection()}`;
+    ${liveRegion('h2h')}
+    ${liveRegion('sessions', vp)}
+    ${liveRegion('trend')}`;
   }
   return `
   ${timerCardHtml()}
-  ${todaysKpiSection()}
+  ${liveRegion('kpi', vp)}
   <div class="section-title">Head-to-Head</div>
-  ${timerComparisonBlockSafe()}
+  ${liveRegion('h2h')}
   ${pendingPlanSection()}
-  ${todaysSessionsSection()}
-  ${timerTrendSection()}`;
+  ${liveRegion('sessions', vp)}
+  ${liveRegion('trend')}`;
 }
 
 // Countdown: was WIP pending Umang describing the actual "Countdown Plan" — he's now said
@@ -11074,20 +11232,61 @@ function homePaperGridHtml(profileId){
   // columns needed ~403px inside a 368px page and the whole Home page could be dragged sideways on a 400px phone.
   return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:6px">${cards.join('')}</div>`;
 }
+// ── v123: Home's live pieces (each is a live region, so they tick with the timers) ──
+function homeTargetInnerHtml(vp){
+  const target = effectiveTodayTarget(vp);
+  const todayH = todayHoursLive(vp);
+  const remaining = Math.max(0, target-todayH);
+  const pct = target>0 ? Math.min(100, todayH/target*100) : 0;
+  return `<div class="tbar"><div class="tfill" style="width:${pct.toFixed(1)}%"></div></div>
+      <div class="target-row-nums"><span>Done <b>${todayH.toFixed(1)}h</b></span><span>Left <b>${remaining.toFixed(1)}h</b></span></div>`;
+}
+function homeWeekInnerHtml(vp){
+  const off = S.homeWeekOffset||0;
+  return `<div class="week-vals">${weekValsRow(vp, off)}</div>
+    <div class="week-bars">${weekBars(vp, off)}</div>`;
+}
+function homeVsBar(label, numA, numB, suffix, decimals){
+  suffix = suffix||''; decimals = decimals||0;
+  const total = Math.max(0.01, numA+numB);
+  const pctA = Math.round(numA/total*100), pctB = 100-pctA;
+  const aW = numA >= numB, bW = numB >= numA;
+  const fmtA = decimals ? numA.toFixed(decimals) : Math.round(numA);
+  const fmtB = decimals ? numB.toFixed(decimals) : Math.round(numB);
+  return `
+    <div style="margin-bottom:10px">
+      <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-align:center;letter-spacing:.05em;margin-bottom:4px;text-transform:uppercase">${label}</div>
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="font-size:12.5px;font-weight:${aW?'800':'500'};color:${aW?'var(--umang)':'var(--text-muted)'};min-width:36px;text-align:right">${fmtA}${suffix}</span>
+        <div style="flex:1;display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface2)">
+          <div style="width:${pctA}%;background:var(--umang);border-radius:4px 0 0 4px;transition:width .6s cubic-bezier(.22,.8,.4,1)"></div>
+          <div style="width:${pctB}%;background:var(--chetna);border-radius:0 4px 4px 0;transition:width .6s cubic-bezier(.22,.8,.4,1)"></div>
+        </div>
+        <span style="font-size:12.5px;font-weight:${bW?'800':'500'};color:${bW?'var(--chetna)':'var(--text-muted)'};min-width:36px">${fmtB}${suffix}</span>
+      </div>
+    </div>`;
+}
+function homeCmpRow(key){
+  const a = PROFILES[0], b = PROFILES[1];
+  if(key==='today')  return homeVsBar('Today',       todayHoursLive(a.id),         todayHoursLive(b.id),         'h', 1);
+  if(key==='week')   return homeVsBar('This Week',   liveHoursInRange(a.id,7),     liveHoursInRange(b.id,7),     'h', 1);
+  if(key==='total')  return homeVsBar('Total Hours', liveTotalHours(a.id),         liveTotalHours(b.id),         'h', 1);
+  if(key==='streak') return homeVsBar('Streak',      liveStreak(a.id),             liveStreak(b.id),             'd', 0);
+  return '';
+}
 function viewHome(){
   const vp = S.viewingProfile;
   if(vp==='umang' && isUmangBlockedForViewer()) return blockedScreenHtml();
   const prof = profileById(vp);
   const isMe = vp === S.local.myProfile;
-  const target = effectiveTodayTarget(vp);
   const isOverridden = !!(S.shared.dailyTargetOverride && S.shared.dailyTargetOverride[vp] && S.shared.dailyTargetOverride[vp].date===todayStr());
-  const todayH = hoursOnDate(vp, todayStr());
-  const remaining = Math.max(0, target-todayH);
 
   const blocks = {
     quote: ()=> dailyQuoteBoxHtml(),
-    timer: ()=> isMe ? timerHomeTeaser() : '',
-    partner: ()=> isMe ? partnerHomeStatusCard() : '',
+    // v123: the live timer cards sit right under the motivation card. On your Home: your own session, then the partner's.
+    // On the partner's Home: the partner's session. Both tick and appear/disappear on their own (live region 'homeLive').
+    timer: ()=> liveRegion('homeLive', isMe ? S.local.myProfile : vp),
+    partner: ()=> isMe ? liveRegion('homeLive', otherProfileId(S.local.myProfile)) : '',
     countdown: ()=> `
   <div class="section-title">Countdown</div>
   <div class="top-row">
@@ -11100,8 +11299,7 @@ function viewHome(){
         ${prof.nick}'s target today${isOverridden?' <span style="color:var(--amber);font-weight:700">(raised)</span>':''}
         ${isMe?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;opacity:.6;flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>`:''}
       </div>
-      <div class="tbar"><div class="tfill" style="width:${Math.min(100,todayH/target*100)}%"></div></div>
-      <div class="target-row-nums"><span>Done <b>${todayH.toFixed(1)}h</b></span><span>Left <b>${remaining.toFixed(1)}h</b></span></div>
+      ${liveRegion('homeTarget', vp)}
       ${isMe && isOverridden ? `<div style="margin-top:6px;text-align:right"><span onclick="event.stopPropagation();clearTodaysTargetOverride('${vp}')" style="font-size:10px;color:var(--text-faint);text-decoration:underline;cursor:pointer">Reset to ${S.shared.targets[vp]||4}h minimum</span></div>` : ''}
     </div>
   </div>
@@ -11122,8 +11320,7 @@ function viewHome(){
     </span>
   </div>
   <div class="card">
-    <div class="week-vals">${weekValsRow(vp, S.homeWeekOffset||0)}</div>
-    <div class="week-bars">${weekBars(vp, S.homeWeekOffset||0)}</div>
+    ${liveRegion('homeWeek', vp)}
     <div class="week-dates">${weekDatesRow(S.homeWeekOffset||0)}</div>
   </div>
   `,
@@ -11496,7 +11693,7 @@ function dualTrendChartSVG(dataA, dataB, colorA, colorB, height, labelEvery){
   const labelIdxs = [];
   for(let i=0;i<n;i++){ if(i%labelEvery===0 || i===n-1) labelIdxs.push(i); }
 
-  const uid = 'dtc'+(Math.random()*1e6|0);
+  const uid = 'dtc'+liveHash(JSON.stringify([dataA.map(d=>d.hours), dataB.map(d=>d.hours), colorA, colorB, height])); // deterministic (not random) so an unchanged chart is recognised as unchanged by the live-region patcher
   const baseY = valueToY(0).toFixed(1);
 
   // Area paths: close back along bottom baseline
@@ -11537,7 +11734,7 @@ function timerTrendData(profileId, days, offsetDays){
   const out = [];
   for(let i=days-1;i>=0;i--){
     const d = new Date(end.getTime() - i*86400000);
-    out.push({label: d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}), hours: hoursOnDate(profileId, localDateStr(d))});
+    out.push({label: d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}), hours: Math.round(liveHoursOnDate(profileId, localDateStr(d))*60)/60}); // v123: live, rounded to the minute so the chart only redraws once a minute
   }
   return out;
 }
@@ -11557,9 +11754,9 @@ function timerTrendWeeklyData(profileId, weeks, offsetDays){
     let sum = 0;
     for(let i=0;i<7;i++){
       const d = new Date(weekEnd.getTime() - i*86400000);
-      sum += hoursOnDate(profileId, localDateStr(d));
+      sum += liveHoursOnDate(profileId, localDateStr(d));
     }
-    out.push({label: weekEnd.toLocaleDateString('en-IN',{day:'numeric',month:'short'}), hours: sum});
+    out.push({label: weekEnd.toLocaleDateString('en-IN',{day:'numeric',month:'short'}), hours: Math.round(sum*60)/60});
   }
   return out;
 }
@@ -11692,7 +11889,7 @@ function weekBars(profileId, offset){
   const endDay = new Date(now.getTime() + offset*7*86400000);
   const days = [];
   for(let i=6;i>=0;i--){ days.push(new Date(endDay.getTime()-i*86400000)); }
-  const hoursArr = days.map(d=>hoursOnDate(profileId, localDateStr(d)));
+  const hoursArr = days.map(d=>liveHoursOnDate(profileId, localDateStr(d)));
   const max = Math.max(1, ...hoursArr);
   return days.map((d,i)=>{
     const h = hoursArr[i];
@@ -11707,7 +11904,7 @@ function weekValsRow(profileId, offset){
   const days = [];
   for(let i=6;i>=0;i--){ days.push(new Date(endDay.getTime()-i*86400000)); }
   return days.map(d=>{
-    const h = hoursOnDate(profileId, localDateStr(d));
+    const h = liveHoursOnDate(profileId, localDateStr(d));
     return `<div class="week-val-cell">${h>0?h.toFixed(1):'–'}</div>`;
   }).join('');
 }
@@ -11859,10 +12056,6 @@ function comparisonBlock(){
   const a = PROFILES[0], b = PROFILES[1]; // Umang, Chetna
   const prepA = overallPrep(a.id), prepB = overallPrep(b.id);
   const scoreA = prepA.prepScore, scoreB = prepB.prepScore;
-  const todayA = todayHoursLive(a.id), todayB = todayHoursLive(b.id);
-  const weekA = hoursInRange(a.id,7), weekB = hoursInRange(b.id,7);
-  const totalA = totalHours(a.id), totalB = totalHours(b.id);
-  const strkA = streak(a.id), strkB = streak(b.id);
   const aLeads = scoreA >= scoreB;
   const diff = Math.abs(scoreA - scoreB);
 
@@ -11950,13 +12143,13 @@ function comparisonBlock(){
         <span style="font-size:10px;font-weight:800;color:var(--umang);letter-spacing:.03em">${a.nick}</span>
         <span style="font-size:10px;font-weight:800;color:var(--chetna);letter-spacing:.03em">${b.nick}</span>
       </div>
-      ${vsBar('Today',       todayA,       todayB,       'h', 1)}
-      ${vsBar('This Week',   weekA,        weekB,        'h', 1)}
-      ${vsBar('Total Hours', totalA,       totalB,       'h', 1)}
+      ${liveRegion('cmp','today')}
+      ${liveRegion('cmp','week')}
+      ${liveRegion('cmp','total')}
       ${vsBar('Lectures',    prepA.lecPct, prepB.lecPct, '%', 0)}
       ${vsBar('Revision',    Math.round((prepA.rev1Pct+prepA.rev2Pct)/2), Math.round((prepB.rev1Pct+prepB.rev2Pct)/2), '%', 0)}
       ${vsBar('Mock Avg',    prepA.mockAvg, prepB.mockAvg, '%', 0)}
-      ${vsBar('Streak',      strkA,        strkB,        'd', 0)}
+      ${liveRegion('cmp','streak')}
     </div>
 
     <!-- Radar chart -->
@@ -12054,22 +12247,22 @@ function radarSVG(){
 // ═══════════════════════════════════════════════════════════
 // TIMER PAGE: KPIs + consolidated paper/chapter/lecture/task/time linkage
 // ═══════════════════════════════════════════════════════════
-function hoursByPaperToday(profileId){
+function liveHoursMapToday(profileId, field){
   const map = {};
   (S.shared.logs[profileId]||[]).filter(l=>l.date===todayStr()).forEach(l=>{
-    const key = l.paperId || '_general';
+    const key = l[field] || '_general';
     map[key] = (map[key]||0) + Number(l.hours||0);
   });
+  // the running session, under the paper / activity it is filed to (same as its log will be)
+  const L = liveSessionInfo(profileId);
+  if(L && L.date===todayStr()){
+    const key = L[field==='paperId'?'paperId':'category'] || '_general';
+    map[key] = (map[key]||0) + L.hours;
+  }
   return map;
 }
-function hoursByCategoryToday(profileId){
-  const map = {};
-  (S.shared.logs[profileId]||[]).filter(l=>l.date===todayStr()).forEach(l=>{
-    const key = l.category || '_general';
-    map[key] = (map[key]||0) + Number(l.hours||0);
-  });
-  return map;
-}
+function hoursByPaperToday(profileId){ return liveHoursMapToday(profileId, 'paperId'); }
+function hoursByCategoryToday(profileId){ return liveHoursMapToday(profileId, 'category'); }
 function kpiBarList(dataMap, labelFn){
   const entries = Object.entries(dataMap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   if(!entries.length) return `<div style="font-size:11.5px;color:var(--text-faint);padding:6px 0 2px">No sessions logged yet today.</div>`;
@@ -12077,23 +12270,27 @@ function kpiBarList(dataMap, labelFn){
   return entries.map(([k,v])=>`
     <div style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px"><span style="font-weight:600">${escChat(labelFn(k))}</span><span style="font-variant-numeric:tabular-nums;color:var(--text-faint)">${formatHoursAsHM(v)}</span></div>
-      <div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.max(4,v/max*100)}%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));border-radius:4px"></div></div>
+      <div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.max(4,Math.round(v/max*100))}%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));border-radius:4px"></div></div>
     </div>`).join('');
 }
-function todaysKpiSection(){
-  const me = S.local.myProfile;
-  const target = effectiveTodayTarget(me);
-  const todayH = hoursOnDate(me, todayStr());
-  const weekH = hoursInRange(me, 7);
-  const streakDays = streak(me);
-  const sessionsToday = (S.shared.logs[me]||[]).filter(l=>l.date===todayStr()).length;
+// Today's hours + KPIs for ONE profile (yours, or the partner's on their Timer page) -- live region 'kpi'.
+function todaysKpiSection(profileId){
+  const pid = profileId || S.local.myProfile;
+  const prof = profileById(pid);
+  const isMe = pid === S.local.myProfile;
+  const target = effectiveTodayTarget(pid);
+  const todayH = todayHoursLive(pid);
+  const weekH = liveHoursInRange(pid, 7);
+  const streakDays = liveStreak(pid);
+  const sessionsToday = liveSessionsOnDate(pid, todayStr());
+  const pct = target>0 ? Math.min(100, todayH/target*100) : 0;
   return `
-  <div class="section-title">Today's Study Hours &amp; KPIs</div>
+  <div class="section-title">${isMe ? "Today's Study Hours &amp; KPIs" : escChat(prof.nick)+"'s Study Hours &amp; KPIs"}</div>
   <div class="card">
     <div style="text-align:center;margin-bottom:14px">
       <div class="hero-num" style="font-size:38px;font-weight:800">${formatHoursAsHM(todayH)}</div>
       <div style="font-size:11px;color:var(--text-faint)">of ${formatHoursAsHM(target)} target today</div>
-      <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:8px"><div style="height:100%;width:${Math.min(100,todayH/target*100)}%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));border-radius:4px"></div></div>
+      <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:8px"><div style="height:100%;width:${pct.toFixed(1)}%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));border-radius:4px"></div></div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <div style="flex:1;text-align:center;background:var(--surface2);border-radius:10px;padding:10px 4px">
@@ -12107,9 +12304,9 @@ function todaysKpiSection(){
       </div>
     </div>
     <div style="font-size:10.5px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">By Paper Today</div>
-    ${kpiBarList(hoursByPaperToday(me), k=>k==='_general'?'General':(paperById(k)?paperById(k).nick:k))}
+    ${kpiBarList(hoursByPaperToday(pid), k=>k==='_general'?'General':(paperById(k)?paperById(k).nick:k))}
     <div style="font-size:10.5px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px">By Activity Today</div>
-    ${kpiBarList(hoursByCategoryToday(me), k=>k==='_general'?'General':(TIMER_CATEGORY_LABELS[k]||k))}
+    ${kpiBarList(hoursByCategoryToday(pid), k=>k==='_general'?'General':(TIMER_CATEGORY_LABELS[k]||k))}
   </div>`;
 }
 // Timer-focused head-to-head — same VS-card + animated-bar visual language as Home's
@@ -12119,15 +12316,18 @@ function todaysKpiSection(){
 // other.
 function timerComparisonBlock(){
   const a = PROFILES[0], b = PROFILES[1];
+  // v123: every figure here comes from the same live-aware helpers as the KPI card and Home, so they always agree.
   const todayA = todayHoursLive(a.id), todayB = todayHoursLive(b.id);
-  const sessA = (S.shared.logs[a.id]||[]).filter(l=>l.date===todayStr()).length;
-  const sessB = (S.shared.logs[b.id]||[]).filter(l=>l.date===todayStr()).length;
+  const sessA = liveSessionsOnDate(a.id, todayStr()), sessB = liveSessionsOnDate(b.id, todayStr());
+  const strA = liveStreak(a.id), strB = liveStreak(b.id);
+  const wkA = liveHoursInRange(a.id,7), wkB = liveHoursInRange(b.id,7);
+  const moA = liveHoursInRange(a.id,30), moB = liveHoursInRange(b.id,30);
   const metrics = [
     {key:'today', label:"Today's Hours", va:formatHoursAsHM(todayA), vb:formatHoursAsHM(todayB), suffix:'', numA:todayA, numB:todayB},
     {key:'sessions', label:'Sessions Today', va:sessA, vb:sessB, suffix:'', numA:sessA, numB:sessB},
-    {key:'streak', label:'Streak', va:streak(a.id), vb:streak(b.id), suffix:'d', numA:streak(a.id), numB:streak(b.id)},
-    {key:'week', label:'This Week', va:formatHoursAsHM(hoursInRange(a.id,7)), vb:formatHoursAsHM(hoursInRange(b.id,7)), suffix:'', numA:hoursInRange(a.id,7), numB:hoursInRange(b.id,7)},
-    {key:'month', label:'This Month', va:formatHoursAsHM(hoursInRange(a.id,30)), vb:formatHoursAsHM(hoursInRange(b.id,30)), suffix:'', numA:hoursInRange(a.id,30), numB:hoursInRange(b.id,30)},
+    {key:'streak', label:'Streak', va:strA, vb:strB, suffix:'d', numA:strA, numB:strB},
+    {key:'week', label:'This Week', va:formatHoursAsHM(wkA), vb:formatHoursAsHM(wkB), suffix:'', numA:wkA, numB:wkB},
+    {key:'month', label:'This Month', va:formatHoursAsHM(moA), vb:formatHoursAsHM(moB), suffix:'', numA:moA, numB:moB},
   ];
   return `
   <div class="card" id="timer-comparison-card">
@@ -14439,10 +14639,10 @@ function statsOverview(vp, prof){
 
   <div class="section-title">Headline Numbers</div>
   <div class="stat-grid" style="margin-bottom:14px">
-    ${statsKpi(totalHours(vp), 'Total study hours', {decimals:1, suffix:'h'})}
-    ${statsKpi(hoursInRange(vp,30), 'Hours — last 30d', {decimals:1, suffix:'h'})}
+    ${statsKpi(liveTotalHours(vp), 'Total study hours', {decimals:1, suffix:'h'})}
+    ${statsKpi(liveHoursInRange(vp,30), 'Hours — last 30d', {decimals:1, suffix:'h'})}
     ${statsKpi(statsAvgPerActiveDay(vp), 'Avg / active day', {decimals:1, suffix:'h'})}
-    ${statsKpi(streak(vp), 'Current streak', {suffix:'d'})}
+    ${statsKpi(liveStreak(vp), 'Current streak', {suffix:'d'})}
     ${statsKpi(hit30.pct, 'Target hit rate 30d', {suffix:'%', sub:`${hit30.hit}/${hit30.total} days ≥ ${hit30.target}h`})}
     ${statsKpi(daysActive, 'Days studied', {sub:`${skipped} skipped of ${daysSince}`})}
     ${statsKpi(lecturesDone, 'Lectures completed')}
@@ -14655,8 +14855,8 @@ function statsCompareRows(vp, other, prof, otherProf){
     {label:'Revision 2',     av:a.rev2Pct,                   bv:b.rev2Pct,                   suffix:'%'},
     {label:'Practice',       av:a.practicePct,               bv:b.practicePct,               suffix:'%'},
     {label:'Mock average',   av:a.mockAvg,                   bv:b.mockAvg,                   suffix:'%'},
-    {label:'Hours — 30d',    av:Number(hoursInRange(vp,30).toFixed(1)),   bv:Number(hoursInRange(other,30).toFixed(1)),   suffix:'h', raw:true},
-    {label:'Current streak', av:streak(vp),                  bv:streak(other),               suffix:'d', raw:true},
+    {label:'Hours — 30d',    av:Number(liveHoursInRange(vp,30).toFixed(1)),   bv:Number(liveHoursInRange(other,30).toFixed(1)),   suffix:'h', raw:true},
+    {label:'Current streak', av:liveStreak(vp),              bv:liveStreak(other),              suffix:'d', raw:true},
   ];
   const colA = `var(--${prof.color})`, colB = `var(--${otherProf.color})`;
   return `
@@ -16189,7 +16389,7 @@ function syncBadgeHtml(){
   // the actual problem reported: the badge said "Sync error" with no way to see WHY on a
   // phone. Tapping it while in error state now shows the real message via toast instead.
   const tap = S.syncStatus==='error' ? `onclick="showToast(${escChat(JSON.stringify(S.syncError||'No further detail available.'))})" style="cursor:pointer"` : '';
-  return `<span class="sync-badge ${S.syncStatus}" title="${S.syncError||'Drive sync '+S.syncStatus}" ${tap}>${icons[S.syncStatus]} ${labels[S.syncStatus]}</span>`;
+  return `<span class="sync-badge ${S.syncStatus}" title="${S.syncError||'Drive sync '+S.syncStatus}" ${tap}>${icons[S.syncStatus]} <span class="sync-label">${labels[S.syncStatus]}</span></span>`;
 }
 
 // ═══════════════════════════════════════════════════════════
