@@ -3993,7 +3993,9 @@ let _renderedStudyDay = ''; // the study day the screen was last drawn for (see 
 function renderApp(){ return withFrame(_renderAppImpl); } // one shared "now" for every number drawn in this pass
 function _renderAppImpl(){
   const root = document.getElementById('app-root');
+  const _dayFlipped = !!_renderedStudyDay && _renderedStudyDay !== todayStr();
   _renderedStudyDay = todayStr();
+  if(_dayFlipped) setTimeout(()=>{ try{ ensureDailyQuote(); }catch(e){} }, 0); // 5 AM passed with the app open: today's motivation
   applyTheme();
   if(S.view==='home') root.innerHTML = viewHome();
   else if(S.view==='timer') root.innerHTML = viewTimerPage();
@@ -8712,7 +8714,7 @@ document.addEventListener('visibilitychange', ()=>{
   // Leaving: send one last "still going" stamp before the browser freezes the page. Returning: send a fresh one
   // and pull the partner's latest straight away.
   pushOwnHeartbeat(document.hidden);
-  if(!document.hidden){ refreshPartnerTimerSoon([0, 4000]); renderIfStudyDayChanged(); }
+  if(!document.hidden){ refreshPartnerTimerSoon([0, 4000]); renderIfStudyDayChanged(); try{ ensureDailyQuote(); }catch(e){} } // ensureDailyQuote is a no-op once today's message exists
 });
 function chatStatusInfo(otherId){
   const chat = S.shared.chat;
@@ -8738,7 +8740,9 @@ function chatStatusInfo(otherId){
 // (a missed notification, not lost study data) left as-is rather than rushed into this fix.
 const SINGLE_OWNER_SHARED_KEYS = ['logs','targets','chapters','lectures','mockScores','tasks',
   'profileInfo','dailyTargetOverride','prefs','celebratedMilestones','habits','habitLog',
-  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets'];
+  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','dailyQuote'];
+// v124: 'dailyQuote' added -- each profile writes only its own motivation, and without this the partner's phone could re-upload a stale
+// copy of it, wiping today's message and triggering a second generation.
 // milestoneTargets was missing from this list entirely — the rebuilt Targets page (see its
 // own big comment above) added a genuinely new single-owner field but never registered it
 // here, so a target you created could survive locally for a while and then quietly vanish:
@@ -8770,7 +8774,8 @@ function refreshOtherProfileDataFromRemote(freshRemote){
     const L = (S.shared.logs && S.shared.logs[other]) || [];
     let h = 0, c = 0;
     for(const l of L){ h += Number(l.hours||0); c = (c*31 + (l.date ? l.date.charCodeAt(9)*7 + l.date.charCodeAt(8) : 0)) | 0; }
-    return L.length+':'+h.toFixed(4)+':'+c+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other]]);
+    // v124: the partner's daily motivation is part of the slice too, so her card on my Home appears the moment her message lands
+    return L.length+':'+h.toFixed(4)+':'+c+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], ((S.shared.dailyQuote||{})[other]||{}).text]);
   };
   const before = slice();
   SINGLE_OWNER_SHARED_KEYS.forEach(key=>{
@@ -11114,63 +11119,49 @@ function homeDateHeaderHtml(){
     <span class="home-date-text">${month} ${day}, ${year}<span class="home-date-weekday">${weekday}</span></span>
   </div>`;
 }
-function dailyQuoteBoxHtml(){
-  const q = (S.shared.dailyQuote||{})[S.viewingProfile];
-  const hasToday = q && q.date===todayStr() && q.text;
-  const isMe = S.viewingProfile === S.local.myProfile;
-  // Long-press (hard press) on the card refreshes the motivation — own profile only.
-  // Uses a 600ms pointerdown timer that gets cancelled on pointerup/pointercancel.
-  // The ripple flash on the card confirms the gesture was registered.
-  const lpAttrs = isMe
-    ? `onpointerdown="_motLpStart(event,this)" onpointerup="_motLpCancel()" onpointercancel="_motLpCancel()" oncontextmenu="event.preventDefault()" style="cursor:pointer;-webkit-touch-callout:none;user-select:none"`
-    : '';
+// ═══ v124: DAILY MOTIVATION — rebuilt from scratch ═══════════════════════════════════════════════════════════
+// One message per profile per STUDY DAY (5 AM boundary), written in the voice of the person who believes in you most.
+// Generation lives in ensureDailyQuote() (see the AI FEATURES section); this only draws what is stored in
+// S.shared.dailyQuote[profile] = {v, date, text, source:'ai'|'offline', at, tries, recent[]}. There is deliberately NO
+// hold-to-refresh any more: the message is generated once and then simply stays for the day.
+function motivationInnerHtml(){
+  const vp = S.viewingProfile;
+  const isMe = vp === S.local.myProfile;
+  const prof = profileById(vp);
+  const q = (S.shared.dailyQuote||{})[vp];
+  const hasToday = !!(q && q.date===todayStr() && q.v>=MOTIVATION_VERSION && q.text);
+  const weekday = new Date(todayStr()+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long'});
+  const label = isMe ? "Today's Motivation" : `${escChat(prof.nick)}'s Motivation`;
+  const spark = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:17px;height:17px"><path d="M12 2.5l1.9 5.6a2 2 0 001.3 1.3l5.6 1.9-5.6 1.9a2 2 0 00-1.3 1.3L12 20.1l-1.9-5.6a2 2 0 00-1.3-1.3L3.2 11.3l5.6-1.9a2 2 0 001.3-1.3z"/><path d="M19 3.5l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z" opacity=".7"/></svg>`;
+  const cardStyle = `background:linear-gradient(135deg,color-mix(in srgb,var(--active-accent,var(--umang)) 13%,var(--surface)),color-mix(in srgb,var(--active-accent-2,var(--umang-2)) 5%,var(--surface)));border-color:color-mix(in srgb,var(--active-accent,var(--umang)) 26%,var(--border));padding:16px 16px 14px`;
+  let body;
+  if(hasToday){
+    body = `<div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));box-shadow:0 2px 10px color-mix(in srgb,var(--active-accent,var(--umang)) 40%,transparent)">${spark}</div>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:14.5px;font-weight:600;line-height:1.62;color:var(--text);letter-spacing:-.01em">${escChat(q.text)}</div>
+          <div style="margin-top:9px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">For ${escChat(prof.nick)} · ${weekday}</div>
+        </div>
+      </div>`;
+  } else if(isMe){
+    body = `<div style="display:flex;align-items:center;gap:10px;color:var(--text-faint)">
+        <div class="loading-dots" style="margin:0"><span></span><span></span><span></span></div>
+        <span style="font-size:12.5px">Writing today's message for you…</span>
+      </div>`;
+  } else {
+    body = `<div style="font-size:12.5px;color:var(--text-faint);line-height:1.5">${escChat(prof.nick)} hasn't opened Olympus yet today — their message appears here once they do.</div>`;
+  }
   return `
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:4px">
-    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint)">Today's Motivation</div>
-    ${isMe ? `<span style="font-size:9.5px;color:var(--text-faint);font-style:italic">hold to refresh</span>` : ''}
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint)">${label}</div>
   </div>
-  <div class="card" id="motivation-card" ${lpAttrs} style="background:color-mix(in srgb,var(--active-accent,var(--umang)) 6%,var(--surface));border-color:color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--border));padding:16px 18px;transition:transform .12s,box-shadow .12s">
-    ${hasToday
-      ? `<div style="font-size:14.5px;font-weight:600;line-height:1.6;color:var(--text);letter-spacing:-.01em">${escChat(q.text)}</div>`
-      : `<div style="display:flex;align-items:center;gap:10px;color:var(--text-faint)">
-           <div class="loading-dots" style="margin:0"><span></span><span></span><span></span></div>
-           <span style="font-size:12.5px">Building today's motivation…</span>
-         </div>`}
-  </div>`;
+  <div class="card" id="motivation-card" style="${cardStyle}">${body}</div>`;
 }
-// Allow manual refresh of the daily motivation — resets the date so ensureDailyQuote()
-// fires a fresh call on the next renderApp(). Rate-limited client-side: won't allow
-// more than one refresh per 60 seconds to avoid hammering the Gemini API.
-// Triggered by a long-press (hold ≥600ms) on the motivation card.
-let _lastQuoteRefresh = 0;
-function regenerateDailyQuote(){
-  const now = Date.now();
-  if(now - _lastQuoteRefresh < 60000){ showToast('Wait a moment before refreshing again.'); return; }
-  _lastQuoteRefresh = now;
-  if(!S.shared.dailyQuote) S.shared.dailyQuote = {};
-  S.shared.dailyQuote[S.local.myProfile] = {date:'', text:''};
-  renderApp();
-  ensureDailyQuote();
-}
-let _motLpTimer = null;
-function _motLpStart(ev, el){
-  if(ev.pointerType === 'mouse' && ev.button !== 0) return;
-  el.style.transform = 'scale(.98)';
-  el.style.boxShadow = '0 0 0 2px color-mix(in srgb,var(--active-accent,var(--umang)) 45%,transparent)';
-  _motLpTimer = setTimeout(()=>{
-    _motLpTimer = null;
-    el.style.transform = '';
-    el.style.boxShadow = '';
-    // Brief flash to confirm
-    el.style.background = 'color-mix(in srgb,var(--active-accent,var(--umang)) 18%,var(--surface))';
-    setTimeout(()=>{ el.style.background=''; }, 180);
-    regenerateDailyQuote();
-  }, 600);
-}
-function _motLpCancel(){
-  if(_motLpTimer){ clearTimeout(_motLpTimer); _motLpTimer=null; }
-  const el = document.getElementById('motivation-card');
-  if(el){ el.style.transform=''; el.style.boxShadow=''; }
+function dailyQuoteBoxHtml(){ return `<div id="motivation-wrap">${motivationInnerHtml()}</div>`; }
+// Redraws just the card (generation finishes asynchronously, long after the page was drawn).
+function refreshMotivationCard(){
+  const w = document.getElementById('motivation-wrap');
+  if(w && S.view==='home') w.innerHTML = motivationInnerHtml();
 }
 // Paper grid — 3×2. Row 1: FR, AFM, AUDIT | Row 2: DT, IDT, IBS
 // Clean flat design: tier-tinted card, prominent ring with score inside,
@@ -15620,49 +15611,185 @@ function fireLocalPushNotification(title, body, opts){
     reg.showNotification(title, Object.assign({ body, icon:'./icon-192.png' }, opts||{}));
   }).catch(e=> console.warn('Local push notification failed:', e));
 }
+// ═══ v124: DAILY MOTIVATION — generation ═══════════════════════════════════════════════════════════════════════
+// Exactly one AI call per profile per study day (the result is stored in S.shared.dailyQuote[profile] and synced, and
+// 'dailyQuote' is a single-owner key so the partner's phone can never roll it back and trigger a second call). If the AI
+// is unreachable the person still gets a warm hand-written message from the bank below -- never a permanent "loading" --
+// and the AI is retried quietly (at most 3 more times, 20+ minutes apart); the real message replaces the fallback.
+const MOTIVATION_VERSION = 2; // entries from the old generator (no/lower v) are treated as "not generated yet" -> one fresh message
+const MOTIVATION_ANGLES = [
+  'Start before you feel ready: momentum arrives after the first 10 minutes, not before them.',
+  'Small honest sessions beat heroic ones: consistency is the real superpower.',
+  'Remember why they chose CA and who they are doing this for.',
+  'Their future self is already grateful for what they do today.',
+  'The progress already made is real (lectures done, hours logged) and today adds to it.',
+  'Discipline over mood: they do not need to feel like it, they only need to begin.',
+  'One paper, one chapter, one session at a time: do not carry the whole syllabus at once.',
+  'Rest is part of the plan, but the first focused session comes first.',
+  'A rough or missed day does not define them: today is a clean page.',
+  'Be proud of how far they have come, then take the very next step.',
+  'Focus is a gift they give themselves: phone away, timer on, full attention.',
+  'Quiet confidence: they have done hard things before and this is one more.',
+];
+// Hand-written fallbacks, same voice. Hindi verbs are kept gender-neutral on purpose (imperatives, "ho jaayega", "tumse hoga"),
+// because the message is addressed to either of two people. need: 'days' | 'streak' | 'comeback' limits a line to when it is true.
+const MOTIVATION_FALLBACKS = [
+  {t:"{nick}, aaj ka din simple rakhte hain: ek focused session, phir doosra. Phone door, timer on, shuruaat tum karo, momentum baaki sambhal lega. Mujhe tum par poora bharosa hai."},
+  {t:"Good morning {nick}! Tumne pehle bhi mushkil cheezein paar ki hain, aur yeh syllabus bhi ek ek chapter karke hi khatam hota hai. Chalo, aaj ka pehla session abhi lagate hain."},
+  {t:"{nick}, perfect hone ki zarurat nahi, bas aaj bhi aana hai, baithna hai aur apna best dena hai. Chhote steps, solid kaam. Ho jaayega, main tumhare saath hoon."},
+  {t:"Jab man na kare na, tab sirf 25 minute ka timer lagao. Shuruaat hi sabse bhaari hoti hai, uske baad sab halka lagta hai. Yeh tumne pehle bhi kiya hai, aaj bhi hoga, {nick}."},
+  {t:"{nick}, tumhari mehnat sach mein dikhti hai, chahe tumhe khud na dikhe. Aaj ka din bhi us mehnat mein jodo: ek honest session, aur din tumhara."},
+  {t:"Aaj ke liye bas ek kaam: sabse zaroori topic uthao aur usse poora dhyaan do. Baaki sab uske baad. Tumse ho jaayega, {nick}, mujhe yaqeen hai."},
+  {t:"Future wale tum abhi se thank-you bol rahe hain, {nick}. Aaj ke session ko kal ka sabse bada tohfa bana do. Chalo, shuru karte hain!"},
+  {t:"{nick}, mood par nahi, routine par chalna hai. Pehla session lagao, phir dekho kaise man khud lag jaata hai. Main yahin hoon, tumhe cheer karte hue."},
+  {t:"Thoda thakan ho toh bhi theek hai, rest plan ka hissa hai. Par pehle ek solid session, phir chai-break. Tumhari mehnat rang layegi, {nick}."},
+  {t:"Aaj ka goal: kal se bas ek step aage. Ek chapter, ek revision, ek chhoti si jeet. Itna kaafi hai, aur yeh tumse aaram se ho jaayega, {nick}."},
+  {t:"{nick}, ek ek lecture, ek ek chapter, yahi toh poora syllabus banta hai. Aaj ki apni ek eent rakho. Main proud hoon tumpe, ab chalo kaam pe!"},
+  {t:"Tumhara focus tumhari superpower hai, {nick}. Aaj phone ko side mein rakho, timer chalao, aur dekho kitna kuch ho jaata hai. Full support tumhare saath."},
+  {t:"{days} din bache hain, {nick}, aur har focused ghanta tumhe finish line ke kareeb le jaata hai. Aaj ke ghante kamao, tumhari taiyari roz mazboot ho rahi hai.", need:'days'},
+  {t:"Sirf {days} din, aur roz ek honest session ho toh itna time kaafi hai. Aaj ka session lagao, {nick}, baaki kal ka din sambhal lega.", need:'days'},
+  {t:"{nick}, {days} din ka countdown chal raha hai, aur ek ek din tumhare naam ho raha hai. Aaj bhi jeeto: pehla session abhi.", need:'days'},
+  {t:"Streak chal rahi hai, {nick}! Isse todna nahi, aaj ka ek session kal ke tumhe thank-you bolne ki wajah dega. Chalo, aaj bhi!", need:'streak'},
+  {t:"{nick}, consistency tumpe bahut suit karti hai, dekho kitne din ho gaye lagataar. Aaj ek aur din jod do, main tumhare saath hoon.", need:'streak'},
+  {t:"Kal jaisa bhi gaya, chhodo, aaj ek fresh page hai, {nick}. Pehla session chhota hi lo, bas shuru karo. Mujhe tum par bharosa hai.", need:'comeback'},
+  {t:"{nick}, ek din ka break koi problem nahi, wapas aana hi asli jeet hai. Aaj ek focused session se wapsi karo, baaki din khud ban jaayega.", need:'comeback'},
+  {t:"Kisi ek din se tumhari kahani nahi banti, {nick}. Aaj wapsi ka din hai: ek chapter, poora dhyaan, aur sab wapas track pe.", need:'comeback'},
+];
+function motivationStudyDays(pid){ return new Set(logsFor(pid).filter(l=>Number(l.hours||0)>0).map(l=>l.date)); }
+// Facts about today that are TRUE, so the message can be specific without inventing anything.
+function motivationContext(pid){
+  const today = todayStr();
+  const yd = new Date(today+'T00:00:00'); yd.setDate(yd.getDate()-1);
+  const yStr = localDateStr(yd);
+  const target = effectiveTodayTarget(pid);
+  const days = motivationStudyDays(pid);
+  const hasHistory = days.size>0;
+  const yH = hoursOnDate(pid, yStr);
+  const todayH = hoursOnDate(pid, today);
+  const weekH = hoursInRange(pid, 7);
+  // streak as of "yesterday or today", so a morning with nothing logged yet doesn't read as a broken streak
+  let streakN = 0; const sd = new Date(today+'T00:00:00');
+  if(!days.has(today)) sd.setDate(sd.getDate()-1);
+  while(days.has(localDateStr(sd))){ streakN++; sd.setDate(sd.getDate()-1); }
+  const examDays = daysUntilExam();
+  const prep = overallPrep(pid);
+  const ranked = PAPERS.map(p=>({p, score:paperComponents(pid, p.id).prepScore})).sort((a,b)=>a.score-b.score);
+  const lowest = ranked[0];
+  let mostPending = null;
+  LECTURE_TRACKER_PAPERS.forEach(id=>{
+    const left = lecturesFor(pid, id).filter(l=>l.status!=='done').length;
+    if(left>0 && (!mostPending || left>mostPending.left)) mostPending = {p:paperById(id), left};
+  });
+  const hr = new Date().getHours();
+  const part = hr>=5 && hr<12 ? 'morning' : hr>=12 && hr<17 ? 'afternoon' : hr>=17 && hr<21 ? 'evening' : 'late night';
+  const weekday = new Date(today+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long'});
+  const comeback = hasHistory && yH<0.2;
+  const facts = [];
+  facts.push(`It is ${weekday} ${part} for them right now.`);
+  if(examDays>0) facts.push(`${examDays} days are left until the CA Final exam.`);
+  if(!hasHistory) facts.push('They are just getting started with tracking their study here.');
+  else if(yH>=target) facts.push(`Yesterday they studied ${yH.toFixed(1)}h and hit their ${target}h target.`);
+  else if(yH>=0.2) facts.push(`Yesterday they studied ${yH.toFixed(1)}h (their target is ${target}h).`);
+  else facts.push('Yesterday they did not log any study. Be gentle: no guilt, just a fresh start today.');
+  if(streakN>=2) facts.push(`Their study streak is ${streakN} days.`);
+  if(weekH>0) facts.push(`They studied ${weekH.toFixed(1)}h over the last 7 days.`);
+  if(todayH>0) facts.push(`They have already studied ${todayH.toFixed(1)}h today.`);
+  facts.push(`Today's target is ${target}h.`);
+  facts.push(`Overall exam readiness is ${prep.prepScore}%.`);
+  if(lowest) facts.push(`The paper with the lowest readiness is ${lowest.p.nick} (${lowest.p.code}) at ${lowest.score}%.`);
+  if(mostPending) facts.push(`${mostPending.left} lecture${mostPending.left>1?'s':''} are still pending in ${mostPending.p.nick}.`);
+  // angle: rotates daily; a missed day / long streak overrides it with the one that fits
+  const dayNo = Math.floor(Date.parse(today+'T00:00:00Z')/86400000);
+  let angleIdx = (dayNo + parseInt(liveHash(pid),36)) % MOTIVATION_ANGLES.length;
+  if(comeback) angleIdx = 8; else if(streakN>=7) angleIdx = 9;
+  const focusPaper = (mostPending && mostPending.p) ? mostPending.p.nick : (lowest ? lowest.p.nick : '');
+  return {nick: profileById(pid).nick, facts, angle: MOTIVATION_ANGLES[angleIdx], focusPaper, days: examDays, streakN, comeback};
+}
+function motivationRecent(pid){
+  const cur = (S.shared.dailyQuote||{})[pid];
+  if(!cur) return [];
+  const base = Array.isArray(cur.recent) ? cur.recent.slice() : [];
+  if(cur.date!==todayStr() && cur.text) base.push(cur.text);
+  return base.filter(Boolean).slice(-6);
+}
+function buildMotivationPrompt(pid, recent){
+  const c = motivationContext(pid);
+  const info = profileInfoPromptBlock(pid);
+  return `${info}You are writing today's message to ${c.nick}, a CA Final student in India, in the voice of the person who loves them most: their partner and biggest supporter. You are warm, affectionate, proud of them, a little playful, and you truly believe in them. You also want them to actually sit down and study well today, so the message must gently but clearly push them to start and to stay focused.
+
+What is true about today (weave in at most two of these naturally; never list them and never invent numbers):
+${c.facts.map(f=>'- '+f).join('\n')}
+
+Today's angle: ${c.angle}
+
+Write 3 or 4 short sentences, about 45 to 70 words in total:
+1. Open warmly and personally, using the name "${c.nick}" or a natural, affectionate address. No romantic clichés, and do not sign off or claim to be a named person.
+2. Make them feel seen and capable, reflecting where they really are today (coming back after a missed day without guilt, proud of a streak, a fresh start, the exam getting closer).
+3. Give ONE concrete thing to do first${c.focusPaper?`, for example a focused session on ${c.focusPaper}`:''}, small enough to start within ten minutes.
+4. End with energy and belief, as a statement, not a question.
+
+Style rules:
+- Hinglish: Hindi and English mixed naturally in Roman letters, the way Indian students talk. Never use Devanagari script.
+- Keep Hindi verbs gender-neutral. Avoid forms such as "karoge/karogi", "sakte/sakti", "chuke/chuki", "rahe ho/rahi ho", "karte ho/karti ho". Prefer imperatives ("shuru karo"), "ho jaayega", "tumse hoga", "chalo shuru karte hain".
+- Uplifting and kind: no guilt, no pressure, no comparing them with anyone, no "hustle until you break". If they might be tired, say rest is part of the plan but the first focused session comes first.
+- Not generic: no clichés like "journey", "sky is the limit", "hard work pays off", "never give up".
+- No quotation marks, no lists, no markdown, no headings. At most one emoji (💛 or 🔥) at the very end, or none.
+${recent.length?`- Do not reuse the openings, images or phrases of these recent messages:\n${recent.map(r=>'  * '+r.replace(/\s+/g,' ').slice(0,170)).join('\n')}\n`:''}
+Return ONLY the message text.`;
+}
+function cleanMotivationText(raw){
+  let t = String(raw||'').replace(/```[\s\S]*?```/g,' ').replace(/[*_#>`~]/g,'').replace(/\s*\n+\s*/g,' ').replace(/\s{2,}/g,' ').trim();
+  t = t.replace(/^(today'?s\s+)?(message|motivation)\s*[:\-–]\s*/i,'').replace(/^["“”'‘’]+|["“”'‘’]+$/g,'').trim();
+  if(t.length>520){
+    const cut = t.slice(0,520), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+    t = end>200 ? cut.slice(0,end+1) : cut.replace(/\s+\S*$/,'')+'…';
+  }
+  if(t.length<30) return '';
+  if(/\b(as an ai|language model|i cannot|i can't (help|assist))\b/i.test(t)) return '';
+  return t;
+}
+function offlineMotivationFor(pid){
+  const c = motivationContext(pid);
+  const pool = MOTIVATION_FALLBACKS.filter(l=> !l.need || (l.need==='days' && c.days>0) || (l.need==='streak' && c.streakN>=3) || (l.need==='comeback' && c.comeback));
+  const idx = parseInt(liveHash(todayStr()+'|'+pid),36) % pool.length;
+  return pool[idx].t.replace(/\{nick\}/g, c.nick).replace(/\{days\}/g, String(Math.max(0,c.days)));
+}
 async function ensureDailyQuote(){
   if(!S.shared.dailyQuote) S.shared.dailyQuote = {};
-  const profileId = S.local.myProfile;
-  if(!profileId) return; // no profile chosen yet — nothing to personalize for
-  const mine = S.shared.dailyQuote[profileId];
-  if(mine && mine.date === todayStr()) return; // already have today's for THIS profile — including one just synced in from the other device
+  const pid = S.local && S.local.myProfile;
+  if(!pid) return; // no profile chosen yet, nothing to write for
+  const today = todayStr();
+  const cur = S.shared.dailyQuote[pid];
+  const haveToday = !!(cur && cur.date===today && cur.v>=MOTIVATION_VERSION && cur.text);
+  if(haveToday){
+    if(cur.source!=='offline') return;                                       // the real message for today exists: never generate again
+    if((cur.tries||1) >= 4) return;                                          // gave up on the AI for today; the warm fallback stays
+    if(Date.now() - new Date(cur.at||0).getTime() < 20*60*1000) return;     // retry quietly, at most every 20 minutes
+  }
   if(_dailyQuoteFetching) return;
   _dailyQuoteFetching = true;
   try{
-    // Build a context-aware prompt using live app data so the message actually fits today.
-  const _rawDays = daysUntilExam(); const days = Number.isFinite(_rawDays) ? Math.max(0, _rawDays) : 0;
-  const todayH = hoursOnDate(S.local.myProfile, todayStr());
-  const weekH = Number(hoursInRange(S.local.myProfile,7).toFixed(1));
-  const strkDays = streak(S.local.myProfile);
-  const prep = overallPrep(S.local.myProfile);
-  const profile = profileById(S.local.myProfile);
-  // Build context sentence for the AI so it can make the message hyper-relevant
-  const ctx = [
-    days>0 ? `${days} days left until the CA Final exam.` : 'Exam is today or has passed.',
-    todayH>0 ? `They have already logged ${todayH.toFixed(1)} hours today.` : 'No study hours logged yet today.',
-    weekH>0 ? `${weekH}h studied this week so far.` : 'No hours this week yet.',
-    strkDays>1 ? `Current study streak: ${strkDays} days.` : strkDays===1 ? 'Streak just started today.' : 'No active streak right now.',
-    `Overall prep score: ${prep.prepScore}%. Lectures: ${prep.lecPct}%. Revision R1: ${prep.rev1Pct}%. Mock avg: ${prep.mockAvg}%.`,
-  ].join(' ');
-  const promptText = `You are a sharp, warm study coach for ${escChat(profile.nick)}, a CA Final student. Here is their situation today: ${ctx}
-
-Write a single focused message for them — 1 to 3 short sentences. It should:
-- Acknowledge where they actually are right now (use the data naturally, not robotically)
-- Give them one clear mental anchor or action for today
-- Sound like it comes from someone who knows them and believes in them — direct, real, not generic
-- Mix Hindi/Hinglish and English naturally the way Indian students actually speak (not forced)
-- End with energy, not a question
-
-Do NOT write a quote with quotation marks. Do NOT write a list. Do NOT use the word "journey". Return ONLY the message text, nothing else.`;
-  const text = await callClaudeAI(promptText);
-    S.shared.dailyQuote[profileId] = {date: todayStr(), text: (text||'').trim()};
-    saveShared(); // triggers the normal debounced driveSyncSave() internally — see saveShared()
-    if(S.view==='home') renderApp();
-    if(S.shared.dailyQuote[profileId].text) fireLocalPushNotification("Today's Motivation", S.shared.dailyQuote[profileId].text, {tag:'olympus-daily-quote'});
+    const recent = motivationRecent(pid);
+    let text = '';
+    try{ text = cleanMotivationText(await callClaudeAI(buildMotivationPrompt(pid, recent))); }
+    catch(e){ console.warn('Daily motivation: AI unavailable, using the hand-written fallback.', e); }
+    if(todayStr() !== today) return; // the study day rolled over mid-request; the next trigger handles the new day
+    const latest = S.shared.dailyQuote[pid]; // another device of the same profile may have finished first
+    if(latest && latest.date===today && latest.v>=MOTIVATION_VERSION && latest.text && latest.source!=='offline') return;
+    const tries = (haveToday ? (cur.tries||1) : 0) + 1;
+    if(!text && haveToday){ if(latest){ latest.tries = tries; latest.at = new Date().toISOString(); saveShared(); } return; } // still offline: keep the fallback, count the try
+    const source = text ? 'ai' : 'offline';
+    if(!text) text = offlineMotivationFor(pid);
+    S.shared.dailyQuote[pid] = {v:MOTIVATION_VERSION, date:today, text, source, at:new Date().toISOString(), tries,
+      recent: haveToday ? (cur.recent||[]) : motivationRecent(pid)};
+    saveShared(); // normal debounced Drive sync
+    refreshMotivationCard();
+    if(source==='ai') fireLocalPushNotification("Today's Motivation", text, {tag:'olympus-daily-quote'});
   }catch(e){
-    console.warn('Daily quote fetch failed:', e); // stays showing the loading placeholder; retried next app open
+    console.warn('Daily motivation failed:', e);
+  }finally{
+    _dailyQuoteFetching = false;
   }
-  _dailyQuoteFetching = false;
 }
 async function callClaudeAI(promptText){
   if(!S.appSession) throw new Error('Not signed in');
