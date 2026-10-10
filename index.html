@@ -595,41 +595,58 @@ body.targets-mode #targets-root{display:flex}
 /* Status colors drive almost everything on this page — the bar, the badge, and the card's
    left accent stripe all key off the same four values so a glance at the page (not even
    reading numbers) tells you what needs attention. */
-.mt-card{position:relative;padding-left:17px!important;overflow:hidden;cursor:pointer}
+.mt-card{position:relative;padding:12px 14px 12px 18px!important;overflow:hidden;cursor:pointer;margin-bottom:10px}
 .mt-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--mt-color,var(--border))}
 .mt-card:active{background:var(--surface2)}
-.mt-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
-.mt-title{font-weight:800;font-size:13px;line-height:1.3}
+/* press-and-hold a target to edit it -- the hold must not start a text selection or the iOS/Android callout */
+[data-mt-edit]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.mt-hint{text-align:center;font-size:10.5px;color:var(--text-faint);margin:14px 0 4px;opacity:.85}
+.mt-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.mt-title{font-weight:800;font-size:13.5px;line-height:1.3;overflow-wrap:anywhere}
 .mt-sub{font-size:10.5px;color:var(--text-faint);margin-top:2px}
 .mt-badge{flex-shrink:0;font-size:9px;font-weight:800;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;background:var(--mt-tint,var(--surface2));color:var(--mt-color,var(--text-muted))}
-.mt-bar{height:8px;background:var(--surface2);border-radius:5px;overflow:hidden;margin:8px 0 7px;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
+.mt-bar{position:relative;height:8px;background:var(--surface2);border-radius:5px;overflow:hidden;margin:11px 0 8px;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
 .mt-fill{height:100%;border-radius:5px;background:var(--mt-color,var(--active-accent,var(--umang)));box-shadow:0 0 7px color-mix(in srgb, var(--mt-color,var(--active-accent,var(--umang))) 60%, transparent);transition:width .5s cubic-bezier(.22,.8,.4,1)}
-.mt-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--text-muted)}
-.mt-meta b{color:var(--text);font-variant-numeric:tabular-nums}
-.mt-bar{position:relative}
 .mt-tick{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--text);opacity:.55}
-.mt-big{font-size:12.5px;color:var(--text-muted);margin-top:2px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
-.mt-big b{font-size:24px;font-weight:800;line-height:1;color:var(--mt-color,var(--text));font-variant-numeric:tabular-nums}
-.mt-big small{font-size:10.5px;color:var(--text-faint)}
-.mt-explain{font-size:11px;color:var(--mt-color,var(--text-muted));margin-top:6px;line-height:1.4}
-/* Section headers — reused verbatim across Needs Attention / Active / History */
-.mt-section-title{font-weight:800;font-size:11px;margin:2px 0 8px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between}
-/* Form (create/edit) — same inline input styling as the rest of the app's forms (Planner's
-   Add Task, etc.) rather than a bespoke component, so it feels native. */
-.mt-form-row{display:flex;flex-direction:column;gap:4px}
+.mt-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--text-muted)}
+.mt-row b{color:var(--text);font-variant-numeric:tabular-nums;font-size:13px}
+.mt-line{font-size:11px;color:var(--mt-color,var(--text-muted));margin-top:5px;line-height:1.4}
+.mt-big{font-size:13px;color:var(--text-muted);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:10px}
+.mt-big b{font-size:28px;font-weight:800;line-height:1;color:var(--mt-color,var(--text));font-variant-numeric:tabular-nums}
+.mt-summary{font-size:11.5px;color:var(--text-faint);margin:0 2px 10px}
+.mt-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.mt-tile{background:var(--surface2);border-radius:10px;padding:10px 4px;text-align:center}
+.mt-tile b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
+.mt-tile span{font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em}
+.mt-verdict{font-size:12.5px;line-height:1.55;color:var(--text)}
+.mt-note{font-size:10.5px;color:var(--text-faint);line-height:1.45;margin-top:6px}
+.mt-lbl{font-size:10px;color:var(--text-faint);margin-bottom:6px}
+.mt-ideas{margin-bottom:14px}
+.mt-chips{display:flex;gap:6px;flex-wrap:wrap}
+.mt-chip{padding:6px 11px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.mt-chip.active{background:color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--surface2));border-color:var(--active-accent,var(--umang));color:var(--text)}
+.mt-preview{border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;color:var(--text);background:color-mix(in srgb,var(--active-accent,var(--umang)) 9%,var(--surface2));border:1px solid color-mix(in srgb,var(--active-accent,var(--umang)) 22%,var(--border))}
+.mt-preview.warn{background:color-mix(in srgb,var(--amber) 11%,var(--surface2));border-color:color-mix(in srgb,var(--amber) 30%,var(--border))}
+.mt-preview b{font-variant-numeric:tabular-nums}
+.mt-pair{display:flex;gap:8px}
+.mt-pair>.btn{flex:1}
+.mt-stack{display:flex;flex-direction:column;gap:8px}
+.mt-stack>.btn{width:100%}
+.mt-empty{padding:26px 16px;text-align:center}
+.mt-empty .t{font-weight:800;font-size:15px;margin:6px 0 4px}
+.mt-empty .s{font-size:12px;color:var(--text-faint);line-height:1.5;margin-bottom:14px}
+.mt-empty .mt-chips{justify-content:center;margin-bottom:16px}
+/* Form -- same inline input styling as the rest of the app's forms (Planner's Add Task, etc.) */
+.mt-form{margin-bottom:14px;display:flex;flex-direction:column;gap:14px}
+.mt-form-row{display:flex;flex-direction:column;gap:6px;min-width:0}
 .mt-form-row label{font-size:10px;color:var(--text-faint)}
-.mt-form-row input,.mt-form-row select,.mt-form-row textarea{border:1px solid var(--border);border-radius:6px;padding:8px 9px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:13px}
+.mt-form-row input,.mt-form-row select,.mt-form-row textarea{border:1px solid var(--border);border-radius:6px;padding:9px 10px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:13px;width:100%;min-width:0;box-sizing:border-box}
 .mt-form-row textarea{resize:vertical}
+#targets-root .stats-exit-bar button span{white-space:nowrap}
+#targets-root .stats-exit-bar button svg{width:20px;height:20px;flex:0 0 auto}
 .mt-unit-toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0}
-.mt-unit-toggle button{flex:1;padding:8px 10px;border:none;background:var(--surface2);color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer}
+.mt-unit-toggle button{flex:1;padding:8px 12px;border:none;background:var(--surface2);color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer}
 .mt-unit-toggle button.active{background:var(--active-accent,var(--umang));color:#fff}
-/* Detail view pace bars — two thin bars (required vs current pace) stacked for a direct
-   visual comparison, colored by status like everything else on this page. */
-.mt-pace-row{display:flex;align-items:center;gap:8px;font-size:11px}
-.mt-pace-row .lbl{width:78px;flex-shrink:0;color:var(--text-muted)}
-.mt-pace-row .track{flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden}
-.mt-pace-row .fill{height:100%;border-radius:4px}
-.mt-pace-row .val{width:64px;text-align:right;flex-shrink:0;font-weight:700;font-variant-numeric:tabular-nums}
 .target-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12.5px}
 .target-row:last-child{border-bottom:none}
 
@@ -7487,14 +7504,15 @@ function renderDiaryPage(){
 // untouched in the schema (never deleted) so nothing already synced is lost, matching how the
 // Diary rebuild handled its own legacy fields — it just isn't read or written by anything new.
 // ═══════════════════════════════════════════════════════════
+// v127: `short` is the friendly wording used on the Targets page; `label` is kept as-is for the Planner task titles built from it.
 const TARGET_TYPES = [
-  {id:'lectures', label:'Lecture completion'},
-  {id:'chapters', label:'Chapter completion', flag:'lecDone'},
-  {id:'rev1', label:'Revision (1st)', flag:'rev1'},
-  {id:'rev2', label:'Revision (2nd)', flag:'rev2'},
-  {id:'practice', label:'Practice / Questions', flag:'practice'},
-  {id:'overall', label:'Percentage completion (overall paper)'},
-  {id:'custom', label:'Custom milestone'},
+  {id:'lectures', label:'Lecture completion', short:'Lectures'},
+  {id:'chapters', label:'Chapter completion', flag:'lecDone', short:'Chapters (first study)'},
+  {id:'rev1', label:'Revision (1st)', flag:'rev1', short:'Revision 1'},
+  {id:'rev2', label:'Revision (2nd)', flag:'rev2', short:'Revision 2'},
+  {id:'practice', label:'Practice / Questions', flag:'practice', short:'Practice / questions'},
+  {id:'overall', label:'Percentage completion (overall paper)', short:'Overall readiness'},
+  {id:'custom', label:'Custom milestone', short:'Custom (track by hand)'},
 ];
 function targetTypeInfo(id){ return TARGET_TYPES.find(t=>t.id===id) || TARGET_TYPES[TARGET_TYPES.length-1]; }
 function milestoneTargetsFor(profileId){
@@ -7570,11 +7588,11 @@ function targetPace(profileId, target, currentValue){
   return (currentValue - start.value) / lifetimeDays;
 }
 const TARGET_STATUS_META = {
-  ON_TRACK:  {label:'On Track',  color:'var(--good)',  tint:'var(--good-tint, var(--surface2))'},
-  AT_RISK:   {label:'At Risk',   color:'var(--amber)', tint:'var(--amber-tint)'},
-  CRITICAL:  {label:'Critical',  color:'var(--bad)',   tint:'var(--bad-tint)'},
+  ON_TRACK:  {label:'On track',  color:'var(--good)',  tint:'var(--good-tint, var(--surface2))'},
+  AT_RISK:   {label:'Behind',    color:'var(--amber)', tint:'var(--amber-tint)'},
+  CRITICAL:  {label:'Behind',    color:'var(--bad)',   tint:'var(--bad-tint)'},
   OVERDUE:   {label:'Overdue',   color:'var(--bad)',   tint:'var(--bad-tint)'},
-  COMPLETED: {label:'Completed', color:'var(--good)',  tint:'var(--good-tint, var(--surface2))'},
+  COMPLETED: {label:'Done',      color:'var(--good)',  tint:'var(--good-tint, var(--surface2))'},
 };
 // The single source of truth for a target's status + all the pace numbers the UI shows.
 // Never an arbitrary score — purely target value, current value, days remaining, and
@@ -7704,16 +7722,13 @@ function computeTargetNotifications(profileId){
   const out = [];
   milestoneTargetsFor(profileId).forEach(t=>{
     if(t.completedAt) return;
-    const sd = targetStatusData(profileId, t);
-    if(sd.status==='ON_TRACK') return;
-    const unitLabel = t.unit==='percent' ? '%' : '';
-    const remainingLabel = `${Math.ceil(sd.remaining)}${unitLabel} remaining`;
-    if(sd.status==='OVERDUE'){
-      out.push({type:'warn', ic:'flag', title:`${t.title} — overdue`, text:`Deadline passed. ${remainingLabel} to reach ${t.targetValue}${unitLabel}.`});
-    } else if(sd.status==='CRITICAL'){
-      out.push({type:'warn', ic:'flag', title:`${t.title} — ${sd.daysLeft} day${sd.daysLeft===1?'':'s'} left, CRITICAL`, text:`${remainingLabel}. Current pace won't reach the deadline — focus here now.`});
-    } else if(sd.status==='AT_RISK'){
-      out.push({type:'warn', ic:'flag', title:`${t.title} — ${sd.daysLeft} day${sd.daysLeft===1?'':'s'} left, at risk`, text:`Current pace is below what's needed. ${remainingLabel}.`});
+    const b = targetBrief(profileId, t);
+    const st = b.sd.status;
+    if(st==='ON_TRACK' || st==='COMPLETED') return;
+    if(st==='OVERDUE'){
+      out.push({type:'warn', ic:'flag', title:`${t.title} — overdue`, text:`${b.toGoTxt} still to go. Open Targets to give it more time or keep going.`});
+    } else {
+      out.push({type:'warn', ic:'flag', title:`${t.title} — ${b.dl} ${tgPlural(b.dl,'day')} left`, text:`Behind pace: ${b.toGoTxt} to go. You need ${b.needTxt}.`});
     }
   });
   return out;
@@ -7736,6 +7751,7 @@ function planThisTarget(profileId, targetId){
   const existingOpen = t.plannedTaskIds.filter(id=>manualTasksFor(profileId).some(x=>x.id===id && !x.done));
   const info = targetTypeInfo(t.type);
   let created = 0;
+  let spreadNote = '';
   // Always guard the tasks array — it could be missing for a profile on first use
   if(!S.shared.tasks) S.shared.tasks = {};
   if(!S.shared.tasks[profileId]) S.shared.tasks[profileId] = [];
@@ -7762,9 +7778,15 @@ function planThisTarget(profileId, targetId){
     // How many more items are needed to close the gap, in COUNT terms (even for a % unit
     // target, convert back to a count so we know how many discrete tasks to create).
     const {done, total} = targetTotalAndDone(profileId, t);
-    const goalCount = t.unit==='percent' ? Math.ceil(t.targetValue/100*total) : t.targetValue;
+    const ci = targetCountInfo(profileId, t); // the same goal count the card shows (a 75% target is met at 74.5%), so the plan never adds one task too many
+    const goalCount = ci ? ci.goal : (t.unit==='percent' ? Math.ceil(t.targetValue/100*total) : t.targetValue);
     const neededCount = Math.max(0, goalCount - done - existingOpen.length);
     const toCreate = pendingItems.slice(0, neededCount);
+    // v127: spread the items across today..deadline (the next 7 days if it is already overdue). It used to schedule exactly one a day
+    // from today, which ignored the deadline and the pace the card says you need (62 lectures became 62 days).
+    const dlGap = daysBetweenDates(todayStr(), t.deadline);
+    const spanDays = dlGap>=0 ? dlGap+1 : 7;
+    spreadNote = toCreate.length>1 ? `, about ${fmtPerDay(toCreate.length/spanDays)} a day until ${fmtShortDate(targetDateFromToday(spanDays-1))}` : '';
     const newIds = [];
     let createdNow = 0;
     toCreate.forEach((item, i)=>{
@@ -7772,7 +7794,7 @@ function planThisTarget(profileId, targetId){
       // Item already has an open Planner task → reuse it instead of stacking a duplicate on top.
       const dup = manualTasksFor(profileId).find(x=>x.linkType===linkType && x.linkCategory===linkCategory && x.paperId===t.paperId && x.refId===item.refId && !x.done);
       if(dup){ newIds.push(dup.id); return; }
-      const d = new Date(); d.setDate(d.getDate()+i);
+      const d = new Date(); d.setDate(d.getDate()+Math.min(spanDays-1, Math.floor(i*spanDays/toCreate.length))); // evenly across the days, last item lands by the deadline
       const task = {id:uid(), title:item.label, date:todayStr(d), done:false,
         linkType, linkCategory, paperId:t.paperId, refId:item.refId,
         priority:t.priority, notes:'Created from Targets — "Plan This Target".'};
@@ -7785,7 +7807,7 @@ function planThisTarget(profileId, targetId){
     t.plannedTaskIds = existingOpen.concat(newIds);
   }
   saveShared();
-  if(created>0) showToast(`Added ${created} task${created>1?'s':''} to the Planner.`);
+  if(created>0) showToast(`Added ${created} task${created>1?'s':''} to the Planner${spreadNote}.`);
   else showToast('Already fully planned — check the Planner.');
   renderTargetsPopup();
 }
@@ -7813,52 +7835,67 @@ function fmtNeed(perDay, noun){
   if(perDay>=1) return '~'+fmtRate(perDay)+(noun?' '+noun:'')+'/day';
   return '1'+(noun?' '+noun.replace(/s$/,''):'')+' every '+Math.max(1,Math.floor(1/perDay))+' days';
 }
-function mtCardHtml(profileId, target, opts){
-  opts = opts || {};
-  const sd = targetStatusData(profileId, target);
-  const info = targetCountInfo(profileId, target);
-  const paper = target.paperId ? paperById(target.paperId) : null;
-  const unitLabel = target.unit==='percent' ? '%' : '';
-  const deadlineLabel = new Date(target.deadline+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-  const ceil = targetCeilingValue(profileId,target);
-  const barPct = Math.min(100, Math.round(sd.currentValue/ceil*100));
-  const tickPct = Math.round(Math.min(sd.goal,ceil)/ceil*100);
-  const style = `--mt-color:${sd.meta.color};--mt-tint:${sd.meta.tint}`;
+// ═══ v127: TARGETS, simplified ═══════════════════════════════════════════════════════════════════════════════
+// A target is "finish X by date". Progress is still derived from your syllabus data (see the data model above); this layer only
+// decides what is SAID about it. targetBrief() computes every sentence once, so the list card, the Home widget, the detail page,
+// the notifications and the Planner list can never disagree with each other.
+function tgPlural(n, w){ return n===1 ? w : w+'s'; }
+function fmtShortDate(iso){ return new Date(iso+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}); }
+function targetDateFromToday(n){ const d = new Date(todayStr()+'T00:00:00'); d.setDate(d.getDate()+n); return localDateStr(d); }
+function fmtPerDay(x){ if(!(x>0)) return '0'; if(x<0.1) return '<0.1'; return x>=10 ? String(Math.round(x)) : fmtRate(x); }
+function targetBrief(profileId, t){
+  const sd = targetStatusData(profileId, t);
+  const info = targetCountInfo(profileId, t);
+  const paper = t.paperId ? paperById(t.paperId) : null;
   const completed = sd.status==='COMPLETED', overdue = sd.status==='OVERDUE';
-  const dl = Math.max(0, sd.daysLeft);
-  // Rate figures in the same unit as the headline (items/day when we have a count, else the target's own unit).
-  const needPerDay = info ? (sd.daysLeft>0 ? info.toGoal/sd.daysLeft : info.toGoal) : sd.requiredPace;
-  const pacePerDay = info ? (target.unit==='percent' ? sd.currentPace/100*info.total : sd.currentPace) : sd.currentPace;
-  const rateUnit = info ? ' '+info.noun+'/day' : unitLabel+'/day';
-  let big = '';
-  if(!completed){
-    big = info
-      ? `<div class="mt-big"><b>${info.toGoal}</b> ${info.toGoal===1?info.noun.replace(/s$/,''):info.noun} ${overdue?'still pending':'to go'}<small>${target.unit==='percent'?`to reach ${target.targetValue}%`:`to hit your goal of ${target.targetValue}`}${info.paperLeft!==info.toGoal?` · ${info.paperLeft} pending in paper`:''}</small></div>`
-      : `<div class="mt-big"><b>${Math.ceil(sd.remaining)}${unitLabel}</b> to go<small>of ${target.targetValue}${unitLabel}</small></div>`;
+  const pct = t.unit==='percent' ? '%' : '';
+  const dl = sd.daysLeft;
+  const noun = info ? info.noun : '';
+  const rate = x => info ? fmtNeed(x, noun) : (fmtPerDay(x)+pct+'/day');
+  const toGo = completed ? 0 : (info ? info.toGoal : Math.ceil(sd.remaining));
+  const toGoNum = info ? String(toGo) : toGo+pct;
+  const toGoUnit = info ? (toGo===1 ? noun.replace(/s$/,'') : noun) : '';
+  const toGoTxt = info ? `${toGo} ${toGoUnit}` : `${toGo}${pct}`;
+  const doneTxt = info ? `${info.done} / ${info.total} ${noun}` : `${sd.currentValue}${pct} / ${t.targetValue}${pct}`;
+  const need = info ? (dl>0 ? info.toGoal/dl : info.toGoal) : (dl>0 ? sd.remaining/dl : sd.remaining);
+  const pace = Math.max(0, info ? (t.unit==='percent' ? sd.currentPace/100*info.total : sd.currentPace) : sd.currentPace);
+  const needTxt = rate(need), paceTxt = rate(pace);
+  let proj = null; // when you'd finish if you keep today's recent pace
+  if(!completed && toGo>0 && pace>0){ const days = Math.ceil(toGo/pace); proj = {days, date: targetDateFromToday(days), diff: days - dl}; }
+  const ceil = targetCeilingValue(profileId, t);
+  const barPct = Math.min(100, Math.round(sd.currentValue/ceil*100));
+  const tickPct = Math.round(Math.min(sd.goal, ceil)/ceil*100);
+  let when = '';
+  if(completed){ const e = t.completedAt ? daysBetweenDates(t.completedAt, t.deadline) : 0; when = e>0 ? `${e} ${tgPlural(e,'day')} early` : (e<0 ? `${-e} ${tgPlural(-e,'day')} late` : 'on time'); }
+  let line, verdict;
+  if(completed){ line = `Done ${when}`; verdict = `Completed ${when}.`; }
+  else if(overdue){
+    line = 'Overdue — open it to give it more time';
+    verdict = `The deadline passed ${-dl} ${tgPlural(-dl,'day')} ago with ${toGoTxt} still to go. Give it more time below, or keep going.`;
+  } else {
+    line = `Need ${needTxt}` + (pace>0 ? ` · you're doing ${paceTxt}` : ' · no recent progress');
+    if(pace<=0) verdict = `No recent progress yet. Do ${needTxt} to finish by ${fmtShortDate(t.deadline)}.`;
+    else if(proj.diff<=0) verdict = `On pace: at ${paceTxt} you'd finish around ${fmtShortDate(proj.date)}${proj.diff<0 ? `, ${-proj.diff} ${tgPlural(-proj.diff,'day')} early` : ''}.`;
+    else verdict = `At ${paceTxt} you'd finish around ${fmtShortDate(proj.date)}, ${proj.diff} ${tgPlural(proj.diff,'day')} late. To make ${fmtShortDate(t.deadline)} you need ${needTxt}.`;
   }
-  let explain = '';
-  if(!opts.compact && !completed){
-    if(overdue) explain = `Deadline passed ${-sd.daysLeft} day${-sd.daysLeft===1?'':'s'} ago, ${info?countWord(info.toGoal,info.noun):Math.ceil(sd.remaining)+unitLabel} still pending.`;
-    else explain = `You need ${info?fmtNeed(needPerDay,info.noun):fmtRate(needPerDay)+unitLabel+'/day'} to reach this — recent pace is ${fmtRate(Math.max(0,pacePerDay))}${rateUnit}.`;
-  } else if(completed){
-    explain = `Completed ${target.completedAt===target.deadline?'on time':(target.completedAt<target.deadline?'early':'late')}.`;
-  }
-  return `<div class="card mt-card" style="${style};margin-bottom:10px" onclick="openTargetDetail('${target.id}')">
+  return {sd, info, paper, completed, overdue, pct, dl, noun, toGo, toGoNum, toGoUnit, toGoTxt, doneTxt, need, pace, needTxt, paceTxt, proj, barPct, tickPct, when, line, verdict};
+}
+// The one card used everywhere (Targets list, Completed list, Home "Needs Attention"): name + status, bar, "N to go / N days left", one line.
+function mtCardHtml(profileId, target, opts){
+  const b = targetBrief(profileId, target);
+  const style = `--mt-color:${b.sd.meta.color};--mt-tint:${b.sd.meta.tint}`;
+  const sub = `${b.paper ? b.paper.code+' · '+b.paper.nick : 'General'} · due ${fmtShortDate(target.deadline)}`;
+  const left = b.completed ? '<b>Goal reached</b>' : `<b>${b.toGoTxt}</b> to go`;
+  const right = b.completed ? (target.completedAt ? `done ${fmtShortDate(target.completedAt)}` : '')
+    : (b.overdue ? `<b>${-b.dl}</b> ${tgPlural(-b.dl,'day')} overdue` : (b.dl===0 ? '<b>Due today</b>' : `<b>${b.dl}</b> ${tgPlural(b.dl,'day')} left`));
+  return `<div class="card mt-card" data-mt-edit="${target.id}" style="${style}" onclick="openTargetDetail('${target.id}')">
     <div class="mt-head">
-      <div>
-        <div class="mt-title">${escChat(target.title)}</div>
-        <div class="mt-sub">${paper?paper.code+' · '+paper.nick:'General'}${target.priority==='high'?' · High priority':''} · due ${deadlineLabel}</div>
-      </div>
-      <span class="mt-badge">${overdue?'⚠ ':''}${sd.meta.label}</span>
+      <div style="min-width:0"><div class="mt-title">${escChat(target.title)}</div><div class="mt-sub">${sub}</div></div>
+      <span class="mt-badge">${b.sd.meta.label}</span>
     </div>
-    ${big}
-    <div class="mt-bar"><div class="mt-fill" style="width:${barPct}%"></div>${!completed && tickPct<99 ? `<i class="mt-tick" style="left:${tickPct}%"></i>` : ''}</div>
-    <div class="mt-meta">
-      <span><b>${info?info.done:sd.currentValue}${info?'':unitLabel}</b> / ${info?info.total+' '+info.noun+' done':target.targetValue+unitLabel}</span>
-      ${!completed?`<span>${overdue?`<b>${-sd.daysLeft}</b> day${-sd.daysLeft===1?'':'s'} overdue`:`<b>${dl}</b> day${dl===1?'':'s'} left`}</span>`:`<span>by ${deadlineLabel}</span>`}
-      ${!completed && !overdue && info && info.toGoal>0 ? `<span>need <b>${fmtNeed(needPerDay,info.noun)}</b></span>` : ''}
-    </div>
-    ${explain?`<div class="mt-explain">${explain}</div>`:''}
+    <div class="mt-bar"><div class="mt-fill" style="width:${b.barPct}%"></div>${!b.completed && b.tickPct<99 ? `<i class="mt-tick" style="left:${b.tickPct}%"></i>` : ''}</div>
+    <div class="mt-row"><span>${left}</span><span>${right}</span></div>
+    <div class="mt-line">${escChat(b.line)}</div>
   </div>`;
 }
 
@@ -7913,6 +7950,7 @@ function openTargetsPopup(){
   S.targetsPopupOpen = true;
   S.targetsView = 'dashboard';
   S.targetDetailId = null;
+  S.targetsDraft = null;
   document.body.classList.add('targets-mode');
   refreshAllTargets(S.local.myProfile);
   renderTargetsPopup();
@@ -7929,7 +7967,8 @@ function closeTargetsPopup(){
   renderApp(); // refresh Home's Needs Attention widget behind the popup
 }
 function exitTargetsPopup(){
-  if(S.targetsView !== 'dashboard'){ S.targetsView = 'dashboard'; S.targetDetailId = null; renderTargetsPopup(); return; }
+  if(S.targetsView === 'edit' && S.targetEditReturn === 'detail' && targetById(S.local.myProfile, S.targetEditId)){ S.targetsView = 'detail'; S.targetDetailId = S.targetEditId; S.targetEditId = null; renderTargetsPopup(); return; }
+  if(S.targetsView !== 'dashboard'){ S.targetsView = 'dashboard'; S.targetDetailId = null; S.targetEditId = null; renderTargetsPopup(); return; }
   if(_targetsHistoryActive) history.back();
   else closeTargetsPopup();
 }
@@ -7939,194 +7978,385 @@ function onTargetsBackButton(){ _targetsHistoryActive = false; closeTargetsPopup
 function targetsDashboardHtml(profileId){
   const all = milestoneTargetsFor(profileId);
   const active = all.filter(t=>!t.completedAt);
-  const withStatus = active.map(t=>({t, sd:targetStatusData(profileId,t)}));
-  const needsAttention = withStatus.filter(x=>x.sd.status!=='ON_TRACK' || x.sd.daysLeft<=2)
-    .sort((a,b)=>{ const rank={OVERDUE:0,CRITICAL:1,AT_RISK:2,ON_TRACK:3}; return (rank[a.sd.status]-rank[b.sd.status]) || (a.sd.daysLeft-b.sd.daysLeft); });
-  const needsAttentionIds = new Set(needsAttention.map(x=>x.t.id));
-  const rest = withStatus.filter(x=>!needsAttentionIds.has(x.t.id)).sort((a,b)=>a.sd.daysLeft-b.sd.daysLeft);
-  const completedCount = all.length - active.length;
-  if(all.length===0){
-    return `<div class="card" style="padding:28px 16px;text-align:center">
-      <div style="font-size:34px;margin-bottom:8px">🎯</div>
-      <div style="font-weight:800;font-size:14px;margin-bottom:4px">No targets yet</div>
-      <div style="font-size:12px;color:var(--text-faint);margin-bottom:16px">Set a milestone you're committing to — like "80% DT lectures by 30 Sept" — and progress tracks itself.</div>
-      <button class="btn btn-accent" onclick="openTargetCreateForm()">+ Add Target</button>
-    </div>`;
+  const doneCount = all.length - active.length;
+  const ideas = targetSuggestions(profileId);
+  S._targetIdeas = ideas;
+  if(active.length===0){
+    return `<div class="card mt-empty">
+      <div style="font-size:32px">${all.length ? '🎉' : '🎯'}</div>
+      <div class="t">${all.length ? 'All targets completed' : 'Set your first target'}</div>
+      <div class="s">${all.length ? 'Nice work. Set the next one while the momentum is there.' : 'Pick what to finish and by when. Progress tracks itself from your lectures, chapters and revision.'}</div>
+      ${ideas.length ? `<div class="mt-chips">${ideas.map((x,i)=>`<button type="button" class="mt-chip" onclick="applyTargetIdea(${i})">${escChat(x.label)}</button>`).join('')}</div>` : ''}
+      <button class="btn btn-accent" onclick="openTargetCreateForm()">+ New target</button>
+    </div>
+    ${doneCount>0?`<div style="text-align:center;margin-top:10px"><button class="btn btn-sm" onclick="openTargetHistory()">Completed (${doneCount})</button></div>`:''}`;
   }
+  const rank = {OVERDUE:0, CRITICAL:1, AT_RISK:2, ON_TRACK:3};
+  const items = active.map(t=>({t, sd:targetStatusData(profileId,t)}))
+    .sort((a,b)=> (rank[a.sd.status]-rank[b.sd.status]) || (a.sd.daysLeft-b.sd.daysLeft));
+  const over = items.filter(x=>x.sd.status==='OVERDUE').length;
+  const behind = items.filter(x=>x.sd.status==='CRITICAL'||x.sd.status==='AT_RISK').length;
   return `
-  ${needsAttention.length ? `<div class="mt-section-title">Needs Attention</div>${needsAttention.map(x=>mtCardHtml(profileId,x.t)).join('')}` : ''}
-  <div class="mt-section-title" style="margin-top:${needsAttention.length?'14px':'2px'}">Active Targets</div>
-  ${rest.length ? rest.map(x=>mtCardHtml(profileId,x.t)).join('') : (needsAttention.length ? '' : emptyState('🎯','No active targets.'))}
-  ${completedCount>0?`<div style="text-align:center;margin-top:6px"><button class="btn btn-sm" onclick="openTargetHistory()">View History (${completedCount})</button></div>`:''}
-  `;
+  <div class="mt-summary">${items.length} active${over?` · ${over} overdue`:''}${behind?` · ${behind} behind`:''}${!over&&!behind?' · all on track':''}</div>
+  ${items.map(x=>mtCardHtml(profileId,x.t)).join('')}
+  ${doneCount>0?`<div style="text-align:center;margin-top:6px"><button class="btn btn-sm" onclick="openTargetHistory()">Completed (${doneCount})</button></div>`:''}
+  <div class="mt-hint">Tip: press and hold a target to edit it</div>`;
 }
 
-// ── Creation form ───────────────────────────────────────────────────────────────────────
-function openTargetCreateForm(){ S.targetsView = 'create'; renderTargetsPopup(); }
-function targetCreateFormHtml(profileId){
-  const defaultPaper = PAPERS[0].id;
+// ── Ideas: the papers you are weakest in, turned into ready-to-use targets (tap one to fill the form) ──────────────────
+function targetSuggestions(profileId){
+  const out = [];
+  const have = milestoneTargetsFor(profileId);
+  PAPERS.map(p=>({p, c:paperComponents(profileId,p.id)})).sort((a,b)=>a.c.prepScore-b.c.prepScore).forEach(({p,c})=>{
+    if(out.length>=3) return;
+    let type = null, what = '';
+    if(c.lecTotal>0 && c.lecPct<100){ type='lectures'; what='lectures'; }
+    else if(c.total>0 && c.rev1Pct<100){ type='rev1'; what='1st revision'; }
+    else if(c.total>0 && c.practicePct<100){ type='practice'; what='practice'; }
+    if(!type) return;
+    if(have.some(t=>!t.completedAt && t.paperId===p.id && t.type===type)) return; // already chasing that one
+    out.push({paperId:p.id, type, unit:'percent', value:100, days:14, label:`${p.nick} ${what} · 2 weeks`});
+  });
+  return out;
+}
+function applyTargetIdea(i){
+  const x = (S._targetIdeas||[])[i]; if(!x) return;
+  const g = id => document.getElementById(id);
+  if(S.targetsView==='create' && g('mtc-paper')){
+    g('mtc-paper').value = x.paperId; g('mtc-type').value = x.type; g('mtc-value').value = x.value; g('mtc-deadline').value = targetDateFromToday(x.days);
+    g('mtc-title').value = '';
+    setTargetUnitToggle(x.unit); onTargetTypeChange();
+  } else {
+    openTargetCreateForm({paperId:x.paperId, type:x.type, unit:x.unit, value:x.value, days:x.days});
+  }
+}
+
+// ── The form (new + edit share it) ───────────────────────────────────────────────────────────────────────────────────
+// Goal quick-picks, "by when" quick-picks and a live line that says what the goal actually takes (items per day, and how that
+// compares with your recent lecture pace). Start date and priority were dropped: nothing useful depended on them.
+function openTargetCreateForm(draft){ S.targetsView = 'create'; S.targetsDraft = draft || null; renderTargetsPopup(); }
+function targetFormHtml(profileId, existing, draft){
+  const e = existing || null, d = draft || {};
+  const type = e ? e.type : (d.type || 'lectures');
+  const paperId = (e ? e.paperId : d.paperId) || PAPERS[0].id;
+  const unit = type==='overall' ? 'percent' : (e ? (e.unit||'percent') : (d.unit||'percent'));
+  const val = e ? e.targetValue : (d.value!=null ? d.value : 75);
+  const dl = e ? e.deadline : ((d.deadline && d.deadline>=todayStr()) ? d.deadline : targetDateFromToday(d.days||14));
+  const title = e ? e.title : (d.title||'');
+  const ideas = e ? [] : targetSuggestions(profileId);
+  S._targetIdeas = ideas;
   return `
-  <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
-    <div class="mt-form-row"><label>Target name</label>
-      <input type="text" id="mtc-title" placeholder="e.g. Complete DT Lectures"></div>
-    <div style="display:flex;gap:8px">
+  ${ideas.length ? `<div class="mt-ideas"><div class="mt-lbl">Quick ideas</div><div class="mt-chips">${ideas.map((x,i)=>`<button type="button" class="mt-chip" onclick="applyTargetIdea(${i})">${escChat(x.label)}</button>`).join('')}</div></div>` : ''}
+  <div class="card mt-form">
+    <div class="mt-pair">
       <div class="mt-form-row" style="flex:1"><label>Paper</label>
-        <select id="mtc-paper">${PAPERS.map(p=>`<option value="${p.id}">${p.code} — ${p.nick}</option>`).join('')}</select></div>
-      <div class="mt-form-row" style="flex:1"><label>Type</label>
-        <select id="mtc-type" onchange="onTargetTypeChange()">${TARGET_TYPES.map(t=>`<option value="${t.id}">${t.label}</option>`).join('')}</select></div>
+        <select id="mtc-paper" onchange="refreshTargetFormPreview()">${PAPERS.map(p=>`<option value="${p.id}" ${p.id===paperId?'selected':''}>${p.code} — ${p.nick}</option>`).join('')}</select></div>
+      <div class="mt-form-row" style="flex:1"><label>What to finish</label>
+        <select id="mtc-type" onchange="onTargetTypeChange()">${TARGET_TYPES.map(t=>`<option value="${t.id}" ${t.id===type?'selected':''}>${t.short}</option>`).join('')}</select></div>
     </div>
-    <div style="display:flex;gap:8px;align-items:flex-end">
-      <div class="mt-form-row" style="flex:1"><label>Target value</label>
-        <input type="number" id="mtc-value" min="0" placeholder="e.g. 80" value="80"></div>
-      <div class="mt-unit-toggle" id="mtc-unit-toggle">
-        <button type="button" class="active" onclick="setTargetUnitToggle('percent')" id="mtc-unit-percent">%</button>
-        <button type="button" onclick="setTargetUnitToggle('count')" id="mtc-unit-count">Count</button>
+    <div class="mt-form-row"><label>Goal</label>
+      <div class="mt-chips" id="mtc-goal-chips">${[50,75,100].map(v=>`<button type="button" class="mt-chip" data-goal="${v}" onclick="setTargetGoal(${v})">${v}%</button>`).join('')}</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="mtc-value" min="1" inputmode="decimal" style="flex:1" value="${val}" oninput="refreshTargetFormPreview()">
+        <div class="mt-unit-toggle" id="mtc-unit-toggle" data-unit="${unit}">
+          <button type="button" class="${unit==='percent'?'active':''}" onclick="setTargetUnitToggle('percent')" id="mtc-unit-percent">%</button>
+          <button type="button" class="${unit==='count'?'active':''}" onclick="setTargetUnitToggle('count')" id="mtc-unit-count">Count</button>
+        </div>
       </div>
     </div>
-    <div style="display:flex;gap:8px">
-      <div class="mt-form-row" style="flex:1"><label>Start date</label>
-        <input type="date" id="mtc-start" value="${todayStr()}"></div>
-      <div class="mt-form-row" style="flex:1"><label>Deadline</label>
-        <input type="date" id="mtc-deadline" value="${todayStr(new Date(Date.now()+7*86400000))}"></div>
+    <div class="mt-form-row"><label>By when</label>
+      <div class="mt-chips">${[[7,'1 week'],[14,'2 weeks'],[30,'1 month']].map(([n,l])=>`<button type="button" class="mt-chip" data-due="${n}" onclick="setTargetDue(${n})">${l}</button>`).join('')}</div>
+      <input type="date" id="mtc-deadline" value="${dl}" oninput="refreshTargetFormPreview()" onchange="refreshTargetFormPreview()">
     </div>
-    <div class="mt-form-row"><label>Priority</label>
-      <select id="mtc-priority">${PRIORITIES.map(p=>`<option value="${p.id}" ${p.id==='med'?'selected':''}>${p.label}</option>`).join('')}</select></div>
-    <button class="btn btn-accent" onclick="submitCreateTarget('${profileId}')">+ Add Target</button>
+    <div id="mtc-preview" class="mt-preview"></div>
+    <div class="mt-form-row"><label>Name (optional)</label>
+      <input type="text" id="mtc-title" maxlength="80" value="${escChat(title)}"></div>
+    ${e ? `
+    <div class="mt-stack">
+      <button class="btn btn-accent" onclick="submitEditTarget('${profileId}','${e.id}')">Save changes</button>
+      <button class="btn" onclick="exitTargetsPopup()">Cancel</button>
+      <button class="btn" style="color:var(--bad)" onclick="deleteTarget('${profileId}','${e.id}')">Delete target</button>
+    </div>` : `<button class="btn btn-accent" onclick="submitCreateTarget('${profileId}')">Create target</button>`}
   </div>`;
 }
+function targetFormDraft(){
+  const g = id => document.getElementById(id);
+  const type = g('mtc-type') ? g('mtc-type').value : 'lectures';
+  const tog = g('mtc-unit-toggle');
+  return {
+    paperId: g('mtc-paper').value, type,
+    unit: type==='overall' ? 'percent' : ((tog && tog.dataset.unit) || 'percent'),
+    targetValue: Number(g('mtc-value').value), deadline: g('mtc-deadline').value, title: (g('mtc-title').value||'').trim(),
+  };
+}
+function autoTargetTitle(d){
+  const p = paperById(d.paperId); const nick = p ? p.nick : '';
+  const what = {lectures:'lectures', chapters:'chapters', rev1:'revision 1', rev2:'revision 2', practice:'practice', overall:'overall readiness', custom:'milestone'}[d.type] || 'target';
+  return d.unit==='percent' ? `${nick} ${what} to ${d.targetValue}%` : `${nick}: ${d.targetValue} ${what}`;
+}
 function onTargetTypeChange(){
-  const type = document.getElementById('mtc-type').value;
-  const toggle = document.getElementById('mtc-unit-toggle');
+  const type = document.getElementById('mtc-type') && document.getElementById('mtc-type').value;
+  const toggle = document.getElementById('mtc-unit-toggle'); if(!toggle) return;
   if(type==='overall'){
-    setTargetUnitToggle('percent');
+    toggle.dataset.unit = 'percent';
+    const pb = document.getElementById('mtc-unit-percent'), cb = document.getElementById('mtc-unit-count');
+    if(pb) pb.classList.add('active'); if(cb) cb.classList.remove('active');
     toggle.style.opacity = '.5'; toggle.style.pointerEvents = 'none';
-  } else {
-    toggle.style.opacity = ''; toggle.style.pointerEvents = '';
-  }
+  } else { toggle.style.opacity = ''; toggle.style.pointerEvents = ''; }
+  refreshTargetFormPreview();
 }
 function setTargetUnitToggle(unit){
   document.getElementById('mtc-unit-percent')?.classList.toggle('active', unit==='percent');
   document.getElementById('mtc-unit-count')?.classList.toggle('active', unit==='count');
-  const tog = document.getElementById('mtc-unit-toggle');
-  if(tog) tog.dataset.unit = unit;
+  const tog = document.getElementById('mtc-unit-toggle'); if(tog) tog.dataset.unit = unit;
+  refreshTargetFormPreview();
+}
+function setTargetGoal(v){ const i = document.getElementById('mtc-value'); if(i) i.value = v; setTargetUnitToggle('percent'); }
+function setTargetDue(n){ const i = document.getElementById('mtc-deadline'); if(i) i.value = targetDateFromToday(n); refreshTargetFormPreview(); }
+// items/day you have actually been finishing lately (lectures carry a completion date; chapters do not)
+function recentLecturePace(profileId, paperId){
+  const today = todayStr();
+  const n = lecturesFor(profileId, paperId).filter(l=>{
+    if(l.status!=='done' || !l.completionDate) return false;
+    const g = daysBetweenDates(l.completionDate, today); return g>=0 && g<=13;
+  }).length;
+  return n/14;
+}
+function targetPreview(profileId, d, existing){
+  const today = todayStr();
+  if(!(d.targetValue>0)) return {html:'Enter a goal to see what it takes.'};
+  if(d.unit==='percent' && d.targetValue>100) return {warn:true, html:"A percentage goal can't be above 100%."};
+  if(!d.deadline) return {html:'Pick a deadline to see the daily pace this needs.'};
+  const dl = daysBetweenDates(today, d.deadline);
+  const timeTxt = dl===0 ? 'today' : `${dl} ${tgPlural(dl,'day')}`;
+  const passed = dl<0 ? ' That date has already passed.' : '';
+  const tmp = Object.assign({}, existing||{}, {id:'preview', type:d.type, paperId:d.paperId, unit:d.unit, targetValue:d.targetValue, deadline:d.deadline,
+    manualProgress: (existing && existing.type==='custom') ? (existing.manualProgress||0) : 0});
+  if(d.type==='custom'){
+    const left = Math.max(0, d.targetValue - (tmp.manualProgress||0));
+    return {warn: dl<0, html:`Tracked by hand: you update the number as you go. <b>${left}${d.unit==='percent'?'%':''}</b> to go${dl>0?` in ${timeTxt} (about ${fmtPerDay(left/dl)} a day)`:''}.${passed}`};
+  }
+  if(d.type==='overall'){
+    const cur = paperComponents(profileId, d.paperId).prepScore;
+    if(cur>=d.targetValue) return {warn:true, html:`Overall readiness is already <b>${cur}%</b>. Set a higher goal.`};
+    const need = d.targetValue - cur;
+    return {warn: dl<0, html:`Readiness is <b>${cur}%</b> now. Reaching ${d.targetValue}% ${dl>0?`in ${timeTxt} means about <b>+${fmtPerDay(need/dl)}%</b> a day`:`needs <b>+${need}%</b>`}.${passed}`};
+  }
+  const info = targetCountInfo(profileId, tmp);
+  if(!info) return {warn:true, html:`Nothing to track yet in this paper. Add its ${d.type==='lectures'?'lectures':'chapters'} first.`};
+  if(info.toGoal<=0) return {warn:true, html:`You're already at <b>${info.done}</b> of ${info.total} ${info.noun}, past this goal. Aim higher.`};
+  let html = `<b>${info.toGoal} ${info.noun}</b> to go (you're at ${info.done} of ${info.total}).`;
+  let warn = dl<0;
+  if(dl>0){
+    const need = info.toGoal/dl;
+    html += ` In ${timeTxt} that's <b>${fmtNeed(need, info.noun)}</b>.`;
+    if(d.type==='lectures' && paperComponents(profileId, d.paperId).usesLectureTracker){
+      const rp = recentLecturePace(profileId, d.paperId);
+      if(rp>0){
+        if(need>1.5*rp){ warn = true; html += ` That's well above your recent pace of about ${fmtPerDay(rp)}/day. Consider a later date.`; }
+        else html += ` Your recent pace is about ${fmtPerDay(rp)}/day.`;
+      }
+    }
+  } else if(dl===0){ html += ' All of it is due today.'; }
+  else html += passed;
+  return {warn, html};
+}
+function refreshTargetFormPreview(){
+  const pv = document.getElementById('mtc-preview'); if(!pv) return;
+  const me = S.local.myProfile;
+  const d = targetFormDraft();
+  const existing = S.targetsView==='edit' ? targetById(me, S.targetEditId) : null;
+  document.querySelectorAll('#targets-root [data-goal]').forEach(b=> b.classList.toggle('active', d.unit==='percent' && Number(b.dataset.goal)===d.targetValue));
+  document.querySelectorAll('#targets-root [data-due]').forEach(b=> b.classList.toggle('active', d.deadline===targetDateFromToday(Number(b.dataset.due))));
+  const gc = document.getElementById('mtc-goal-chips'); if(gc) gc.style.display = d.unit==='percent' ? '' : 'none';
+  const ti = document.getElementById('mtc-title'); if(ti) ti.placeholder = d.type==='custom' ? 'Name this target (e.g. 10 mock tests)' : autoTargetTitle(d);
+  const r = targetPreview(me, d, existing);
+  pv.className = 'mt-preview' + (r.warn ? ' warn' : '');
+  pv.innerHTML = r.html;
+}
+// Reads + validates the form. `existing` is the target being edited (its own past deadline is allowed to stay as it is).
+function readTargetForm(existing){
+  const d = targetFormDraft();
+  if(!(d.targetValue>0)){ showToast('Enter a goal greater than 0.'); return null; }
+  if(d.unit==='percent' && d.targetValue>100){ showToast("A percentage goal can't be above 100."); return null; }
+  if(!d.deadline){ showToast('Pick a deadline.'); return null; }
+  if(d.deadline < todayStr() && !(existing && existing.deadline===d.deadline)){ showToast('Pick a deadline from today onward.'); return null; }
+  if(d.type==='custom' && !d.title){ showToast('Name this custom target.'); return null; }
+  if(!d.title) d.title = autoTargetTitle(d);
+  return d;
 }
 function submitCreateTarget(profileId){
-  const title = document.getElementById('mtc-title')?.value.trim();
-  const paperId = document.getElementById('mtc-paper')?.value;
-  const type = document.getElementById('mtc-type')?.value;
-  const targetValue = Number(document.getElementById('mtc-value')?.value);
-  const unit = document.getElementById('mtc-unit-toggle')?.dataset.unit || 'percent';
-  const startDate = document.getElementById('mtc-start').value || todayStr();
-  const deadline = document.getElementById('mtc-deadline').value;
-  const priority = document.getElementById('mtc-priority').value;
-  if(!title){ showToast('Give this target a name.'); return; }
-  if(!targetValue || targetValue<=0){ showToast('Enter a target value greater than 0.'); return; }
-  if(!deadline){ showToast('Pick a deadline.'); return; }
-  if(deadline < startDate){ showToast('Deadline must be after the start date.'); return; }
-  createTarget(profileId, {title, paperId, type, unit, targetValue, startDate, deadline, priority});
-  S.targetsView = 'dashboard';
+  const d = readTargetForm(null); if(!d) return;
+  const t = createTarget(profileId, {title:d.title, paperId:d.paperId, type:d.type, unit:d.unit, targetValue:d.targetValue, startDate:todayStr(), deadline:d.deadline, priority:'med'});
+  S.targetsDraft = null;
+  S.targetDetailId = t.id; S.targetsView = 'detail'; // straight to the plan, so you see what it takes
   renderTargetsPopup();
+  showToast('Target created.');
 }
-// Prefilled quick-create, reached from the Lectures workspace tab (superseding the old
-// standalone "Lecture Completion Target Date" control there — see wsLectures).
+
+// ── Edit (press and hold a target card, or the Edit button on its detail page) ──────────────────────────────────────
+// `from` is where Cancel / Save should land afterwards: 'dashboard' (default) or 'detail'.
+function openTargetEdit(targetId, from){
+  const me = S.local && S.local.myProfile; if(!me) return;
+  if(!targetById(me, targetId)) return;
+  if(!S.targetsPopupOpen) openTargetsPopup(); // e.g. held from the Home "Needs Attention" card: open the Targets page first
+  S.targetEditId = targetId;
+  S.targetEditReturn = from === 'detail' ? 'detail' : 'dashboard';
+  S.targetDetailId = targetId;
+  S.targetsView = 'edit';
+  renderTargetsPopup();
+  const sc = document.getElementById('targets-scroll'); if(sc) sc.scrollTop = 0;
+}
+function submitEditTarget(profileId, targetId){
+  const t = targetById(profileId, targetId);
+  if(!t){ showToast('This target no longer exists.'); S.targetsView='dashboard'; renderTargetsPopup(); return; }
+  const d = readTargetForm(t); if(!d) return;
+  const {title, paperId, type, unit, targetValue, deadline} = d;
+  const measureChanged = t.type!==type || (t.paperId||'')!==(paperId||'') || t.unit!==unit;
+  const hadPlan = (t.plannedTaskIds||[]).length>0 && (measureChanged || t.deadline!==deadline);
+  Object.assign(t, {title, paperId, type, unit, targetValue, deadline, updatedAt: Date.now()}); // start date + priority stay as they were
+  if(type==='custom' && t.manualProgress===undefined) t.manualProgress = 0;
+  // What "progress" means changed (other paper / type / unit): the old once-a-day snapshots no longer describe this target,
+  // so pace starts over from today rather than mixing two different measures.
+  if(measureChanged) t.progressLog = [];
+  // A finished target whose goal was raised past what's done becomes active again; otherwise it just stays finished.
+  if(t.completedAt && targetCurrentValue(profileId, t) < t.targetValue) t.completedAt = null;
+  try{ ensureTargetSnapshot(profileId, t); }catch(err){ console.warn('[Targets] snapshot error on edit:', err); }
+  try{ checkTargetCompletion(profileId, t, targetStatusData(profileId, t)); }catch(err){ console.warn('[Targets] completion check error on edit:', err); }
+  saveShared();
+  const back = S.targetEditReturn === 'detail' ? 'detail' : 'dashboard';
+  S.targetsView = back; if(back==='detail') S.targetDetailId = targetId;
+  S.targetEditId = null;
+  renderTargetsPopup();
+  showToast(hadPlan ? 'Target updated. Planner tasks already created were not changed.' : 'Target updated.');
+}
+// Press-and-hold (500 ms, same feel as the Planner's task long-press) on any [data-mt-edit] card opens the editor.
+// One delegated listener, because the cards are redrawn constantly. A hold swallows the tap that follows it so the
+// detail page doesn't open behind the editor; moving or scrolling cancels the hold.
+let _mtLpTimer = null, _mtLpStart = null, _mtLpFiredAt = 0;
+function _clearMtLongPress(){ if(_mtLpTimer){ clearTimeout(_mtLpTimer); _mtLpTimer = null; } _mtLpStart = null; }
+document.addEventListener('pointerdown', e=>{
+  const card = e.target.closest && e.target.closest('[data-mt-edit]');
+  if(!card) return;
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  if(e.target.closest('button, a, input, select, textarea')) return; // real controls inside a card keep their own behaviour
+  _clearMtLongPress();
+  _mtLpStart = {x:e.clientX, y:e.clientY};
+  const id = card.dataset.mtEdit;
+  _mtLpTimer = setTimeout(()=>{
+    _mtLpTimer = null; _mtLpStart = null; _mtLpFiredAt = Date.now();
+    if(navigator.vibrate){ try{ navigator.vibrate(15); }catch(_){} }
+    openTargetEdit(id, S.targetsView==='detail' ? 'detail' : 'dashboard');
+  }, 500);
+}, {passive:true});
+document.addEventListener('pointermove', e=>{
+  if(_mtLpTimer && _mtLpStart && (Math.abs(e.clientX-_mtLpStart.x)>8 || Math.abs(e.clientY-_mtLpStart.y)>8)) _clearMtLongPress();
+}, {passive:true});
+['pointerup','pointercancel','scroll'].forEach(ev=>document.addEventListener(ev, _clearMtLongPress, {passive:true, capture:true}));
+document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('[data-mt-edit]')) e.preventDefault(); });
+document.addEventListener('click', e=>{
+  if(_mtLpFiredAt && Date.now()-_mtLpFiredAt < 700){ e.stopPropagation(); e.preventDefault(); _mtLpFiredAt = 0; } // the tap that ends a hold -- wherever it lands now that the editor replaced the card
+}, true);
+
+// Prefilled quick-create: from the Lectures tab ("Set Target") and from a Planner day ("Add Target").
 function quickCreateTargetForPaper(profileId, paperId, type){
   openTargetsPopup();
-  openTargetCreateForm();
-  setTimeout(()=>{
-    const paperSel = document.getElementById('mtc-paper'); if(paperSel) paperSel.value = paperId;
-    const typeSel = document.getElementById('mtc-type'); if(typeSel){ typeSel.value = type; onTargetTypeChange(); }
-    const titleEl = document.getElementById('mtc-title');
-    if(titleEl && !titleEl.value) titleEl.value = `Complete ${paperById(paperId).code} ${targetTypeInfo(type).label}`;
-  }, 0);
+  openTargetCreateForm({paperId, type, unit:'percent', value:100, days:14});
 }
-
-// Prefilled quick-create, reached from the Calendar day-detail's "Add Target" button —
-// same pattern as quickCreateTargetForPaper above, but prefilling the deadline with
-// whichever date was tapped in the calendar instead of a paper/type.
 function quickCreateTargetForDate(profileId, dateStr){
   openTargetsPopup();
-  openTargetCreateForm();
-  setTimeout(()=>{
-    const deadlineEl = document.getElementById('mtc-deadline'); if(deadlineEl) deadlineEl.value = dateStr;
-  }, 0);
+  openTargetCreateForm({deadline: dateStr});
 }
 
-// ── Detail view ──────────────────────────────────────────────────────────────────────────
+// ── Finish it: it completes by itself when the goal is reached; these cover the other cases ─────────────────────────
+function completeTargetNow(profileId, targetId){
+  const t = targetById(profileId, targetId); if(!t || t.completedAt) return;
+  t.completedAt = todayStr(); t.updatedAt = Date.now();
+  saveShared(); renderTargetsPopup(); showToast('Target marked complete.');
+}
+function reopenTarget(profileId, targetId){
+  const t = targetById(profileId, targetId); if(!t) return;
+  if(targetCurrentValue(profileId, t) >= t.targetValue){ showToast('The goal is already met. Raise the goal under Edit to keep it open.'); return; }
+  t.completedAt = null; t.updatedAt = Date.now();
+  saveShared(); renderTargetsPopup(); showToast('Target reopened.');
+}
+function extendTargetDeadline(profileId, targetId, days){
+  const t = targetById(profileId, targetId); if(!t) return;
+  const base = t.deadline < todayStr() ? todayStr() : t.deadline; // an overdue target gets its extra time from today
+  const d = new Date(base+'T00:00:00'); d.setDate(d.getDate()+days);
+  t.deadline = localDateStr(d); t.updatedAt = Date.now();
+  saveShared(); renderTargetsPopup(); showToast(`Deadline moved to ${fmtShortDate(t.deadline)}.`);
+}
+
+// ── Detail: where you stand, what it takes, and what you can do about it ───────────────────────────────────────────
 function openTargetDetail(targetId){ S.targetDetailId = targetId; S.targetsView = 'detail'; renderTargetsPopup(); }
 function targetDetailHtml(profileId, targetId){
   const t = targetById(profileId, targetId);
   if(!t) return emptyState('🎯','This target no longer exists.');
-  const sd = targetStatusData(profileId, t);
-  const paper = t.paperId ? paperById(t.paperId) : null;
-  const unitLabel = t.unit==='percent' ? '%' : '';
-  const style = `--mt-color:${sd.meta.color};--mt-tint:${sd.meta.tint}`;
-  const paceMax = Math.max(sd.requiredPace===Infinity?0:sd.requiredPace, Math.max(0,sd.currentPace), 0.1);
-  const history = (t.progressLog||[]).slice(-14);
-  return `
-  <div class="card" style="${style};margin-bottom:14px">
+  const b = targetBrief(profileId, t);
+  const style = `--mt-color:${b.sd.meta.color};--mt-tint:${b.sd.meta.tint}`;
+  const sub = `${b.paper ? b.paper.code+' · '+b.paper.nick : 'General'} · ${targetTypeInfo(t.type).short} · due ${fmtShortDate(t.deadline)}`;
+  const head = `<div class="card mt-card" data-mt-edit="${t.id}" style="${style};cursor:default;margin-bottom:12px">
     <div class="mt-head">
-      <div>
-        <div class="mt-title" style="font-size:15px">${escChat(t.title)}</div>
-        <div class="mt-sub">${paper?paper.code+' · '+paper.nick:'General'} · ${targetTypeInfo(t.type).label}</div>
-      </div>
-      <span class="mt-badge">${sd.meta.label}</span>
+      <div style="min-width:0"><div class="mt-title" style="font-size:16px">${escChat(t.title)}</div><div class="mt-sub">${sub}</div></div>
+      <span class="mt-badge">${b.sd.meta.label}</span>
     </div>
-    <div class="mt-bar" style="height:10px"><div class="mt-fill" style="width:${Math.min(100,Math.round(sd.currentValue/targetCeilingValue(profileId,t)*100))}%"></div></div>
-    <div class="stat-grid" style="margin-top:12px">
-      ${statsKpi(sd.currentValue, 'Current', {suffix:unitLabel})}
-      ${statsKpi(t.targetValue, 'Goal', {suffix:unitLabel})}
-      ${statsKpi(Math.ceil(sd.remaining), 'Remaining', {suffix:unitLabel})}
-      ${statsKpi(Math.max(0,sd.daysLeft), 'Days left')}
-      ${(()=>{ const ci = targetCountInfo(profileId,t); return (ci && !t.completedAt) ? statsKpi(ci.toGoal, ci.noun.charAt(0).toUpperCase()+ci.noun.slice(1)+' to goal')+statsKpi(ci.paperLeft, 'Pending in paper') : ''; })()}
+    ${b.completed ? `<div class="mt-big"><b>✓</b> Goal reached</div>` : `<div class="mt-big"><b>${b.toGoNum}</b> ${b.toGoUnit} to go</div>`}
+    <div class="mt-bar"><div class="mt-fill" style="width:${b.barPct}%"></div>${!b.completed && b.tickPct<99 ? `<i class="mt-tick" style="left:${b.tickPct}%"></i>` : ''}</div>
+    <div class="mt-row"><span><b>${b.doneTxt}</b> done</span><span>Goal <b>${t.targetValue}${b.pct}</b></span></div>
+  </div>`;
+  let stand;
+  if(b.completed){
+    stand = `<div class="card" style="margin-bottom:12px;text-align:center;padding:18px"><div style="font-size:26px">🎉</div><div style="font-weight:800;font-size:13px;margin-top:2px">Completed ${b.when}</div>${t.completedAt?`<div class="mt-note">Finished ${fmtShortDate(t.completedAt)} · deadline was ${fmtShortDate(t.deadline)}</div>`:''}</div>`;
+  } else {
+    const tiles = b.overdue
+      ? [[-b.dl,'days overdue'],[b.toGoNum,'to go'],[fmtPerDay(b.pace),'your pace / day']]
+      : [[Math.max(0,b.dl),'days left'],[fmtPerDay(b.need),'need / day'],[fmtPerDay(b.pace),'your pace / day']];
+    stand = `<div class="card" style="margin-bottom:12px">
+      <div class="mt-tiles">${tiles.map(([v,l])=>`<div class="mt-tile"><b>${v}</b><span>${l}</span></div>`).join('')}</div>
+      <div class="mt-verdict">${escChat(b.verdict)}</div>
+      ${b.info ? `<div class="mt-note">Goal = ${b.info.goal} of ${b.info.total} ${b.info.noun}. ${b.info.paperLeft} still pending in the whole paper.</div>` : ''}
+    </div>`;
+  }
+  const custom = (t.type==='custom' && !b.completed) ? `
+  <div class="card" style="margin-bottom:12px">
+    <div class="mt-lbl">Update progress</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="number" id="mtd-manual" value="${t.manualProgress||0}" min="0" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:9px 10px;background:var(--surface2);color:var(--text);font-size:13px;min-width:0">
+      <span style="font-size:12px;color:var(--text-faint)">of ${t.targetValue}${b.pct}</span>
+      <button class="btn btn-accent" onclick="setManualProgress('${profileId}','${t.id}', document.getElementById('mtd-manual').value)">Save</button>
     </div>
-  </div>
-  ${sd.status!=='COMPLETED'?`
-  <div class="section-title">Pace</div>
-  <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">
-    <div class="mt-pace-row"><span class="lbl">Required</span><div class="track"><div class="fill" style="width:${Math.min(100,(sd.requiredPace===Infinity?100:sd.requiredPace)/paceMax*100)}%;background:var(--text-faint)"></div></div><span class="val">${sd.requiredPace===Infinity?'—':sd.requiredPace.toFixed(2)+unitLabel+'/day'}</span></div>
-    <div class="mt-pace-row"><span class="lbl">Current</span><div class="track"><div class="fill" style="width:${Math.min(100,Math.max(0,sd.currentPace)/paceMax*100)}%;background:${sd.meta.color}"></div></div><span class="val">${Math.max(0,sd.currentPace).toFixed(2)}${unitLabel}/day</span></div>
-    <div class="mt-explain" style="margin-top:4px">${sd.status==='OVERDUE'?`Deadline passed ${-sd.daysLeft} day${-sd.daysLeft===1?'':'s'} ago with ${Math.ceil(sd.remaining)}${unitLabel} still remaining.`:`You need approximately ${sd.requiredPace===Infinity?'an unreachable amount':sd.requiredPace.toFixed(1)+unitLabel} per day to reach this target. Your recent pace is approximately ${Math.max(0,sd.currentPace).toFixed(1)}${unitLabel} per day.`}</div>
-  </div>`:`
-  <div class="card" style="margin-bottom:14px;text-align:center;padding:18px">
-    <div style="font-size:28px;margin-bottom:4px">🎉</div>
-    <div style="font-weight:800;font-size:13px">Target Completed</div>
-    <div style="font-size:11px;color:var(--text-faint);margin-top:2px">Deadline: ${new Date(t.deadline+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} · Completed: ${new Date(t.completedAt+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
-  </div>`}
-  ${history.length>1?`
-  <div class="section-title">Progress History</div>
-  <div class="card" style="margin-bottom:14px">
-    ${history.map(h=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11.5px"><span style="color:var(--text-faint)">${new Date(h.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span><b>${h.value}${unitLabel}</b></div>`).join('')}
-  </div>`:''}
-  ${t.type==='custom' && sd.status!=='COMPLETED'?`
-  <div class="section-title">Update Progress</div>
-  <div class="card" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
-    <input type="number" id="mtd-manual" value="${t.manualProgress||0}" min="0" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 9px;background:var(--surface2);color:var(--text)">
-    <button class="btn btn-accent" onclick="setManualProgress('${profileId}','${t.id}', document.getElementById('mtd-manual').value)">Save</button>
-  </div>`:''}
-  ${sd.status!=='COMPLETED'?`<button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="planThisTarget('${profileId}','${t.id}')">📋 Plan This Target</button>`:''}
-  ${paper?`<button class="btn" style="width:100%;margin-bottom:8px" onclick="exitTargetsPopup();openWorkspaceFor('${profileId}','${paper.id}','${t.type==='lectures'?'lectures':'chapters'}')">Open ${paper.nick} in Syllabus</button>`:''}
-  <button class="btn" style="width:100%;color:var(--bad)" onclick="deleteTarget('${profileId}','${t.id}')">Delete Target</button>
-  `;
+  </div>` : '';
+  const needMoreTime = (!b.completed && (b.overdue || b.sd.status==='AT_RISK' || b.sd.status==='CRITICAL')) ? `
+  <div class="card" style="margin-bottom:12px">
+    <div class="mt-lbl">Need more time?</div>
+    <div class="mt-chips">${[[3,'+3 days'],[7,'+1 week'],[14,'+2 weeks']].map(([n,l])=>`<button type="button" class="mt-chip" onclick="extendTargetDeadline('${profileId}','${t.id}',${n})">${l}</button>`).join('')}</div>
+  </div>` : '';
+  const openSyllabus = (b.paper && b.info)
+    ? `<button class="btn" onclick="exitTargetsPopup();openWorkspaceFor('${profileId}','${b.paper.id}','${t.type==='lectures'?'lectures':'chapters'}')">Open ${b.paper.nick} in Syllabus</button>` : '';
+  const actions = b.completed ? `
+  <div class="mt-stack" style="margin-bottom:8px">
+    <button class="btn" onclick="reopenTarget('${profileId}','${t.id}')">↺ Reopen</button>
+  </div>` : `
+  <div class="mt-stack" style="margin-bottom:8px">
+    ${b.toGo>0 ? `<button class="btn btn-accent" onclick="planThisTarget('${profileId}','${t.id}')">📋 Add to my Planner</button>
+    <div class="mt-note" style="margin:-2px 0 2px;text-align:center">${(t.type==='overall'||t.type==='custom') ? "Adds one task to today's Planner." : 'Adds what is left to your Planner, spread over the days until the deadline.'}</div>` : ''}
+    ${openSyllabus}
+    <button class="btn" onclick="completeTargetNow('${profileId}','${t.id}')">✓ Mark complete</button>
+  </div>`;
+  return `${head}${stand}${custom}${needMoreTime}${actions}
+  <div class="mt-pair" style="margin-top:4px">
+    <button class="btn" onclick="openTargetEdit('${t.id}','detail')">✏️ Edit</button>
+    <button class="btn" style="color:var(--bad)" onclick="deleteTarget('${profileId}','${t.id}')">🗑 Delete</button>
+  </div>`;
 }
 
-// ── History — completed targets, early/on-time/late. ────────────────────────────────────
+// ── Completed ──────────────────────────────────────────────────────────────────────────────────────────────────────
 function openTargetHistory(){ S.targetsView = 'history'; renderTargetsPopup(); }
 function targetHistoryHtml(profileId){
   const done = milestoneTargetsFor(profileId).filter(t=>t.completedAt).sort((a,b)=>b.completedAt.localeCompare(a.completedAt));
   if(!done.length) return emptyState('🏁','No completed targets yet.');
-  return done.map(t=>{
-    const unitLabel = t.unit==='percent' ? '%' : '';
-    const early = daysBetweenDates(t.completedAt, t.deadline);
-    const when = early>0 ? `${early} day${early>1?'s':''} early` : (early<0 ? `${-early} day${-early>1?'s':''} late` : 'on time');
-    const paper = t.paperId ? paperById(t.paperId) : null;
-    return `<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="openTargetDetail('${t.id}')">
-      <div class="mt-head">
-        <div><div class="mt-title">${escChat(t.title)}</div><div class="mt-sub">${paper?paper.code+' · '+paper.nick:'General'}</div></div>
-        <span class="mt-badge" style="--mt-color:var(--good);--mt-tint:var(--good-tint,var(--surface2))">${when}</span>
-      </div>
-      <div class="mt-meta"><span>Goal <b>${t.targetValue}${unitLabel}</b></span><span>Deadline <b>${new Date(t.deadline+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</b></span><span>Done <b>${new Date(t.completedAt+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</b></span></div>
-    </div>`;
-  }).join('');
+  return done.map(t=>mtCardHtml(profileId, t)).join('');
 }
 
 // ── Root render ──────────────────────────────────────────────────────────────────────────
@@ -8135,19 +8365,19 @@ function renderTargetsPopup(){
   if(!root) return;
   const profileId = S.local.myProfile;
   const view = S.targetsView || 'dashboard';
-  const titles = {dashboard:'Targets', create:'New Target', detail:'Target', history:'History'};
-  const backAction = view==='dashboard' ? 'exitTargetsPopup()' : 'exitTargetsPopup()';
+  const titles = {dashboard:'Targets', create:'New target', edit:'Edit target', detail:'Target', history:'Completed'};
+  const body = view==='create' ? targetFormHtml(profileId, null, S.targetsDraft)
+    : view==='edit' ? (targetById(profileId, S.targetEditId) ? targetFormHtml(profileId, targetById(profileId, S.targetEditId)) : emptyState('🎯','This target no longer exists.'))
+    : view==='detail' ? targetDetailHtml(profileId, S.targetDetailId)
+    : view==='history' ? targetHistoryHtml(profileId)
+    : targetsDashboardHtml(profileId);
   root.innerHTML = `
     <div class="stats-exit-bar">
-      <button onclick="${backAction}">${CHAT_ICONS.back || '&larr;'} <span>${titles[view]||'Targets'}</span></button>
-      ${view==='dashboard'?`<button onclick="openTargetCreateForm()" style="color:var(--active-accent,var(--umang))">+ <span>Add Target</span></button>`:''}
+      <button onclick="exitTargetsPopup()">${CHAT_ICONS.back || '&larr;'} <span>${titles[view]||'Targets'}</span></button>
+      ${view==='dashboard'?`<button onclick="openTargetCreateForm()" style="color:var(--active-accent,var(--umang))">+ <span>New</span></button>`:''}
     </div>
-    <div class="stats-scroll" id="targets-scroll">
-      ${view==='create' ? targetCreateFormHtml(profileId)
-        : view==='detail' ? targetDetailHtml(profileId, S.targetDetailId)
-        : view==='history' ? targetHistoryHtml(profileId)
-        : targetsDashboardHtml(profileId)}
-    </div>`;
+    <div class="stats-scroll" id="targets-scroll">${body}</div>`;
+  if(view==='create' || view==='edit') onTargetTypeChange(); // locks the unit for "overall", fills the live preview + chip highlights
   const scroll = document.getElementById('targets-scroll');
   if(scroll) animateCountUps(scroll);
 }

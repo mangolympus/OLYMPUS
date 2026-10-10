@@ -153,7 +153,14 @@
 // v124: Home motivation rebuilt from scratch -- one partner-voice, uplifting message per profile per study day (no more hold-to-refresh),
 // real-numbers context + anti-repeat history, warm offline fallback with quiet AI retries, 'dailyQuote' now single-owner synced, regenerates at 5 AM rollover.
 // v125: motivation card simplified -- removed the sparkle icon and the "For <name> · <weekday>" line; just the message.
-const CACHE_VERSION = 'olympus-v125';
+// v126: Targets -- press and hold a target card (Targets list, History, detail page, or the Home "Needs Attention" card) to EDIT it
+// (name, paper, type, goal + unit, start/deadline, priority; finished targets re-open if the goal is raised); Edit button on the detail page;
+// the Type dropdown no longer spills out of the form; the Targets back arrow no longer collapses to 0 px.
+// v127: Targets simplified -- one compact card (status, bar, "N to go · N days left", one line), a create/edit form with goal + deadline quick-picks and a live
+// "what it takes" line (items per day vs your recent lecture pace) plus ready-made ideas from your weakest papers, a plain detail page (days left / need per day /
+// your pace + a sentence + projected finish), Mark complete / Reopen / +3d +1w +2w more time, Add-to-Planner now spreads tasks evenly until the deadline (and no
+// longer adds one too many). Removed: priority + start date fields, pace bars, history list, KPI grid, At Risk/Critical jargon. Data is unchanged.
+const CACHE_VERSION = 'olympus-v127';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
