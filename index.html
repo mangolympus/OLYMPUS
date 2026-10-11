@@ -1254,6 +1254,10 @@ body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
 .chat-bubble .rt-i{font-style:italic}
 .chat-bubble .rt-u{text-decoration:underline}
 .chat-bubble .rt-code{font-family:'SF Mono',Consolas,monospace;background:rgba(127,127,127,.18);padding:1px 6px;border-radius:4px;font-size:13.5px}
+.chat-bubble .rt-link{color:inherit;font-weight:600;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px;word-break:break-all;cursor:pointer;
+  -webkit-user-select:text;user-select:text;-webkit-tap-highlight-color:rgba(255,255,255,.25)}
+.chat-group.in .chat-bubble .rt-link{color:#6ab7ff}
+html[data-mode="light"] .chat-group.in .chat-bubble .rt-link{color:#0b63ce}
 
 .chat-reply-quote{display:flex;flex-direction:column;gap:2px;padding:7px 10px;margin-bottom:6px;border-radius:9px;
   border-left:3px solid rgba(255,255,255,.55);background:rgba(255,255,255,.14);cursor:pointer;max-width:100%}
@@ -3481,7 +3485,13 @@ async function saveShared(data, opts){
     // fetch() off mid-request even after the local save (and its "✓ Saved" badge) already
     // completed — this timestamp is what catches that case on the next load, rather than
     // silently trusting whatever stale snapshot Drive happens to have.
-    if(S.local){ S.local.lastLocalSaveAt = Date.now(); saveLocal(); }
+    if(S.local){
+      S.local.lastLocalSaveAt = Date.now();
+      // v128: persisted "there is something here that Drive has not confirmed yet" -- survives a reload/kill, cleared only by an upload
+      // that began after this save and succeeded (see performDriveSaveOnce). Heartbeat-style saves that skip the upload don't set it.
+      if(!(opts && opts.skipDrivePush) && S.appSession && isHosted()) S.local.driveDirty = true;
+      saveLocal();
+    }
   }catch(e){
     console.error('Shared save failed', e);
     // A SET failing while window.storage exists is a much stronger signal of a real problem
@@ -3951,6 +3961,7 @@ function navItems(){
 function renderNav(){
   const effectiveView = S.view==='workspace' ? 'timer' : S.view;
   const unread = unreadChatCount();
+  syncAppBadge(unread);
   document.getElementById('bottomnav').innerHTML = navItems().map(n=>{
     const badge = (n.id==='chat' && unread>0) ? `<span class="nav-badge">${unread>99?'99+':unread}</span>` : '';
     return `<button class="${effectiveView===n.id?'active':''}" onclick="switchView('${n.id}')"><span class="nav-icon-wrap">${ICONS[n.id]||''}${badge}</span>${n.label}</button>`;
@@ -8683,16 +8694,60 @@ function fmtDateSeparator(dateStr){
   const sameYear = d.getFullYear() === studyNow().getFullYear();
   return d.toLocaleDateString('en-IN', sameYear ? {weekday:'long', day:'numeric', month:'short'} : {day:'numeric', month:'short', year:'numeric'});
 }
-// Lightweight markdown-lite: **bold**, *italic*, __underline__, `code`. Escapes first so
-// user text can never break out of the markup; only our own generated spans are trusted.
+// Lightweight markdown-lite: **bold**, *italic*, __underline__, `code`, plus (v128) tappable links. Escapes first so
+// user text can never break out of the markup; only our own generated spans/anchors are trusted.
+//
+// v128 LINKS: this function never made links at all -- a URL sent in chat was plain, un-tappable text. Now http(s):// and www.
+// addresses (and bare domains with a common ending, e.g. youtu.be/xyz or meet.google.com/abc) become real anchors that open in
+// a new tab/browser (a PWA must not navigate away from itself). Each URL is swapped for a placeholder BEFORE the markdown
+// passes so the _ and * inside real-world URLs are not mangled into underline/italic, then swapped back as an <a>. Only
+// http/https hrefs are ever produced (safeUrl() is applied as well), so a "javascript:" string can never become a link.
+const RT_TLDS = 'com|in|org|net|io|co|edu|gov|me|app|dev|ly|be|tv|ai|info|us|uk|ca|xyz|link|page|gl';
+const RT_URL_SCHEME_RE = /(^|[^\w])((?:https?:\/\/|www\.)[^\s<>]+)/gi;
+const RT_URL_BARE_RE = new RegExp('(^|[^\\w@./:%-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+(?:' + RT_TLDS + ')(?![\\w@-]|\\.[a-z0-9])(?:\\/[^\\s<>]*)?)', 'gi');
+// Peels sentence punctuation / markdown markers / an unmatched ")" off the end of a matched URL.
+function rtTrimUrl(u){
+  let url = u, trail = '';
+  for(;;){
+    const m = /[.,;:!?'"*_`\]}>]+$/.exec(url);
+    if(m){ trail = m[0] + trail; url = url.slice(0, -m[0].length); continue; }
+    if(url.endsWith(')') && (url.match(/\(/g)||[]).length < (url.match(/\)/g)||[]).length){ trail = ')' + trail; url = url.slice(0, -1); continue; }
+    break;
+  }
+  return {url, trail};
+}
+function rtLinkHtml(url){
+  const href = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+  const shown = url.length > 52 ? url.slice(0, 49) + '…' : url;
+  return `<a class="rt-link" href="${safeUrl(href)}" target="_blank" rel="noopener noreferrer" onclick="return chatLinkClick(event)">${escChat(shown)}</a>`;
+}
+// A tap on a link inside a bubble must open it -- but not when that same touch was a long-press (message menu), a swipe-to-reply,
+// or a tap while messages are being selected.
+let _chatLongPressAt = 0, _chatSwipeAt = 0;
+function chatLinkClick(ev){
+  if(S._chatSelectMode || (Date.now() - _chatLongPressAt) < 900 || (Date.now() - _chatSwipeAt) < 500){ ev.preventDefault(); return false; }
+  ev.stopPropagation();
+  return true;
+}
 function renderRichText(text){
-  let s = escChat(text);
+  const links = [];
+  const stash = (m, pre, found)=>{
+    const t = rtTrimUrl(found);
+    if(!/[a-z0-9]/i.test(t.url.replace(/^(https?:\/\/|www\.)/i, ''))) return m;
+    links.push(t.url);
+    return pre + '' + (links.length - 1) + '' + t.trail;
+  };
+  let raw = String(text==null ? '' : text).replace(/[]/g, '');
+  raw = raw.replace(RT_URL_SCHEME_RE, stash).replace(RT_URL_BARE_RE, stash);
+  let s = escChat(raw);
   s = s.replace(/`([^`\n]+?)`/g, '<span class="rt-code">$1</span>');
   s = s.replace(/\*\*([^\n*]+?)\*\*/g, '<span class="rt-b">$1</span>');
   s = s.replace(/__([^\n_]+?)__/g, '<span class="rt-u">$1</span>');
   s = s.replace(/\*([^\n*]+?)\*/g, '<span class="rt-i">$1</span>');
+  s = s.replace(/(\d+)/g, (m, i)=> rtLinkHtml(links[+i]));
   return s.replace(/\n/g, '<br>');
 }
+
 // Searches live messages first, then the in-memory archive if already fetched this session.
 // Read-only callers (reply bar preview, reply-quote display, jump-to) work correctly once
 // archive is in memory. Write callers (delete, edit, pin, star, react) guard separately
@@ -8768,7 +8823,10 @@ let _backgroundPollTimer = null;
 let _bgPollInFlight = false; // see the guard inside the interval below
 // Heartbeat push throttle — see the detailed note at the call site inside the poll below.
 let _heartbeatTickCount = 0;
-const HEARTBEAT_PUSH_EVERY_N_TICKS = 3; // 3 x 30s poll = a Drive push roughly every 90s
+// v128: the poll is 15 s (was 30 s) so a chat message / the unread badge shows up faster when no push is available; the Drive push of the
+// heartbeat stays at roughly every 90 s (6 x 15 s).
+const BG_POLL_MS = 15000;
+const HEARTBEAT_PUSH_EVERY_N_TICKS = 6; // 6 x 15s poll = a Drive push roughly every 90s
 function startBackgroundPoll(){
   stopBackgroundPoll();
   _backgroundPollTimer = setInterval(async ()=>{
@@ -8819,10 +8877,12 @@ function startBackgroundPoll(){
     if(_bgPollInFlight) return; // same one-at-a-time reasoning as the chat poll — see there
     _bgPollInFlight = true;
     try{
+      const _readStartedAt = Date.now();
       const remote = await driveSyncLoad();
       if(remote){
         let changed = false;
-        if(remote.chat && mergeChatFromRemote(remote)) changed = true;
+        // v128: chat goes through applyRemoteChat() (badge, local persist, lost-write repair); it no longer forces a full upload via `changed` below.
+        applyRemoteChat(remote, _readStartedAt);
         // Partner's timer AND their logged sessions come from the same read, so when a session ends the live card, their
         // 'Last session ended at' line and today's hours all update together instead of the hours dipping until the next sync.
         if(refreshOtherProfileDataFromRemote(migrateShared(remote))) changed = true;
@@ -8850,7 +8910,7 @@ function startBackgroundPoll(){
       }
     }catch(e){ console.warn('Background poll failed', e); }
     finally{ _bgPollInFlight = false; }
-  }, 30000);
+  }, BG_POLL_MS);
 }
 function stopBackgroundPoll(){ if(_backgroundPollTimer){ clearInterval(_backgroundPollTimer); _backgroundPollTimer=null; } }
 // Pulls in the other profile's live Timer status if the remote copy is newer than what we
@@ -8925,7 +8985,11 @@ async function refreshPartnerTimerNow(){
   if(_partnerRefreshBusy || !S.appSession || !isHosted() || !(S.local && S.local.myProfile)) return;
   _partnerRefreshBusy = true;
   try{
+    const _t0 = Date.now();
     const remote = await driveSyncLoad();
+    // v128: this is what a push and "app came back to the foreground" call, and it only refreshed the partner's timer -- a new chat
+    // message was left waiting for the next background poll (up to 30 s) and nothing happened at all while hidden. Chat is applied here too.
+    if(remote) applyRemoteChat(remote, _t0);
     if(remote && refreshOtherProfileDataFromRemote(migrateShared(remote))){ saveShared(null, {skipDrivePush:true}); renderNav(); onPartnerTimerChanged(); }
   }catch(e){ console.warn('Partner timer refresh failed', e); }
   finally{ _partnerRefreshBusy = false; }
@@ -8944,7 +9008,10 @@ document.addEventListener('visibilitychange', ()=>{
   // Leaving: send one last "still going" stamp before the browser freezes the page. Returning: send a fresh one
   // and pull the partner's latest straight away.
   pushOwnHeartbeat(document.hidden);
-  if(!document.hidden){ refreshPartnerTimerSoon([0, 4000]); renderIfStudyDayChanged(); try{ ensureDailyQuote(); }catch(e){} } // ensureDailyQuote is a no-op once today's message exists
+  postSwViewState();
+  if(document.hidden) flushPendingSaveNow(); // v128: don't wait out the debounce when the screen is going off
+  else flushDriveIfDirty();                  // v128: anything that never reached Drive goes up now
+  if(!document.hidden){ refreshPartnerTimerSoon([0, 2000, 5000]); renderIfStudyDayChanged(); try{ ensureDailyQuote(); }catch(e){} } // ensureDailyQuote is a no-op once today's message exists
 });
 function chatStatusInfo(otherId){
   const chat = S.shared.chat;
@@ -8964,13 +9031,16 @@ function chatStatusInfo(otherId){
 // see performDriveSave() for why these get refreshed from a freshly-fetched remote copy
 // before every single save, not just when chat changed. timerState is deliberately excluded
 // here — it already has its own timestamp-guarded merge (mergeTimerStateFromRemote) below,
-// a better fit than a blind replace. pushSubscriptions/pushState/pushPrefs are excluded too —
-// sendPush()'s expiry handling and the reminders cron can also write into those on the OTHER
-// profile's behalf, so a blind replace here could undo one of those; a much lower-stakes risk
-// (a missed notification, not lost study data) left as-is rather than rushed into this fix.
+// a better fit than a blind replace. pushState is excluded too — the reminders cron writes into it on
+// both profiles' behalf, so a blind replace could undo one of those.
+// v128: pushSubscriptions and pushPrefs ARE single-owner (see the list below). They were excluded before, on the assumption that a
+// stale copy was a low-stakes risk (a missed notification) -- but that is exactly the symptom being reported: a partner's phone kept
+// uploading its old copy of MY subscription / my "new message" switch, and never refreshed its own cached copy of them, so pushes
+// to me were dropped or sent to a dead address with nothing visibly wrong. Each profile writes only its own entry; the sender no
+// longer deletes the partner's (it remembers a dead endpoint on its own device instead -- see sendPush()).
 const SINGLE_OWNER_SHARED_KEYS = ['logs','targets','chapters','lectures','mockScores','tasks',
   'profileInfo','dailyTargetOverride','prefs','celebratedMilestones','habits','habitLog',
-  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','dailyQuote'];
+  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','dailyQuote','pushSubscriptions','pushPrefs'];
 // v124: 'dailyQuote' added -- each profile writes only its own motivation, and without this the partner's phone could re-upload a stale
 // copy of it, wiping today's message and triggering a second generation.
 // milestoneTargets was missing from this list entirely — the rebuilt Targets page (see its
@@ -9018,6 +9088,7 @@ function refreshOtherProfileDataFromRemote(freshRemote){
   return timerChanged || before !== slice();
 }
 function mergeChatFromRemote(remoteShared){
+  _chatMergeListChanged = false;
   if(!remoteShared || !remoteShared.chat) return false;
   let changed = false;
   const remote = remoteShared.chat;
@@ -9036,11 +9107,17 @@ function mergeChatFromRemote(remoteShared){
   const merged = Object.values(byId).sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
   if(merged.length !== (local.messages||[]).length) changed = true;
   local.messages = merged;
+  let listChanged = changed; // message list (new/edited message) vs. presence-only (typing / online) -- see applyRemoteChat()
+  (remote.messages||[]).forEach(m=>{ _remoteChatIds.add(m.id); });
   ['readUpto','typingUntil','lastActive'].forEach(k=>{
     if(!local[k]) local[k] = {};
     if(!remote[k]) return;
     PROFILES.forEach(p=>{
       const lv = local[k][p.id], rv = remote[k][p.id];
+      // v128: my OWN typing flag is mine alone. This merge ran on every save too (performDriveSave's pre-save read) and took Drive's older
+      // copy of it -- null, because my upload hadn't landed yet -- over the fresh value I had just set, so the partner almost never saw
+      // "typing…" at all. Only the other person's flag is ever taken from Drive.
+      if(k === 'typingUntil' && S.local && p.id === S.local.myProfile) return;
       if(k === 'typingUntil'){
         // null is a meaningful signal here (= sender stopped typing / sent a message) and must
         // overwrite a stale non-null local value, otherwise the typing indicator never clears
@@ -9050,11 +9127,220 @@ function mergeChatFromRemote(remoteShared){
         const shouldUpdate = rv !== lv && (rv === null || !lv || new Date(rv) > new Date(lv));
         if(shouldUpdate){ local[k][p.id] = rv; changed = true; }
       } else {
-        if(rv && (!lv || new Date(rv) > new Date(lv))){ local[k][p.id]=rv; changed=true; }
+        if(rv && (!lv || new Date(rv) > new Date(lv))){ local[k][p.id]=rv; changed=true; if(k==='readUpto') listChanged = true; } // her read pointer moves my ticks
       }
     });
   });
+  _chatMergeListChanged = listChanged;
   return changed;
+}
+
+// ═══ v128: CHAT SYNC CORE ═══════════════════════════════════════════════════════════════════════════════════════════
+// Every place that reads the shared file (the 3 s chat poll, the app-wide background poll, the refresh that runs when a push
+// arrives or the app comes back to the foreground, the check after an upload) now funnels through applyRemoteChat(), so they
+// all behave the same: merge, redraw only what changed, keep the unread badge right, and notice when OUR recent messages are
+// missing from Drive.
+let _chatMergeListChanged = false;   // set by mergeChatFromRemote(): did the message LIST change (new/edited message, partner's read pointer)?
+const _remoteChatIds = new Set();    // ids of messages seen in a copy that came from Drive -- drives the single/double tick
+function chatPartnerMsgCount(){
+  const me = S.local && S.local.myProfile; if(!me || !S.shared || !S.shared.chat) return 0;
+  return (S.shared.chat.messages||[]).filter(m=> m.from!==me).length;
+}
+// My recent messages/edits that the freshly-read Drive copy does not have (or has an older version of). Only things that were
+// already inside my last successful upload count -- anything newer is still travelling in a queued upload.
+function chatMissingOnRemote(remote, uploadedUpTo){
+  const rc = remote && remote.chat;
+  const have = {};
+  ((rc && rc.messages) || []).forEach(m=>{ have[m.id] = new Date(m.updatedAt||m.createdAt).getTime(); });
+  const horizon = Date.now() - 6*3600*1000;
+  const missing = [];
+  ((S.shared.chat && S.shared.chat.messages) || []).forEach(m=>{
+    const t = new Date(m.updatedAt||m.createdAt).getTime();
+    if(!(t >= horizon) || t > uploadedUpTo) return;
+    if(have[m.id] === undefined || have[m.id] < t) missing.push(m.id);
+  });
+  return missing;
+}
+let _chatRepushAt = 0, _chatRepushCount = 0, _chatRepushKey = '';
+// The whole shared file is replaced on every save, so when both phones save within the same second or two the later upload
+// silently wipes the earlier one's new message from Drive (each phone still shows its own message, so nothing looks wrong on
+// the sender's side, but the partner never gets it). Every read of Drive now checks for that and re-uploads. Returns
+// 'clean' (everything of mine is on Drive), 'repushed', or 'waiting' (can't tell yet -- an upload is queued/in flight, or
+// this read began before my last upload finished).
+function chatRepushIfNeeded(remote, readStartedAt){
+  try{
+    if(!remote || !S.appSession || !isHosted()) return 'waiting';
+    if(_syncPending || _driveSavePromise) return 'waiting';
+    if(!_lastPostSnapshotAt || readStartedAt < _lastPostDoneAt) return 'waiting';
+    const missing = chatMissingOnRemote(remote, _lastPostSnapshotAt);
+    if(!missing.length){ _chatRepushCount = 0; _chatRepushKey = ''; return 'clean'; }
+    const key = missing.join(',');
+    if(key !== _chatRepushKey){ _chatRepushKey = key; _chatRepushCount = 0; }
+    if(_chatRepushCount >= 6 || Date.now() - _chatRepushAt < 2500) return 'waiting';
+    _chatRepushCount++; _chatRepushAt = Date.now();
+    console.warn('Chat: Drive is missing ' + missing.length + ' recent message(s) (overwritten by a simultaneous save) — uploading again');
+    driveSyncSaveNow();
+    return 'repushed';
+  }catch(e){ console.warn('chatRepushIfNeeded failed', e); return 'waiting'; }
+}
+// Look at Drive a few seconds after an upload that changed chat (and again after each repair) until it holds everything.
+let _chatVerifyToken = 0;
+function verifyChatOnDrive(attempt){
+  if(!S.appSession || !isHosted()) return;
+  const delays = [4000, 9000, 20000, 40000];
+  if(attempt >= delays.length) return;
+  const tok = ++_chatVerifyToken;
+  setTimeout(async ()=>{
+    if(tok !== _chatVerifyToken) return; // a newer chat change has its own check
+    const t0 = Date.now();
+    let remote = null;
+    try{ remote = await driveSyncLoad(); }catch(e){}
+    if(tok !== _chatVerifyToken) return;
+    if(!remote){ verifyChatOnDrive(attempt+1); return; }
+    const r = applyRemoteChat(remote, t0);
+    if(r.state !== 'clean') verifyChatOnDrive(attempt+1);
+  }, delays[attempt]);
+}
+function chatHasUndeliveredOut(){
+  const me = S.local && S.local.myProfile; if(!me || !S.shared || !S.shared.chat) return false;
+  return (S.shared.chat.messages||[]).some(m=> m.from===me && !m.deleted && !chatMsgOnDrive(m));
+}
+function chatMsgOnDrive(m){
+  return _remoteChatIds.has(m.id) || (_lastPostSnapshotAt > 0 && _lastPostSnapshotAt >= new Date(m.createdAt).getTime());
+}
+// The one place a freshly-read Drive copy is applied to chat, whichever view is open.
+function applyRemoteChat(remote, readStartedAt){
+  const out = {changed:false, listChanged:false, readChanged:false, state:'waiting'};
+  if(!remote || !S.local || !S.local.myProfile || !S.shared || !S.shared.chat) return out;
+  const unreadBefore = unreadChatCount();
+  out.changed = mergeChatFromRemote(remote);
+  out.listChanged = _chatMergeListChanged;
+  const inChat = S.view === 'chat';
+  // A message only counts as read when it is really on screen: chat open, screen on, scrolled to the newest message.
+  if(inChat && !document.hidden && chatIsNearBottom()) out.readChanged = markChatRead();
+  if(inChat){
+    if(out.listChanged || out.readChanged) renderChatMessagesOnly();
+    else updateChatPresenceUI(); // typing / online / last-seen only -- leaves the message list (and the scroll position) alone
+  } else if(out.listChanged || unreadChatCount() !== unreadBefore){
+    renderNav(); // unread badge
+  }
+  if(out.readChanged) saveShared();                                        // my read pointer moved: upload so the sender's ticks turn blue promptly
+  else if(out.listChanged) saveShared(null, {skipDrivePush:true});         // local only: Drive already has everything that was just merged
+  out.state = chatRepushIfNeeded(remote, readStartedAt);
+  return out;
+}
+// Typing bubble + header status, without touching the message list.
+function updateChatHeaderStatus(){
+  const me = S.local.myProfile || 'umang';
+  const status = chatStatusInfo(otherProfileId(me));
+  const statusEl = document.getElementById('chat-header-status');
+  if(statusEl){
+    statusEl.className = 'chat-header-status'+(status.typing?' typing':'');
+    statusEl.innerHTML = status.typing ? `<span class="typedots"><span></span><span></span><span></span></span>typing…` : escChat(status.text);
+  }
+  const dotEl = document.querySelector('.chat-header-avatar .dot');
+  if(dotEl) dotEl.classList.toggle('online', !!status.online);
+  return status;
+}
+function updateChatPresenceUI(){
+  const list = document.getElementById('chat-messages-list');
+  if(!list) return;
+  const status = updateChatHeaderStatus();
+  const bubble = list.querySelector('.chat-typing-bubble');
+  const me = S.local.myProfile || 'umang';
+  if(status.typing && !S._chatStarredFilter){
+    if(!bubble){
+      const wasAtBottom = S._chatPinToBottom || (list.scrollHeight - list.scrollTop - list.clientHeight) < 80;
+      const el = document.createElement('div');
+      el.className = 'chat-typing-bubble';
+      el.setAttribute('aria-label', profileById(otherProfileId(me)).nick + ' is typing');
+      el.innerHTML = '<span></span><span></span><span></span>';
+      list.appendChild(el);
+      if(wasAtBottom) list.scrollTop = list.scrollHeight;
+      updateScrollToBottomFab(list);
+    }
+  } else if(bubble){
+    bubble.remove();
+  }
+}
+
+// ── Chat <-> service worker: "is somebody looking at the chat right now?" ──
+// The SENDER can't know that reliably (it only sees a synced timestamp), so the old rule -- skip the push when the partner's
+// lastActive is under 90 s old -- swallowed exactly the pushes that matter: right after she left chat, or locked her phone
+// in the middle of a conversation. Now the push is always sent and the RECIPIENT'S service worker decides, using this report.
+function postSwViewState(){
+  try{
+    const c = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if(c) c.postMessage({type:'VIEW_STATE', inChat: S.view==='chat' && !document.hidden});
+  }catch(e){}
+}
+// Notification tap (or ?open=chat on a cold start) -> straight into the chat.
+function openChatFromNotification(){
+  if(!(S.appSession && S.local && S.local.myProfile)) return;
+  if(S.view === 'chat'){ pollChatUpdates(); return; }
+  if(typeof switchView === 'function') switchView('chat');
+}
+function applyPendingOpenFromUrl(){
+  try{
+    const params = new URLSearchParams(location.search);
+    if(params.get('open') !== 'chat') return;
+    history.replaceState(null, '', location.pathname);
+    openChatFromNotification();
+  }catch(e){}
+}
+// A push said a message is on its way: the sender's upload can land a few seconds after the push does, so look repeatedly
+// (and stop as soon as it shows up).
+let _chatSoonToken = 0;
+function refreshChatSoon(){
+  const tok = ++_chatSoonToken;
+  const before = chatPartnerMsgCount();
+  [0, 1500, 4000, 9000, 16000].forEach(ms=> setTimeout(async ()=>{
+    if(tok !== _chatSoonToken) return;
+    await refreshPartnerTimerNow();
+    if(tok === _chatSoonToken && chatPartnerMsgCount() > before) _chatSoonToken++; // arrived -- cancel the remaining looks
+  }, ms));
+}
+// Home-screen / launcher badge with the unread count, where the browser supports it (installed PWA on Android, desktop).
+let _lastAppBadge = -1;
+function syncAppBadge(n){
+  if(n === _lastAppBadge) return;
+  _lastAppBadge = n;
+  try{
+    if(n > 0 && navigator.setAppBadge) navigator.setAppBadge(n).catch(()=>{});
+    else if(n === 0 && navigator.clearAppBadge) navigator.clearAppBadge().catch(()=>{});
+  }catch(e){}
+}
+// First load: Drive's copy replaces this device's, so a message that was typed here but never reached Drive (app closed or
+// signal lost mid-upload, then the partner's phone saved in between) would vanish on reload. Fold this device's RECENT chat
+// back in (only the last 7 days -- anything older was swept to the archive on purpose) and report whether it added anything.
+function unionRecentLocalChat(target, localShared){
+  if(!target || !localShared || !localShared.chat) return false;
+  if(!target.chat) target.chat = {messages:[], readUpto:{umang:null,chetna:null}, typingUntil:{umang:null,chetna:null}, lastActive:{umang:null,chetna:null}};
+  const horizon = Date.now() - 7*864e5;
+  const have = {};
+  (target.chat.messages||[]).forEach(m=>{ have[m.id] = m; });
+  let changed = false;
+  (localShared.chat.messages||[]).forEach(m=>{
+    const t = new Date(m.updatedAt||m.createdAt).getTime();
+    if(!(t >= horizon)) return;
+    const ex = have[m.id];
+    if(!ex || t > new Date(ex.updatedAt||ex.createdAt).getTime()){ have[m.id] = m; changed = true; }
+  });
+  if(changed) target.chat.messages = Object.values(have).sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+  const me = S.local && S.local.myProfile;
+  if(me && localShared.chat.readUpto && localShared.chat.readUpto[me]){
+    if(!target.chat.readUpto) target.chat.readUpto = {};
+    const lv = localShared.chat.readUpto[me], rv = target.chat.readUpto[me];
+    if(!rv || new Date(lv) > new Date(rv)){ target.chat.readUpto[me] = lv; changed = true; }
+  }
+  return changed;
+}
+async function readLocalSharedQuiet(){
+  try{
+    const res = await storageGet('olympusData', true);
+    if(res && res.value) return migrateShared(JSON.parse(res.value));
+  }catch(e){ console.warn('readLocalSharedQuiet failed', e); }
+  return null;
 }
 
 // ── Lifecycle ────────────────────────────────────────────────
@@ -9077,6 +9363,7 @@ function enterChat(){
   // re-render restores whatever half-settled scroll position it happens to measure.
   S._chatPinToBottom = true;
   if(S._chatDraft===undefined) S._chatDraft = '';
+  if(!S._chatDraft && S.local && S.local.chatDraft) S._chatDraft = S.local.chatDraft; // v128: an unsent draft survives a reload
   if(!_chatHistoryActive){
     try{ history.pushState({olympusChat:true}, '', location.href); }catch(e){}
     _chatHistoryActive = true;
@@ -9092,6 +9379,7 @@ function enterChat(){
   scrollChatToBottomOnEntry();
   startChatPolling();
   startChatHeartbeat();
+  postSwViewState(); // chat is on screen now: sw.js clears the chat notification and won't show a new one while we look at it
   focusComposer();
 }
 // Common cleanup, used whether chat was left via the in-app back arrow or the hardware/browser back button.
@@ -9115,6 +9403,7 @@ function finishLeavingChat(){
     saveShared();
   }
   S.view = S._chatReturnView || 'home';
+  postSwViewState();
   S._justNavigated = true;
   renderNav(); renderApp();
 }
@@ -9153,6 +9442,7 @@ function startChatHeartbeat(){
     const me = S.local.myProfile; if(!me) return;
     S.shared.chat.lastActive[me] = nowISO();
     saveShared();
+    postSwViewState(); // keep sw.js's "chat is open" report fresh (it expires after 75 s)
   }, 25000);
 }
 function stopChatHeartbeat(){ if(_chatHeartbeatTimer){ clearInterval(_chatHeartbeatTimer); _chatHeartbeatTimer=null; } }
@@ -9168,6 +9458,7 @@ function stopChatPolling(){
   document.removeEventListener('visibilitychange', onChatVisibilityChange);
 }
 function onChatVisibilityChange(){
+  postSwViewState(); // tell sw.js whether the chat is on screen, so it knows whether to show a notification
   if(document.hidden){
     if(_chatPollTimer){ clearInterval(_chatPollTimer); _chatPollTimer=null; }
     // Stop the heartbeat too. lastActive is the cross-device "they're looking at Chat right
@@ -9197,43 +9488,41 @@ function onChatVisibilityChange(){
 // fresh. One at a time: if a poll is still running, skip this tick entirely and let the next
 // one pick it up. Applies to the manual refresh button and the push-triggered poll too,
 // which is correct — if a read is already on the way, a second one adds nothing.
-let _chatPollInFlight = false;
-async function pollChatUpdates(){
-  if(S.view!=='chat' || !S.appSession || !isHosted()) return;
-  if(_chatPollInFlight) return;
-  _chatPollInFlight = true;
-  try{
-    const remote = await driveSyncLoad();
-    if(remote && remote.chat){
-      const changed = mergeChatFromRemote(remote);
-      // Only mark read if the newest message is actually on screen — see chatIsNearBottom().
-      const readChanged = chatIsNearBottom() ? markChatRead() : false;
-      if(changed){ renderChatMessagesOnly(); saveShared(); }
-      else if(readChanged){
-        renderChatMessagesOnly();
-        // Persist the updated readUpto to localStorage only — no full Drive write here to
-        // avoid hammering the API on every 3s poll for a minor read-receipt advance. The
-        // 25s heartbeat handles Drive propagation. Without this local persist, closing the
-        // app within that window would revert the pointer and show messages as unread again.
-        storageSet('olympusData', JSON.stringify(S.shared), true).catch(()=>{});
-      }
-    }
-  }catch(e){ console.warn('Chat poll failed', e); }
-  finally{ _chatPollInFlight = false; }
+let _chatPollPromise = null;
+// Returns a promise (true = Drive was reached and applied) so the manual refresh button can wait on it and report failure.
+function pollChatUpdates(){
+  if(S.view!=='chat' || !S.appSession || !isHosted()) return Promise.resolve(false);
+  if(_chatPollPromise) return _chatPollPromise; // one read at a time -- see the note above
+  _chatPollPromise = (async()=>{
+    try{
+      const t0 = Date.now();
+      const remote = await driveSyncLoad();
+      if(!remote) return false;
+      // v128: applyRemoteChat() redraws only what changed. This used to call saveShared() -- a complete GET + POST of the whole
+      // shared file -- every time ANYTHING in chat changed, including the partner's typing flag or online heartbeat, so two phones
+      // with the chat open kept re-uploading the entire file in response to each other, which is exactly when simultaneous
+      // saves overwrite each other's messages. Now only a moved read pointer (so the sender's ticks turn blue) uploads.
+      applyRemoteChat(remote, t0);
+      return true;
+    }catch(e){ console.warn('Chat poll failed', e); return false; }
+    finally{ _chatPollPromise = null; }
+  })();
+  return _chatPollPromise;
 }
-// Manual "refresh chat" button — was referenced by the UI (chat-force-refresh-btn's onclick)
-// but never actually implemented, so tapping it silently did nothing (a ReferenceError,
-// swallowed since inline onclick handlers don't surface exceptions anywhere visible). The
-// 3-second background poll (see startChatPolling()) already keeps chat current on its own,
-// same underlying pollChatUpdates() call — this just gives an immediate, visible way to
-// force that same check right now rather than waiting for the next tick, with a spin icon
-// for feedback.
+// Manual "refresh chat" button. Waits for a read that is already in flight and then reads again (that one may have started
+// before the latest message existed), and says so out loud when Drive can't be reached instead of silently doing nothing.
 async function forceRefreshChat(){
   const btn = document.getElementById('chat-force-refresh-btn');
   if(btn) btn.classList.add('spin');
-  await pollChatUpdates();
+  let ok = true;
+  try{
+    if(_chatPollPromise) await _chatPollPromise;
+    ok = await pollChatUpdates();
+  }catch(e){ ok = false; }
+  if(!ok && S.view==='chat') showToast("Couldn't reach the server — will keep trying.");
   if(btn) setTimeout(()=> btn.classList.remove('spin'), 400);
 }
+
 
 // ── Render: page shell ──────────────────────────────────────
 function chatPageHtml(){
@@ -9466,10 +9755,10 @@ function chatTicksHtml(msg){
   const other = otherProfileId(me);
   const readUpto = S.shared.chat.readUpto && S.shared.chat.readUpto[other];
   const isRead = readUpto && new Date(readUpto) >= new Date(msg.createdAt);
-  const delivered = S.lastSynced && new Date(S.lastSynced) >= new Date(msg.createdAt);
+  const delivered = chatMsgOnDrive(msg); // v128: really on Drive (seen in a copy read from Drive, or inside a successful upload) -- was "any save finished after it was written"
   if(isRead) return `<span class="chat-ticks read" title="Read">${CHAT_ICONS.checkDouble}</span>`;
   if(delivered) return `<span class="chat-ticks" title="Delivered">${CHAT_ICONS.checkDouble}</span>`;
-  return `<span class="chat-ticks" title="Sent">${CHAT_ICONS.checkSingle}</span>`;
+  return `<span class="chat-ticks" title="Sending…">${CHAT_ICONS.checkSingle}</span>`;
 }
 // Poll creation and voting were removed from Chat. Historic type:'poll' messages stay in the
 // thread and still show their question and final tallies, but read-only — no vote buttons, so
@@ -9577,15 +9866,7 @@ function renderChatMessagesOnly(){
   if(wasAtBottom) msgList.scrollTop = msgList.scrollHeight;
   else msgList.scrollTop = prevScrollTop + (msgList.scrollHeight - prevScrollHeight);
   updateScrollToBottomFab(msgList);
-  const me = S.local.myProfile || 'umang';
-  const status = chatStatusInfo(otherProfileId(me));
-  const statusEl = document.getElementById('chat-header-status');
-  if(statusEl){
-    statusEl.className = 'chat-header-status'+(status.typing?' typing':'');
-    statusEl.innerHTML = status.typing ? `<span class="typedots"><span></span><span></span><span></span></span>typing…` : escChat(status.text);
-  }
-  const dotEl = document.querySelector('.chat-header-avatar .dot');
-  if(dotEl) dotEl.classList.toggle('online', !!status.online);
+  updateChatHeaderStatus();
 }
 
 // ── Scroll / windowing ─────────────────────────────────────
@@ -9702,7 +9983,7 @@ function onChatScroll(el){
   if(chatIsNearBottom() && markChatRead()){
     updateScrollToBottomFab(el);
     renderNav();
-    storageSet('olympusData', JSON.stringify(S.shared), true).catch(()=>{});
+    saveShared(); // v128: was local-only until the next heartbeat; upload now so her ticks turn blue when you actually read it
   }
 }
 function jumpToOriginal(id){ jumpToChatId(id); }
@@ -9743,13 +10024,20 @@ async function jumpToChatId(id){
 // ── Composer interactions ───────────────────────────────────
 function focusComposer(){ const el = document.getElementById('chat-composer-input'); if(el) el.focus(); }
 function autoGrowComposer(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
-function chatComposerInput(el){ S._chatDraft = el.value; autoGrowComposer(el); markComposerTyping(); }
+function chatComposerInput(el){ S._chatDraft = el.value; autoGrowComposer(el); markComposerTyping(); persistChatDraft(); }
+// v128: what is typed but not sent is kept on this device, so a reload / the OS killing the page doesn't throw it away.
+let _chatDraftTimer = null;
+function persistChatDraft(){
+  if(S._chatEditing) return; // the text of a message being edited is not an unsent draft
+  clearTimeout(_chatDraftTimer);
+  _chatDraftTimer = setTimeout(()=>{ if(S.local){ S.local.chatDraft = S._chatDraft || ''; saveLocal(); } }, 600);
+}
 function markComposerTyping(){
   const now = Date.now();
   if(S._chatLastTypingPing && now - S._chatLastTypingPing < 2000) return;
   S._chatLastTypingPing = now;
   const me = S.local.myProfile; if(!me) return;
-  S.shared.chat.typingUntil[me] = new Date(now+4000).toISOString();
+  S.shared.chat.typingUntil[me] = new Date(now+6000).toISOString(); // v128: 6 s (was 4) -- the flag has to survive the upload + the partner's 3 s poll
   // The typing flag is a few bytes, but saveShared() pushes the ENTIRE shared blob (chat
   // history with inline base64 photos included) — so holding down a sentence used to fire a
   // full multi-megabyte upload every 2 seconds, on top of the 3s full-blob poll already
@@ -10053,7 +10341,7 @@ function sendChatMessage(){
     S._chatReplyTo = null;
     isNewMessage = true;
   }
-  S._chatDraft = '';
+  S._chatDraft = ''; if(S.local) S.local.chatDraft = ''; // (persisted by the saveShared() below)
   // Clear the typing indicator immediately — without this it lingers for up to 4 more
   // seconds after the message already arrived on the other person's screen.
   if(S.shared.chat.typingUntil) S.shared.chat.typingUntil[me] = null;
@@ -10071,7 +10359,7 @@ function sendSticker(char){
     forwarded:false, edited:false, editedAt:null, deleted:false, pinned:false, starredBy:{}, reactions:{}, createdAt:now, updatedAt:now});
   S._chatReplyTo = null; S._chatTray = null;
   if(S.shared.chat.typingUntil) S.shared.chat.typingUntil[me] = null;
-  saveShared(); renderChatPage(); scrollChatToBottom();
+  saveShared(); notifyPartnerNewMessage(me, 'Sticker ' + char); renderChatPage(); scrollChatToBottom();
 }
 // pollDraftAddOption/pollDraftRemoveOption/pollDraftUpdate/submitPoll/votePoll removed along
 // with the poll feature — nothing can create a poll or change a vote any more. renderPollBubble()
@@ -10114,7 +10402,7 @@ function forwardMessage(id){
     replyTo:null, forwarded:true, edited:false, editedAt:null, deleted:false, pinned:false,
     starredBy:{}, reactions:{}, createdAt:now, updatedAt:now,
   });
-  saveShared(); renderChatPage(); scrollChatToBottom();
+  saveShared(); notifyPartnerNewMessage(me, chatPlainPreview(msg)); renderChatPage(); scrollChatToBottom();
 }
 function pinChatMessage(id){
   const msg = findMsg(id); if(!msg) return;
@@ -10284,12 +10572,14 @@ function chatPressStart(ev, id){
   _pressMsgId = id; _pressStartX = ev.clientX; _pressStartY = ev.clientY; _pressSwiping = false;
   _pressEl = ev.currentTarget.closest('.chat-row');
   _pressPointerId = ev.pointerId;
-  try{ ev.currentTarget.setPointerCapture(ev.pointerId); }catch(e){}
+  // v128: capturing the pointer re-targets the click to the bubble, so a tap on a link inside it would never reach the link.
+  const onLink = !!(ev.target.closest && ev.target.closest('.rt-link'));
+  try{ if(!onLink) ev.currentTarget.setPointerCapture(ev.pointerId); }catch(e){}
   clearTimeout(_pressTimer);
   _pressTimer = null;
   if(S._chatSelectMode) return; // in selection mode every tap just toggles — see chatPressEnd
   _pressTimer = setTimeout(()=>{
-    if(!_pressSwiping){ _pressTimer=null; if(navigator.vibrate) navigator.vibrate(12); openChatSheet(id); }
+    if(!_pressSwiping){ _pressTimer=null; _chatLongPressAt = Date.now(); if(navigator.vibrate) navigator.vibrate(12); openChatSheet(id); }
   }, 450);
 }
 function chatPressMove(ev){
@@ -10308,6 +10598,7 @@ function chatPressMove(ev){
 function chatPressEnd(ev){
   if(_pressTimer){ clearTimeout(_pressTimer); _pressTimer=null; }
   if(_pressSwiping && _pressEl){
+    _chatSwipeAt = Date.now();
     const dx = (ev.clientX||_pressStartX) - _pressStartX;
     _pressEl.style.transition = '';
     _pressEl.style.transform = '';
@@ -16656,9 +16947,34 @@ let _lastSavedChatFingerprint = null;
 //    problem, that's the next thing to actually dig into — likely via a real architecture
 //    change (photos stored as separate files, referenced by ID, rather than embedded
 //    inline), not a further timer tweak.
-async function performDriveSave(){
+// ═══ v128: SAVE PIPELINE — one upload at a time, remembered until it lands, retried until it does ═══════════════════
+// What was wrong before: performDriveSave() could run twice at once (the 900 ms debounce and driveSyncSaveNow() both start
+// one), so an older upload could land AFTER a newer one; a failed upload was only noted ("Sync error") and never retried, so
+// a message sent just before the signal dropped stayed on the sender's phone only; and nothing remembered "there is
+// something not on Drive yet" across a reload, so closing the app mid-upload lost the change for good (initAfterLogin
+// adopts whatever Drive has). Now: uploads run strictly one after another (a request that arrives meanwhile is folded into
+// ONE follow-up), S.local.driveDirty stays true until an upload that began after the change has succeeded, failures retry
+// after 4 s / 10 s / 30 s / 60 s, and coming back online / back to the foreground / reopening the app flushes anything dirty.
+let _syncPending = false;            // a debounced upload is scheduled but has not started yet
+let _driveSavePromise = null;        // the upload loop currently running (null = idle)
+let _driveSaveQueued = false;        // another upload was requested while one was running
+let _driveSaveSeq = 0;               // bumped by every driveSyncSave() request -- lets an upload tell if more changes arrived while it ran
+let _lastPostSnapshotAt = 0;         // when the body of the last SUCCESSFUL upload was serialised: everything older than this is on Drive
+let _lastPostDoneAt = 0;             // when that upload finished
+let _driveRetryTimer = null, _driveRetryN = 0;
+function performDriveSave(){
+  if(_driveSavePromise){ _driveSaveQueued = true; return _driveSavePromise; }
+  _driveSavePromise = (async()=>{
+    try{ do{ _driveSaveQueued = false; await performDriveSaveOnce(); } while(_driveSaveQueued); }
+    finally{ _driveSavePromise = null; }
+  })();
+  return _driveSavePromise;
+}
+async function performDriveSaveOnce(){
+  _syncPending = false;
   S.syncStatus = 'syncing'; renderNav();
   if(S.view==='settings') renderApp(); // Settings shows sync status inline in its own HTML — renderNav() alone doesn't touch that, only the header/nav chrome
+  const hadUndeliveredOut = chatHasUndeliveredOut();
   try{
     // Always pull a fresh remote copy right before writing — previously this only happened
     // when chat specifically had changed (see chatFingerprint() above), on the reasoning that
@@ -16675,31 +16991,72 @@ async function performDriveSave(){
       if(remote){
         const migratedRemote = migrateShared(remote); // same shape S.shared expects — see doSync()/initAfterLogin()
         const chatChanged = mergeChatFromRemote(migratedRemote);
-        if(chatChanged && S.view==='chat' && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly();
+        // v128: rebuild the message list only when a MESSAGE changed; typing / online changes just update the header + typing bubble
+        if(chatChanged && S.view==='chat'){
+          if(_chatMergeListChanged && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly();
+          else if(typeof updateChatPresenceUI==='function') updateChatPresenceUI();
+        }
         const timerChanged = refreshOtherProfileDataFromRemote(migratedRemote);
         if(timerChanged) onPartnerTimerChanged(); // this merge used to be silent, so the next poll saw 'nothing new' and never redrew
       }
     } catch(e){ console.warn('Pre-save refresh failed, proceeding with local copy:', e); }
     await yieldToMain();
+    const snapshotAt = Date.now(), seq = _driveSaveSeq; // both taken in the same tick the body is serialised in
     await appSyncRequest('POST', null, S.shared);
-    _lastSavedChatFingerprint = chatFingerprint();
+    _lastPostSnapshotAt = snapshotAt; _lastPostDoneAt = Date.now();
+    // Only clear the "not on Drive yet" flag when nothing changed since this upload's body was built.
+    if(seq === _driveSaveSeq && S.local && S.local.driveDirty){ S.local.driveDirty = false; saveLocal(); }
+    _driveRetryN = 0; clearTimeout(_driveRetryTimer);
+    const fp = chatFingerprint();
+    const chatMoved = fp !== _lastSavedChatFingerprint;
+    _lastSavedChatFingerprint = fp;
     S.syncStatus = 'ok';
     S.lastSynced = new Date().toISOString();
     S.syncError = null;
+    // Chat: a concurrent upload from the partner's phone can still overwrite this one (the whole file is replaced on every
+    // save), so look again a few seconds later and put the messages back if they are gone -- see verifyChatOnDrive().
+    if(chatMoved) verifyChatOnDrive(0);
+    if(hadUndeliveredOut && S.view==='chat' && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly(); // single tick -> double tick
   } catch(e){
     console.warn('Sync save failed:', e);
     S.syncStatus = 'error';
     S.syncError = e.message;
+    scheduleDriveRetry();
   }
   renderNav();
   if(S.view==='settings') renderApp();
 }
+function scheduleDriveRetry(){
+  if(!S.appSession || !isHosted()) return; // signed out (e.g. session expired) -- retrying cannot succeed
+  clearTimeout(_driveRetryTimer);
+  const delay = [4000, 10000, 30000, 60000][Math.min(_driveRetryN, 3)];
+  _driveRetryN++;
+  _driveRetryTimer = setTimeout(()=>{ if(S.appSession && S.local && S.local.driveDirty) performDriveSave(); }, delay);
+}
+// Anything saved locally that Drive has not confirmed yet gets pushed now: called when the network comes back, when the app
+// returns to the foreground, and from initAfterLogin().
+function flushDriveIfDirty(){
+  if(!S.appSession || !isHosted() || !(S.local && S.local.driveDirty)) return;
+  if(_driveSavePromise || _syncPending) return; // one is already on its way
+  clearTimeout(_driveRetryTimer);
+  performDriveSave();
+}
+// Leaving the app: don't sit out the 900 ms debounce -- start the upload now, while the page can still run for a moment.
+function flushPendingSaveNow(){
+  if(!_syncPending || !S.appSession || !isHosted()) return;
+  clearTimeout(_syncDebounceTimer);
+  performDriveSave();
+}
+window.addEventListener('online', ()=>{ _driveRetryN = 0; flushDriveIfDirty(); });
 
 async function driveSyncSave(){
   if(!S.appSession || !isHosted()) return;
+  _driveSaveSeq++;
+  _syncPending = true;
   clearTimeout(_syncDebounceTimer);
   _syncDebounceTimer = setTimeout(performDriveSave, 900); // was 1500ms — see the note above for the bigger factor in perceived save speed
 }
+
 // Timer actions (Start/Break/Resume/Complete/Discard) go through this instead of
 // driveSyncSave() — the "partner is live" signal is exactly the case where the usual
 // debounce-and-batch trade-off works against the point of the feature, so it's skipped
@@ -16788,11 +17145,18 @@ async function initAfterLogin(){
   // "I refreshed and everything went blank": a technically-truthy but empty/sparse Drive
   // read (network hiccup, race condition, anything) used to get adopted unconditionally
   // and then immediately re-saved, overwriting good local data with that emptiness.
-  if(migratedDrive && sharedDataHasContent(migratedDrive) && !localIsNewer){
+  // v128: take this device's copy of chat BEFORE it is overwritten below. Adopting Drive's copy wholesale dropped any message that was typed
+  // here but never reached Drive (app closed / signal lost mid-upload, then the partner's phone saved in between so Drive looked "newer") --
+  // gone from this phone too after the reload. The recent messages are folded back in and uploaded.
+  const adoptDrive = !!(migratedDrive && sharedDataHasContent(migratedDrive) && !localIsNewer);
+  const localSnapshot = adoptDrive ? await readLocalSharedQuiet() : null;
+  if(adoptDrive){
     S.shared = migratedDrive;
+    if(localSnapshot) unionRecentLocalChat(S.shared, localSnapshot);
     await saveShared();
   } else {
     S.shared = await loadShared();
+    if(migratedDrive) mergeChatFromRemote(migratedDrive); // v128: show her latest messages straight away rather than at the first poll
     // Local was ahead — push it back up now instead of leaving Drive stale until the next
     // unrelated change happens to trigger a save.
     if(localIsNewer) driveSyncSaveNow();
@@ -16816,6 +17180,10 @@ async function initAfterLogin(){
   renderNav();
   renderApp();
   startBackgroundPoll();
+  flushDriveIfDirty();          // v128: anything left over from a previous session that Drive never confirmed
+  reconcilePushSubscription();  // v128: repair a dropped / renewed push address
+  applyPendingOpenFromUrl();    // v128: opened from a chat notification -> straight into the chat
+  postSwViewState();
   applyBgTheme(); // motion background — reads S.local.bgTheme, no-ops if 'off'
   maybeSweepArchive(); // fire-and-forget; gated to once/day/device internally, never blocks load
   ensureArchiveLoaded(); // fire-and-forget; makes archived (30+ day old) history visible app-wide once it lands
@@ -17215,11 +17583,15 @@ if('serviceWorker' in navigator){
     if(!d) return;
     if(d.type==='TIMER_ACTION'){
       applyTimerNotificationAction(d.action);
+    } else if(d.type==='OPEN_CHAT'){
+      openChatFromNotification(); // tapped a chat notification
     } else if(d.type==='PUSH_RECEIVED'){
-      // A push just arrived — poll chat immediately so the other person's message
-      // appears without waiting for the next 3-second polling tick.
-      if(typeof pollChatUpdates === 'function') pollChatUpdates();
-      refreshPartnerTimerSoon(); // 'X started studying' is a timer push -- fetch their live state now, not at the next 30s poll
+      const kind = d.payload && d.payload.data && d.payload.data.kind;
+      // v128: a chat push used to call pollChatUpdates(), which does nothing unless the chat is the open screen -- so a message that
+      // arrived while she was on Home/Timer/Planner waited for the next poll. refreshChatSoon() works from any screen and keeps
+      // looking until the message appears (the sender's upload can land a few seconds after the push does).
+      if(kind==='chat') refreshChatSoon();
+      else refreshPartnerTimerSoon(); // 'X started studying' is a timer push -- fetch their live state now, not at the next poll
     }
   });
 }
@@ -17279,10 +17651,11 @@ function pushSettingsRow(){
   let sub;
   if(!support.supported) sub = support.reason;
   else if(denied) sub = "Blocked — enable notifications for this site in your phone's browser settings.";
-  else if(subscribed) sub = 'On — nudges, partner activity, and evening target reminders.';
+  else if(subscribed) sub = 'On — new chat messages, nudges, partner activity, and evening target reminders.';
   else sub = "Get notified even when the app isn't open.";
   return `<div class="settings-row"><div><div class="settings-row-lbl">Push notifications</div><div class="settings-row-sub">${sub}</div></div>
-    ${support.supported && !denied ? `<div class="toggle ${subscribed?'on':''}" onclick="togglePushNotifications()"></div>` : ''}</div>`;
+    ${support.supported && !denied ? `<div class="toggle ${subscribed?'on':''}" onclick="togglePushNotifications()"></div>` : ''}</div>
+    ${support.supported && !denied && subscribed ? `<div class="settings-row"><div><div class="settings-row-lbl">Test notification</div><div class="settings-row-sub">Sends a notification to this device to check it really arrives.</div></div><button class="btn btn-sm" onclick="sendTestPush()">Send test</button></div>` : ''}`;
 }
 // Same visual pattern as prefToggleRow, but for S.shared.pushPrefs — these control which
 // push TYPES you receive (only meaningful once subscribed at all, see pushSettingsRow above).
@@ -17351,9 +17724,7 @@ async function subscribeToPush(){
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
-    if(!S.shared.pushSubscriptions) S.shared.pushSubscriptions = {};
-    S.shared.pushSubscriptions[me] = subscription.toJSON();
-    saveShared();
+    storePushSubscription(me, subscription); // also remembers which address belongs to THIS device (see reconcilePushSubscription)
     renderApp();
   }catch(err){
     console.error('Push subscription failed:', err);
@@ -17369,14 +17740,14 @@ async function unsubscribePush(){
     if(sub) await sub.unsubscribe();
   }catch(err){ console.error('Push unsubscribe failed:', err); }
   if(S.shared.pushSubscriptions) delete S.shared.pushSubscriptions[me];
+  if(S.local){ S.local.pushEndpoint = null; saveLocal(); }
   saveShared();
   renderApp();
 }
 // Posts to /api/send-push. Silently no-ops if the target has no stored subscription (never
 // enabled notifications) or this device isn't hosted — same no-op convention as Drive/AI.
-// Clears a subscription the push service reports as dead (410/404) so their Settings toggle
-// correctly flips back to "off" next time they look, prompting a fresh subscribe rather than
-// silently failing forever.
+// v128: a subscription the push service reports as dead (410/404) is remembered on THIS device and skipped for a day; it is no
+// longer deleted from the shared file (the owner's own device repairs/renews it -- reconcilePushSubscription(), Settings "Send test").
 // Reads the RECIPIENT's granular push preference from S.shared.pushPrefs (see
 // buildDefaultShared() for why this can't live in S.local). Missing/undefined always reads
 // as "on" — S.shared.pushPrefs doesn't need every key pre-populated for every profile.
@@ -17384,33 +17755,115 @@ function pushPrefEnabled(profileId, key){
   const p = (S.shared.pushPrefs && S.shared.pushPrefs[profileId]) || {};
   return p[key] !== false;
 }
-async function sendPush(targetProfileId, title, body, data){
-  if(!isHosted() || !S.appSession) return;
+// v128: returns the server's answer ({ok}, {ok:false, expired:true}) or null if it couldn't be reached, so the Settings "Send test"
+// button can say what happened. `opts` = {urgency:'high'|'normal'|..., ttl:seconds}: chat pushes go out as HIGH urgency -- with the
+// default 'normal' Android's Doze mode may hold a push back for minutes until the phone wakes, which is the "notification came
+// late" symptom. `flags.force` skips the dead-endpoint memory (used by the test button).
+async function sendPush(targetProfileId, title, body, data, opts, flags){
+  if(!isHosted() || !S.appSession) return null;
   const sub = S.shared.pushSubscriptions && S.shared.pushSubscriptions[targetProfileId];
-  if(!sub) return;
+  if(!sub) return null;
+  const dead = (S.local && S.local.deadPush) || {};
+  if(!(flags && flags.force) && sub.endpoint && dead[sub.endpoint] && Date.now() - dead[sub.endpoint] < 864e5) return {ok:false, dead:true};
   // 10 s timeout — matches the convention used for every other network call in this file
   // (sync calls). Push sends are fire-and-forget and failures are non-fatal, but without
   // a timeout a hung /api/send-push response would keep the caller waiting indefinitely.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
   try{
+    const payload = {subscription: sub, title, body, data: data||{}};
+    if(opts && opts.urgency) payload.urgency = opts.urgency;
+    if(opts && opts.ttl) payload.ttl = opts.ttl;
     const res = await fetch(PUSH_SEND_URL, {
       method:'POST', headers:{'Content-Type':'application/json', 'Authorization':`Bearer ${S.appSession.token}`},
-      body: JSON.stringify({subscription: sub, title, body, data: data||{}}),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
     const result = await res.json().catch(()=>({}));
-    if(result && result.expired){
-      if(S.shared.pushSubscriptions && S.shared.pushSubscriptions[targetProfileId]){
-        delete S.shared.pushSubscriptions[targetProfileId];
-        saveShared();
+    if(S.local && sub.endpoint){
+      if(result && result.expired){
+        // v128: remember it on THIS device only. The old code deleted the partner's subscription from the shared file, but
+        // pushSubscriptions is now owned by its own profile (SINGLE_OWNER_SHARED_KEYS) and refreshed from Drive before every
+        // save, so a deletion made here could never stick -- and a stale copy could also overwrite a good one.
+        if(!S.local.deadPush) S.local.deadPush = {};
+        S.local.deadPush[sub.endpoint] = Date.now();
+        saveLocal();
+      } else if(result && result.ok && S.local.deadPush && S.local.deadPush[sub.endpoint]){
+        delete S.local.deadPush[sub.endpoint]; saveLocal();
       }
     }
+    return result;
   }catch(err){
     clearTimeout(timeoutId);
     console.warn('Push send failed (non-fatal):', err);
+    return null;
   }
+}
+// Keeps the shared copy of MY subscription honest. It used to be written once, at the moment Settings → Push was switched on,
+// and then trusted forever -- but it lives in the one shared file that both phones overwrite wholesale, so a stale save from
+// the partner's phone could drop it, and a browser that renews its endpoint left a dead one behind; either way the partner's
+// sendPush() found nothing (or a dead address) and every notification vanished without an error. Runs on every app open.
+// Deliberately never replaces an address that belongs to a DIFFERENT device of the same profile.
+async function currentPushSubscription(){
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+function storePushSubscription(me, sub){
+  const json = (sub && sub.toJSON) ? sub.toJSON() : sub;
+  if(!S.shared.pushSubscriptions) S.shared.pushSubscriptions = {};
+  S.shared.pushSubscriptions[me] = json;
+  if(S.local){
+    S.local.pushEndpoint = json.endpoint;
+    if(S.local.deadPush) delete S.local.deadPush[json.endpoint];
+    saveLocal();
+  }
+  saveShared();
+}
+async function reconcilePushSubscription(){
+  try{
+    const me = S.local && S.local.myProfile;
+    if(!me || !S.appSession || !isHosted() || !pushSupportInfo().supported) return;
+    if(Notification.permission !== 'granted') return;
+    const known = (S.local && S.local.pushEndpoint) || null;
+    const sub = await currentPushSubscription();
+    const cur = S.shared.pushSubscriptions && S.shared.pushSubscriptions[me];
+    if(!sub){
+      if(!known) return; // never switched on from this device
+      const reg = await navigator.serviceWorker.ready;
+      const fresh = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+      storePushSubscription(me, fresh);
+      return;
+    }
+    const json = sub.toJSON ? sub.toJSON() : sub;
+    if(!cur){ storePushSubscription(me, sub); return; }                                   // dropped from the shared file: put it back
+    if(cur.endpoint === json.endpoint){
+      if(known !== json.endpoint && S.local){ S.local.pushEndpoint = json.endpoint; saveLocal(); }
+      return;
+    }
+    if(known && cur.endpoint === known) storePushSubscription(me, sub);                    // this device's own address was renewed by the browser
+  }catch(e){ console.warn('Push subscription check failed (non-fatal):', e); }
+}
+async function renewPushSubscription(){
+  const me = S.local && S.local.myProfile; if(!me) return;
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const old = await reg.pushManager.getSubscription();
+    if(old) await old.unsubscribe();
+  }catch(e){ console.warn('Push renew: unsubscribe failed', e); }
+  if(S.local){ S.local.deadPush = {}; S.local.pushEndpoint = null; saveLocal(); }
+  if(S.shared.pushSubscriptions) delete S.shared.pushSubscriptions[me];
+  await subscribeToPush();
+}
+// Settings → Push notifications → "Send test": a real push to THIS device, so "are notifications working?" has an answer.
+async function sendTestPush(){
+  const me = S.local && S.local.myProfile; if(!me) return;
+  if(!(S.shared.pushSubscriptions && S.shared.pushSubscriptions[me])){ showToast('Notifications are off on this device.'); return; }
+  showToast('Sending a test notification…');
+  const r = await sendPush(me, '🔔 Olympus test', 'Notifications are working on this device.', {url:'./', kind:'test', ts:Date.now()}, {urgency:'high', ttl:300}, {force:true});
+  if(r && r.ok) showToast('Sent — it should appear in a few seconds.');
+  else if(r && (r.expired || r.dead)){ showToast('This device\'s notification link had expired — renewing it…'); await renewPushSubscription(); showToast('Renewed. Tap “Send test” again.'); }
+  else showToast("Couldn't send — check your connection and try again.");
 }
 function nudgePartner(){
   const me = S.local.myProfile; if(!me) return;
@@ -17465,23 +17918,19 @@ function checkMinHoursCelebration(profileId){
   saveShared();
   celebrateMilestone(`Minimum study hours reached — ${minHours}h logged today!`);
 }
-// Skips the push if the recipient is currently looking at Chat. The original spec said to
-// check S.view, but S.view is this device's own local, unsynced session state (see the
-// state-model notes at the top of the file) — the sender has no way to read the recipient's
-// S.view at all, on a different device. chat.lastActive IS synced via S.shared, and is only
-// ever stamped while that profile's own device has the Chat overlay open (enterChat()'s
-// initial stamp, refreshed by a 25s heartbeat — see startChatHeartbeat()), so a recent
-// lastActive is the real cross-device signal for "they're looking at Chat right now." Uses
-// the same 90s recency window otherLiveStatusInfo() already uses for the "Online" indicator.
+// v128: the push is ALWAYS sent now (unless the recipient turned "new message" off). The old rule skipped it whenever the
+// recipient's chat.lastActive was under 90 s old, but lastActive is also stamped when someone LEAVES chat and by a 25 s
+// heartbeat that was only paused once the screen went off -- so for up to ~90 s after she closed the chat, or locked her phone
+// in the middle of a conversation, every reply was swallowed (exactly when replies happen). Whether to actually show it is now
+// decided on the RECIPIENT'S device by sw.js, which knows for certain whether she has the chat open on screen
+// (see postSwViewState()). Stickers and forwards notify too -- they used to be silent.
 function notifyPartnerNewMessage(me, text){
   if(me==='umang' && umangHasBlocked()) return;
   const other = otherProfileId(me);
   if(!pushPrefEnabled(other, 'newMessage')) return;
-  const lastActive = S.shared.chat && S.shared.chat.lastActive && S.shared.chat.lastActive[other];
-  if(lastActive && (Date.now() - new Date(lastActive).getTime()) < 90000) return;
   const prof = profileById(me);
-  const preview = (text||'').slice(0,80);
-  sendPush(other, `💬 ${prof.nick}`, preview || 'Sent a message', {url:'./'});
+  const preview = String(text||'').replace(/\s+/g,' ').trim().slice(0,120) || 'Sent a message';
+  sendPush(other, `💬 ${prof.nick}`, preview, {url:'./?open=chat', kind:'chat', from:me, ts:Date.now()}, {urgency:'high', ttl:86400});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -160,7 +160,17 @@
 // "what it takes" line (items per day vs your recent lecture pace) plus ready-made ideas from your weakest papers, a plain detail page (days left / need per day /
 // your pace + a sentence + projected finish), Mark complete / Reopen / +3d +1w +2w more time, Add-to-Planner now spreads tasks evenly until the deadline (and no
 // longer adds one too many). Removed: priority + start date fields, pace bars, history list, KPI grid, At Risk/Critical jargon. Data is unchanged.
-const CACHE_VERSION = 'olympus-v127';
+// v128: CHAT -- notifications, saving, refreshing, links.
+//  * Push: the sender now ALWAYS sends the push (high urgency, so Android's Doze mode doesn't hold it back) and THIS worker decides whether to show it:
+//    suppressed only when the chat is open on screen right now (index.html reports that through VIEW_STATE messages, see below). The old sender-side
+//    rule ("skip if the partner was active in the last 90 s") swallowed pushes for ~90 s after she left chat or locked her phone mid-conversation.
+//  * Chat notifications collapse into ONE ("3 new messages · latest text") that re-alerts on every message, carry the unread count as the app badge,
+//    are cleared when the chat is opened, and tapping one opens the chat itself (OPEN_CHAT message / ./?open=chat on a cold start).
+//  * Pushes also wake any open window (PUSH_RECEIVED) so it can fetch the new message at once, even when the app is on another tab.
+//  * index.html: save pipeline (serialised uploads, retry with back-off, "not on Drive yet" flag that survives a reload, lost-write repair), chat refresh
+//    from every screen / on return to the foreground, unsynced messages survive a reload, push subscription self-repair + Settings "Send test",
+//    delivered tick reflects Drive, tappable links in chat bubbles, unsent draft kept across reloads.
+const CACHE_VERSION = 'olympus-v128';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
@@ -209,9 +219,22 @@ self.addEventListener('activate', (event) => {
 // the brief. So this shows static status text ("Session Active — Started at 10:00 AM" / "On
 // Break") that only changes on real state transitions (start/pause/resume), same tag every
 // time so it replaces in place rather than stacking.
+// v128: which of this origin's windows has the chat open on screen right now -- reported by index.html (VIEW_STATE) whenever the
+// view/visibility changes and every 25 s while chat is open. In memory only: if this worker was restarted the map is empty, which
+// safely means "not watching" and the notification is shown.
+const CHAT_TAG = 'olympus-chat';
+const viewStates = new Map(); // client id -> { inChat, ts }
+async function clearChatNotifications() {
+  try { (await self.registration.getNotifications({ tag: CHAT_TAG })).forEach((n) => n.close()); } catch (e) { /* ignore */ }
+  try { if (self.navigator && self.navigator.clearAppBadge) await self.navigator.clearAppBadge(); } catch (e) { /* ignore */ }
+}
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  } else if (event.data && event.data.type === 'VIEW_STATE') {
+    const id = event.source && event.source.id;
+    if (id) viewStates.set(id, { inChat: !!event.data.inChat, ts: Date.now() });
+    if (event.data.inChat) event.waitUntil(clearChatNotifications()); // she is looking at the chat: the notification has done its job
   } else if (event.data && event.data.type === 'TIMER_NOTIFY') {
     const { title, body } = event.data;
     self.registration.showNotification(title, {
@@ -290,27 +313,47 @@ self.addEventListener('fetch', (event) => {
 
 // ── Push notifications ──────────────────────────────────────────
 // The payload is whatever /api/send-push passed through to web-push's sendNotification() —
-// see sendPush() in index.html: {title, body, data:{url}}.
+// see sendPush() in index.html: {title, body, data:{url, kind, from, ts}}.
 self.addEventListener('push', (event) => {
   let payload = {};
   try { payload = event.data ? event.data.json() : {}; } catch (e) { /* non-JSON payload, ignore */ }
-  const title = payload.title || 'Olympus';
-  const options = {
-    body: payload.body || '',
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    data: payload.data || {},
-  };
-  // Show the notification AND immediately wake any open app window so the chat
-  // poll fires right away instead of waiting for the next 3-second tick.
-  event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(title, options),
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((all) => {
-        all.forEach((client) => client.postMessage({ type: 'PUSH_RECEIVED', payload }));
-      }),
-    ])
-  );
+  const data = payload.data || {};
+  const isChat = data.kind === 'chat';
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // Wake every open window so it fetches the new message right now instead of at its next poll.
+    wins.forEach((client) => client.postMessage({ type: 'PUSH_RECEIVED', payload }));
+    const now = Date.now();
+    if (isChat) {
+      // Chat open and visible (reported within the last 75 s) -> the message is already appearing on screen, no notification.
+      const watching = wins.some((c) => {
+        const st = viewStates.get(c.id);
+        return c.visibilityState === 'visible' && st && st.inChat && now - st.ts < 75000;
+      });
+      if (watching) return;
+    }
+    const options = {
+      body: payload.body || '',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      data,
+      vibrate: [120, 60, 120],
+    };
+    if (isChat) {
+      let count = 1;
+      try {
+        const existing = await self.registration.getNotifications({ tag: CHAT_TAG });
+        if (existing.length) count = ((existing[0].data && existing[0].data.count) || existing.length) + 1;
+      } catch (e) { /* ignore */ }
+      options.tag = CHAT_TAG;      // one notification for the whole conversation...
+      options.renotify = true;     // ...that still buzzes/rings for every new message
+      options.timestamp = data.ts || now;
+      options.data = Object.assign({}, data, { count });
+      if (count > 1) options.body = count + ' new messages · ' + options.body;
+      try { if (self.navigator && self.navigator.setAppBadge) await self.navigator.setAppBadge(count); } catch (e) { /* ignore */ }
+    }
+    await self.registration.showNotification(payload.title || 'Olympus', options);
+  })());
 });
 
 // Focuses an already-open Olympus tab/window if one exists, otherwise opens a new one —
@@ -339,13 +382,19 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || './';
+  const nData = event.notification.data || {};
+  const targetUrl = nData.url || './';
+  const isChat = nData.kind === 'chat';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
-        if (client.url.includes(self.registration.scope) && 'focus' in client) return client.focus();
+        if (client.url.includes(self.registration.scope) && 'focus' in client) {
+          // A chat notification lands in the chat itself, not on whatever screen was open.
+          if (isChat) client.postMessage({ type: 'OPEN_CHAT' });
+          return client.focus();
+        }
       }
-      if (clients.openWindow) return clients.openWindow(targetUrl);
+      if (clients.openWindow) return clients.openWindow(targetUrl); // cold start: ./?open=chat is read by index.html once it has loaded
     })
   );
 });
