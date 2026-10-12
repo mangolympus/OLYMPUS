@@ -42,6 +42,15 @@
 //
 // No third-party Drive package needed — just built-in fetch and crypto.
 //
+// *** v130: FEWER GOOGLE ROUND TRIPS PER REQUEST ***
+// Every request used to do three Google calls one after another: (1) exchange the service-account JWT for an access token,
+// (2) list the folder to find the file's id, (3) download / upload the file. The app does two requests per save (a read to merge,
+// then the write) and one before it can draw the first screen, so a save cost six sequential Google calls. Now, on a warm function
+// instance: the access token is reused until it is about to expire (it is valid for an hour), the file id is remembered per file name
+// (re-looked-up every 10 minutes, and straight away if Drive says it is gone), and a read fetches the file's modifiedTime and its
+// content at the same time. That is ONE Google call for a read and one for a write. A cold start still pays the full price once.
+// Response shapes are unchanged; POST additionally returns modifiedTime.
+//
 // Auth: every request needs `Authorization: Bearer <token>` from a prior /api/auth call.
 // GET  /api/sync?file=<name>  → 200 { data: <JSON, or null if the file doesn't exist yet>, modifiedTime }
 // POST /api/sync              → body { file?: <name>, payload: <JSON to save> }; 200 { ok: true }
@@ -92,7 +101,9 @@ function base64url(input) {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+let _tokenCache = { token: null, expiresAt: 0 };
 async function getServiceAccountAccessToken() {
+  if (_tokenCache.token && Date.now() < _tokenCache.expiresAt - 5 * 60 * 1000) return _tokenCache.token;
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   // Vercel env vars are single-line — the PEM key's real newlines get stored as the literal
   // two characters "\n", which need converting back before the key will parse.
@@ -127,7 +138,29 @@ async function getServiceAccountAccessToken() {
     }),
   });
   if (!resp.ok) throw new Error(`Google token exchange failed: ${resp.status} ${await resp.text()}`);
-  return (await resp.json()).access_token;
+  const tokenJson = await resp.json();
+  _tokenCache = { token: tokenJson.access_token, expiresAt: Date.now() + (Number(tokenJson.expires_in) || 3600) * 1000 };
+  return tokenJson.access_token;
+}
+
+// Runs fn(accessToken); if Google rejects a REUSED token (revoked / clock skew), drops it and tries once more with a fresh one.
+async function withDriveToken(fn) {
+  const first = await getServiceAccountAccessToken();
+  try {
+    return await fn(first);
+  } catch (err) {
+    if (err && err.status === 401) {
+      _tokenCache = { token: null, expiresAt: 0 };
+      return await fn(await getServiceAccountAccessToken());
+    }
+    throw err;
+  }
+}
+
+function driveError(message, status) {
+  const e = new Error(message);
+  e.status = status;
+  return e;
 }
 
 async function findFile(accessToken, fileName) {
@@ -144,7 +177,7 @@ async function findFile(accessToken, fileName) {
     `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${encodeURIComponent('files(id,name,modifiedTime)')}&orderBy=modifiedTime%20desc`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
-  if (!resp.ok) throw new Error(`Drive search failed: ${resp.status} ${await resp.text()}`);
+  if (!resp.ok) throw driveError(`Drive search failed: ${resp.status} ${await resp.text()}`, resp.status);
   const { files } = await resp.json();
   if (files && files.length > 1) {
     // Not fatal — we still proceed with the newest one — but worth surfacing loudly, since
@@ -160,20 +193,21 @@ async function readFileContent(accessToken, fileId) {
   const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!resp.ok) throw new Error(`Drive download failed: ${resp.status} ${await resp.text()}`);
+  if (!resp.ok) throw driveError(`Drive download failed: ${resp.status} ${await resp.text()}`, resp.status);
   return resp.text();
 }
 
 async function updateFileContent(accessToken, fileId, jsonString) {
   const resp = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,modifiedTime`,
     {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: jsonString,
     }
   );
-  if (!resp.ok) throw new Error(`Drive write failed: ${resp.status} ${await resp.text()}`);
+  if (!resp.ok) throw driveError(`Drive write failed: ${resp.status} ${await resp.text()}`, resp.status);
+  return resp.json().catch(() => ({}));
 }
 
 // Only reachable the first time a file (main data / photos / archive) is ever written — needs
@@ -188,7 +222,7 @@ async function createFile(accessToken, fileName, jsonString) {
     `--${boundary}\r\n` +
     `Content-Type: application/json\r\n\r\n${jsonString}\r\n` +
     `--${boundary}--`;
-  const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+  const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -196,7 +230,37 @@ async function createFile(accessToken, fileName, jsonString) {
     },
     body,
   });
-  if (!resp.ok) throw new Error(`Drive create failed: ${resp.status} ${await resp.text()}`);
+  if (!resp.ok) throw driveError(`Drive create failed: ${resp.status} ${await resp.text()}`, resp.status);
+  return resp.json().catch(() => ({}));
+}
+
+// ── file-id memory + combined read ────────────────────────────────────────────────────────
+const FILE_ID_TTL_MS = 10 * 60 * 1000;
+const _fileIdCache = new Map(); // fileName -> { id, at }
+function rememberFileId(fileName, id) { if (id) _fileIdCache.set(fileName, { id, at: Date.now() }); }
+function forgetFileId(fileName) { _fileIdCache.delete(fileName); }
+async function resolveFile(accessToken, fileName) {
+  const hit = _fileIdCache.get(fileName);
+  if (hit && Date.now() - hit.at < FILE_ID_TTL_MS) return { id: hit.id, cached: true };
+  const found = await findFile(accessToken, fileName);
+  if (found) rememberFileId(fileName, found.id);
+  return found ? { id: found.id, modifiedTime: found.modifiedTime, cached: false } : null;
+}
+// Content and modifiedTime in parallel (one round trip instead of two in a row). Both requests are started before either is awaited,
+// and Promise.all attaches handlers to both, so a failure of the one that is not awaited first can never become an unhandled rejection.
+async function fetchModifiedTime(accessToken, fileId) {
+  const metaResp = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!metaResp.ok) throw driveError(`Drive metadata failed: ${metaResp.status} ${await metaResp.text()}`, metaResp.status);
+  return (await metaResp.json()).modifiedTime || null;
+}
+async function readFileWithMeta(accessToken, file) {
+  const contentPromise = readFileContent(accessToken, file.id);
+  const metaPromise = file.modifiedTime !== undefined ? Promise.resolve(file.modifiedTime) : fetchModifiedTime(accessToken, file.id);
+  const [raw, modifiedTime] = await Promise.all([contentPromise, metaPromise]);
+  return { raw, modifiedTime };
 }
 
 // Only letters, digits, dots, hyphens, underscores — every filename this endpoint actually
@@ -216,9 +280,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  let accessToken;
   try {
-    accessToken = await getServiceAccountAccessToken();
+    await getServiceAccountAccessToken(); // fails fast (and says why) if the credentials are wrong; free when a token is already cached
   } catch (err) {
     console.error('Service account credentials not configured correctly:', err);
     res.status(500).json({ error: 'Server misconfigured — check GOOGLE_SERVICE_ACCOUNT_* env vars' });
@@ -232,21 +295,36 @@ export default async function handler(req, res) {
       return;
     }
     try {
-      const existing = await findFile(accessToken, fileName);
-      if (!existing) {
+      const result = await withDriveToken(async (accessToken) => {
+        let file = await resolveFile(accessToken, fileName);
+        if (!file) return null;
+        try {
+          return await readFileWithMeta(accessToken, file);
+        } catch (err) {
+          // A remembered id that Drive no longer serves (file deleted / replaced by hand): forget it and look the file up again.
+          if (file.cached && (err.status === 404 || err.status === 403)) {
+            forgetFileId(fileName);
+            file = await findFile(accessToken, fileName);
+            if (!file) return null;
+            rememberFileId(fileName, file.id);
+            return await readFileWithMeta(accessToken, file);
+          }
+          throw err;
+        }
+      });
+      if (!result) {
         res.status(200).json({ data: null, modifiedTime: null });
         return;
       }
-      const raw = await readFileContent(accessToken, existing.id);
       let data;
       try {
-        data = JSON.parse(raw);
+        data = JSON.parse(result.raw);
       } catch (e) {
         console.error('Shared file content was not valid JSON:', e);
         res.status(500).json({ error: 'Shared data file is corrupted' });
         return;
       }
-      res.status(200).json({ data, modifiedTime: existing.modifiedTime });
+      res.status(200).json({ data, modifiedTime: result.modifiedTime });
     } catch (err) {
       console.error('sync GET failed:', err);
       res.status(500).json({ error: 'Failed to read shared data' });
@@ -267,18 +345,33 @@ export default async function handler(req, res) {
       return;
     }
     try {
-      const existing = await findFile(accessToken, fileName);
       const jsonString = JSON.stringify(payload);
-      if (existing) {
-        await updateFileContent(accessToken, existing.id, jsonString);
-      } else {
+      const saved = await withDriveToken(async (accessToken) => {
+        let file = await resolveFile(accessToken, fileName);
+        if (file) {
+          try {
+            const r = await updateFileContent(accessToken, file.id, jsonString);
+            return { modifiedTime: (r && r.modifiedTime) || null };
+          } catch (err) {
+            if (!(file.cached && (err.status === 404 || err.status === 403))) throw err;
+            forgetFileId(fileName); // remembered id no longer valid -- look again, and fall through to create if the file is really gone
+            file = await findFile(accessToken, fileName);
+            if (file) {
+              rememberFileId(fileName, file.id);
+              const r = await updateFileContent(accessToken, file.id, jsonString);
+              return { modifiedTime: (r && r.modifiedTime) || null };
+            }
+          }
+        }
         // Only reachable if the file genuinely doesn't exist yet — for the main data file,
         // if this fires on what should already exist, it almost always means the Drive-
         // sharing setup step above wasn't done. For the photos/archive files, it's normal
         // the first time either feature is ever used.
-        await createFile(accessToken, fileName, jsonString);
-      }
-      res.status(200).json({ ok: true });
+        const created = await createFile(accessToken, fileName, jsonString);
+        rememberFileId(fileName, created && created.id);
+        return { modifiedTime: (created && created.modifiedTime) || null };
+      });
+      res.status(200).json({ ok: true, modifiedTime: saved.modifiedTime });
     } catch (err) {
       console.error('sync POST failed:', err);
       res.status(500).json({ error: 'Failed to save shared data' });
