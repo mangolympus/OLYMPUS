@@ -174,7 +174,15 @@
 // timer save, and Umang's next app open adopted that old copy. Now Chinnu's phone always takes Drive's Money before uploading; Umang's phone merges Money
 // with Drive record by record (later edit wins, deletes leave a tombstone so they stay deleted), folds its own Money back in when the app opens, and a few
 // seconds after each Money change checks Drive again and re-uploads if another phone's save overwrote it. Index.html only; no backend change.
-const CACHE_VERSION = 'olympus-v129';
+// v130: SPEED -- saving and opening.
+//  * Opening: the app now draws straight from the copy saved on the phone and compares with Drive in the background (same rules as before, applied a
+//    moment later; Drive's newer data is adopted and redrawn unless something was changed in the meantime). Daily-quote / rollover / target snapshots wait
+//    for that comparison. A phone with nothing saved yet still waits for Drive.
+//  * Saving: the upload starts 400 ms after the last change (was 900) and no longer waits up to 200 ms for an idle moment.
+//  * api/sync.js: reuses Google's access token and the file id between requests and reads content + modifiedTime in parallel -- one Google call per read /
+//    write instead of three in a row (POST now also returns modifiedTime). Needs the api/sync.js redeploy to take effect.
+//  * Money tab: one shared number / date formatter (was rebuilt for every row), string-based sort, only the first screenful of rows animates, one click handler.
+const CACHE_VERSION = 'olympus-v130';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

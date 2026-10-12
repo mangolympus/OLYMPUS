@@ -4765,7 +4765,17 @@ function moneyPageHtml(){
   let editingInvoiceId = null;
 
   const $ = (id)=>document.getElementById(id);
-  const fmt = (n)=> "₹" + (Math.round((n+Number.EPSILON)*100)/100).toLocaleString('en-IN',{minimumFractionDigits:2, maximumFractionDigits:2});
+  // v130: one shared formatter. toLocaleString(locale, options) builds a brand-new Intl formatter on EVERY call, and this runs several times per
+  // transaction row (hundreds of rows) plus every balance / chart label -- it was the single biggest cost of opening the Money tab.
+  const _inrFmt = new Intl.NumberFormat('en-IN',{minimumFractionDigits:2, maximumFractionDigits:2});
+  const fmt = (n)=> "₹" + _inrFmt.format(Math.round((n+Number.EPSILON)*100)/100);
+  const _rowDateFmt = new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const _rowDateCache = {};
+  const rowDateLabel = (ymd)=>{
+    if(_rowDateCache[ymd] !== undefined) return _rowDateCache[ymd];
+    const d = new Date(ymd+'T00:00:00');
+    return (_rowDateCache[ymd] = isNaN(d) ? 'Invalid Date' : _rowDateFmt.format(d));
+  };
   // Money follows the app-wide day boundary: a "day" runs 5:00 AM → 4:59 AM, not midnight →
   // midnight. This module used to define its own todayStr() here, which shadowed the global
   // one; it's deliberately gone now so every call below resolves to the app's own todayStr()
@@ -5164,10 +5174,13 @@ function moneyPageHtml(){
     const list = $('money-transactions-list');
     // Always show newest-first by transaction date, regardless of insertion/edit order.
     // Same-day entries fall back to createdAt so the most recently logged one still sits on top.
+    // v130: plain string comparison -- dates are YYYY-MM-DD and createdAt is an ISO timestamp, so text order IS time order, and it avoids
+    // allocating thousands of Date objects inside the comparator.
     let items = transactions.slice().sort((a,b)=>{
-      const dateDiff = new Date(b.date) - new Date(a.date);
-      if(dateDiff !== 0) return dateDiff;
-      return new Date(b.createdAt||b.date) - new Date(a.createdAt||a.date);
+      const da = String(a.date||''), db = String(b.date||'');
+      if(da !== db) return da < db ? 1 : -1;
+      const ca = String(a.createdAt||a.date||''), cb = String(b.createdAt||b.date||'');
+      return ca < cb ? 1 : ca > cb ? -1 : 0;
     });
     if(filter){
       const f = filter.toLowerCase();
@@ -5190,10 +5203,12 @@ function moneyPageHtml(){
     }
     list.innerHTML = items.map((t,i)=>{
       const isIn = t.type === 'inflow';
-      const dateDisplay = new Date(t.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+      const dateDisplay = rowDateLabel(t.date);
       const delay = Math.min(i,12)*25;
+      // Only the first screenful animates in; hundreds of simultaneous CSS animations off-screen were pure paint cost.
+      const anim = i < 16 ? ` animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${delay}ms;` : '';
       return `
-      <div class="rec-item" data-id="${t.id}" style="cursor:pointer; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${delay}ms;">
+      <div class="rec-item" data-id="${t.id}" style="cursor:pointer;${anim}">
         <div class="rec-avatar" style="background:${isIn?'var(--good-bg)':'var(--danger-bg)'}; color:${isIn?'var(--good)':'var(--danger)'};">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${isIn? '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>' : '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'}</svg>
         </div>
@@ -5204,9 +5219,8 @@ function moneyPageHtml(){
         <div class="rec-amt txn-amt ${isIn?'in':'out'}">${isIn?'+':'-'}${fmt(t.amount)}</div>
       </div>`;
     }).join('');
-    list.querySelectorAll('.rec-item').forEach(el=>{
-      el.addEventListener('click', ()=> openTxnViewModal(el.getAttribute('data-id')));
-    });
+    // one delegated listener instead of one per row
+    list.onclick = (e)=>{ const el = e.target.closest && e.target.closest('.rec-item'); if(el && list.contains(el)) openTxnViewModal(el.getAttribute('data-id')); };
   }
 
   function openTxnViewModal(id){
@@ -17094,8 +17108,9 @@ async function writeDriveFile(folderId, fileId, data, fileName){
 // blocking the frame that just drew. That part of "Action A" was already true going in.
 function yieldToMain(){
   return new Promise(resolve=>{
-    if(window.requestIdleCallback) requestIdleCallback(()=>resolve(), {timeout:200});
-    else setTimeout(resolve, 0);
+    // v130: was requestIdleCallback with a 200 ms timeout -- with the motion background / any animation running, idle time is scarce and the
+    // upload sat the full 200 ms before it even started. A 0 ms timer still lets the frame that is in flight paint first.
+    setTimeout(resolve, 0);
   });
 }
 
@@ -17253,7 +17268,7 @@ async function driveSyncSave(){
   _driveSaveSeq++;
   _syncPending = true;
   clearTimeout(_syncDebounceTimer);
-  _syncDebounceTimer = setTimeout(performDriveSave, 900); // was 1500ms — see the note above for the bigger factor in perceived save speed
+  _syncDebounceTimer = setTimeout(performDriveSave, 400); // v130: was 900 (and 1500 before that) — see the note above for the bigger factor in perceived save speed
 }
 
 // Timer actions (Start/Break/Resume/Complete/Discard) go through this instead of
@@ -17324,6 +17339,27 @@ function clearAppSession(){
 
 async function initAfterLogin(){
   S.local = await loadLocal();
+  // v130: LOCAL-FIRST OPEN. This used to wait for the Drive read (a full round trip through the server to Google -- seconds on a mobile
+  // connection, more on a cold start) before drawing a single pixel. If this phone already has a saved copy of the data, draw THAT
+  // straight away and do the Drive comparison in the background (bootReconcileWithDrive: same rules as before, applied a moment later).
+  // A phone with no saved copy yet (first sign-in) still waits for Drive, because there is nothing to show.
+  if(S.appSession && isHosted() && S.local.myProfile){
+    const localShared = await readLocalSharedQuiet();
+    if(localShared && sharedDataHasContent(localShared)){
+      S.shared = localShared;
+      _lastSavedChatFingerprint = chatFingerprint();
+      _lastSavedMoneyDigest = S.shared.money ? moneyDigest(S.shared.money) : '';
+      S.viewingProfile = S.local.myProfile || 'umang';
+      S._justNavigated = true;
+      renderNav();
+      renderApp();
+      applyBgTheme();
+      applyPendingOpenFromUrl();   // opened from a chat notification -> straight into the chat
+      postSwViewState();
+      bootReconcileWithDrive(S.local.lastLocalSaveAt || 0);   // not awaited -- the app is already usable
+      return;
+    }
+  }
   let driveData = null;
   if(S.appSession && isHosted()){
     try{ driveData = await driveSyncLoad(); } catch(e){ console.warn('Drive load on init:', e); }
@@ -17370,9 +17406,26 @@ async function initAfterLogin(){
   // in-memory fingerprint started out null.
   _lastSavedChatFingerprint = chatFingerprint();
   _lastSavedMoneyDigest = S.shared.money ? moneyDigest(S.shared.money) : '';
-  // One-time heal: celebratedMilestones used to live only on this device (S.local); move
-  // whatever's already recorded there into the new synced, per-profile home in S.shared so
-  // a badge/milestone doesn't fire again just because this profile opens a second device.
+  await bootHealCelebratedMilestones();
+  S.viewingProfile = S.local.myProfile || 'umang';
+  S._justNavigated = true;
+  renderNav();
+  renderApp();
+  applyBgTheme(); // motion background — reads S.local.bgTheme, no-ops if 'off'
+  applyPendingOpenFromUrl();    // v128: opened from a chat notification -> straight into the chat
+  postSwViewState();
+  bootStartBackgroundWork();
+  // The manual "who's studying" picker only makes sense in local file mode, where there's
+  // no password login to derive identity from. When hosted, myProfile is already locked to
+  // whichever password was just entered (see attemptPasswordLogin), so skip it entirely.
+  if(SHOW_INTRO_SPLASH) showSplash(()=> { if(!isHosted()) renderProfileModal(); });
+  else if(!isHosted()) renderProfileModal();
+}
+
+// One-time heal: celebratedMilestones used to live only on this device (S.local); move
+// whatever's already recorded there into the new synced, per-profile home in S.shared so
+// a badge/milestone doesn't fire again just because this profile opens a second device.
+async function bootHealCelebratedMilestones(){
   if(S.local.celebratedMilestones && Object.keys(S.local.celebratedMilestones).length && S.local.myProfile){
     const dest = S.shared.celebratedMilestones[S.local.myProfile] || (S.shared.celebratedMilestones[S.local.myProfile]={});
     Object.assign(dest, S.local.celebratedMilestones);
@@ -17380,16 +17433,13 @@ async function initAfterLogin(){
     await saveLocal();
     await saveShared();
   }
-  S.viewingProfile = S.local.myProfile || 'umang';
-  S._justNavigated = true;
-  renderNav();
-  renderApp();
+}
+// Everything that used to run right after the first draw. In the local-first open these wait until the Drive comparison has been
+// applied, so none of them (daily quote, overdue-task rollover, target snapshots, ...) decides anything from an out-of-date copy.
+function bootStartBackgroundWork(){
   startBackgroundPoll();
   flushDriveIfDirty();          // v128: anything left over from a previous session that Drive never confirmed
   reconcilePushSubscription();  // v128: repair a dropped / renewed push address
-  applyPendingOpenFromUrl();    // v128: opened from a chat notification -> straight into the chat
-  postSwViewState();
-  applyBgTheme(); // motion background — reads S.local.bgTheme, no-ops if 'off'
   maybeSweepArchive(); // fire-and-forget; gated to once/day/device internally, never blocks load
   ensureArchiveLoaded(); // fire-and-forget; makes archived (30+ day old) history visible app-wide once it lands
   ensureMcqBankLoaded(); // fire-and-forget; loads the question bank file (and runs its one-time migration off S.shared) without waiting for someone to open Practice/Mock Tests
@@ -17397,11 +17447,51 @@ async function initAfterLogin(){
   PROFILES.forEach(p=> refreshAllTargets(p.id)); // snapshots progress + fires completion celebrations on every load
   ensureDailyQuote(); // fire-and-forget; gated to once/day (shared, not per-device) internally
   applyPendingTimerActionFromUrl();
-  // The manual "who's studying" picker only makes sense in local file mode, where there's
-  // no password login to derive identity from. When hosted, myProfile is already locked to
-  // whichever password was just entered (see attemptPasswordLogin), so skip it entirely.
-  if(SHOW_INTRO_SPLASH) showSplash(()=> { if(!isHosted()) renderProfileModal(); });
-  else if(!isHosted()) renderProfileModal();
+}
+// The second half of the local-first open: read Drive, then apply the same rules initAfterLogin() always used.
+//   * Drive's copy is adopted when this phone had nothing newer (and nothing was changed since the first draw), with this phone's recent
+//     chat and Money folded back in (v128 / v129) -- then the screen is redrawn.
+//   * Otherwise this phone's copy stays; Drive's chat / Money / partner data are merged in, and anything newer here is uploaded.
+async function bootReconcileWithDrive(bootSaveAt){
+  let driveData = null;
+  try{ driveData = await driveSyncLoad(); }catch(e){ console.warn('Drive load on init:', e); }
+  let adopted = false;
+  try{
+    const migratedDrive = driveData ? migrateShared(driveData) : null;
+    const localIsNewer = bootSaveAt && _lastDriveModifiedTime && bootSaveAt > new Date(_lastDriveModifiedTime).getTime();
+    const changedSinceDraw = (S.local.lastLocalSaveAt || 0) !== bootSaveAt; // the person did something (or the app saved something) after the first draw
+    if(migratedDrive && sharedDataHasContent(migratedDrive) && !localIsNewer && !changedSinceDraw){
+      const mine = S.shared;
+      S.shared = migratedDrive;
+      unionRecentLocalChat(S.shared, mine);
+      moneyKeepLocalOnAdopt(S.shared, mine);
+      if(typeof window.moneyExternalChange === 'function') window.moneyExternalChange();
+      await saveShared();
+      adopted = true;
+    } else if(migratedDrive){
+      reconcileMoneyFromRemote(migratedDrive, {skipPersist:true});
+      mergeChatFromRemote(migratedDrive);
+      // her logs / targets / timer, which the first poll would otherwise bring in 15 s from now (only from a Drive copy that has real content)
+      if(sharedDataHasContent(migratedDrive) && refreshOtherProfileDataFromRemote(migratedDrive)) onPartnerTimerChanged();
+      if(localIsNewer || changedSinceDraw) driveSyncSaveNow();
+    }
+  }catch(e){ console.warn('bootReconcileWithDrive failed', e); }
+  _lastSavedChatFingerprint = chatFingerprint();
+  _lastSavedMoneyDigest = S.shared.money ? moneyDigest(S.shared.money) : '';
+  try{ await bootHealCelebratedMilestones(); }catch(e){}
+  if(adopted) redrawAfterAdopt(0);
+  else renderNav();
+  bootStartBackgroundWork();
+}
+// Redraw once Drive's copy has replaced the one that was drawn first -- but never in the middle of typing (a redraw would wipe the field).
+function redrawAfterAdopt(attempt){
+  const ae = document.activeElement;
+  const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+  if(typing && attempt < 10){ setTimeout(()=>redrawAfterAdopt(attempt+1), 500); return; }
+  S._justNavigated = false;
+  renderNav();
+  renderApp();
+  if(S.view === 'chat' && typeof markChatRead === 'function'){ if(!document.hidden && chatIsNearBottom()) markChatRead(); }
 }
 
 function appLogout(){
