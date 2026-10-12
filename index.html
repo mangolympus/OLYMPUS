@@ -3095,7 +3095,7 @@ function buildDefaultShared(){
   });
   return { examDate:'2027-05-02', papers, logs, targets, chapters, lectures, mockScores, notes, tasks, questions:[], qStats:{}, mcqScenarios:{}, mcqSeeds:{}, chat,
     profileInfo, timerState, dailyTargetOverride, prefs, celebratedMilestones, pushSubscriptions, pushState, pushPrefs, habits, habitLog,
-    money:{}, adminAnnouncement:'', dailyQuote:{}, diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget,
+    money:{ __nativeSchema:true, settings:{}, invoices:[], transactions:[], deleted:{} }, adminAnnouncement:'', dailyQuote:{}, diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget,
     milestoneTargets, dailyChallenges, dcState };
 }
 // Umang and Chetna each have their own real Indirect Tax lecture schedule (different lecturers,
@@ -3231,6 +3231,11 @@ function migrateShared(data){
   // (settings/invoices-list/transactions-list, each a JSON string) and reshapes them —
   // nothing on Drive gets deleted by this, so if anything ever looks wrong the original
   // values are still sitting in the old keys under data.money until the next real save.
+  if(data.money && !data.money.__nativeSchema && (Array.isArray(data.money.transactions) || Array.isArray(data.money.invoices))){
+    // v129: a store that already has real record lists but lacks the marker (a brand-new profile's default `money:{}` that moneyStore() then filled in)
+    // must NOT go through the legacy reshaping below -- that rebuilds it from the old flat keys, finds none, and silently empties it.
+    data.money.__nativeSchema = true;
+  }
   if(!data.money || !data.money.__nativeSchema){
     const old = data.money || {};
     const parseOr = (raw, fallback) => { if(!raw) return fallback; try{ const v = JSON.parse(raw); return v==null ? fallback : v; }catch(e){ return fallback; } };
@@ -4786,8 +4791,14 @@ function moneyPageHtml(){
   // own saveShared() — the same local-persist + debounced-Drive-sync pipeline every other
   // Olympus feature already uses, giving Money the exact same backup/sync behavior for free.
   function moneyStore(){
-    if(!S.shared.money) S.shared.money = { __nativeSchema:true, settings:{}, invoices:[], transactions:[] };
-    return S.shared.money;
+    if(!S.shared.money) S.shared.money = { __nativeSchema:true, settings:{}, invoices:[], transactions:[], deleted:{} };
+    const m = S.shared.money;
+    if(!m.__nativeSchema) m.__nativeSchema = true;
+    if(!m.settings || typeof m.settings !== 'object') m.settings = {};
+    if(!Array.isArray(m.invoices)) m.invoices = [];
+    if(!Array.isArray(m.transactions)) m.transactions = [];
+    if(!m.deleted || typeof m.deleted !== 'object') m.deleted = {};
+    return m;
   }
 
   // Delegates to Olympus's own toast UI (defined outside this IIFE, in the global scope)
@@ -4888,6 +4899,7 @@ function moneyPageHtml(){
     };
     applyTheme(settings.theme);
     moneyStore().settings = settings;
+    moneyStore().settingsUpdatedAt = Date.now(); // v129: lets a merge tell which phone's settings are newer
     saveShared();
     toast('Settings saved');
     updateInvNoPreview();
@@ -4895,11 +4907,32 @@ function moneyPageHtml(){
     renderExpenseDashboard();
   }
 
+  // v129: every record carries `updatedAt`, and a record that disappears from the list leaves a tombstone in money.deleted. That is
+  // what lets the merge (see reconcileMoneyFromRemote() above) keep the later edit of a record and keep a deleted record deleted when
+  // an older copy of Money turns up. Done here, once, by comparing against what was last saved, so every add/edit/delete/import/clear
+  // path is covered without each one having to remember to stamp anything.
+  let _invSig = {}, _txnSig = {};
+  const recSig = r => moneyCanon(Object.assign({}, r, {updatedAt:undefined}));
+  function primeSigs(list, sigs){ Object.keys(sigs).forEach(k=> delete sigs[k]); list.forEach(r=>{ if(r && r.id !== undefined) sigs[r.id] = recSig(r); }); }
+  function stampChanges(list, sigs){
+    const store = moneyStore(), now = new Date().toISOString(), seen = {};
+    list.forEach(r=>{
+      if(!r || r.id === undefined) return;
+      seen[r.id] = true;
+      const sig = recSig(r);
+      if(sigs[r.id] !== sig){ r.updatedAt = now; sigs[r.id] = sig; }
+      if(store.deleted[r.id]) delete store.deleted[r.id]; // re-added (e.g. restored from a backup file)
+    });
+    Object.keys(sigs).forEach(id=>{ if(!seen[id]){ store.deleted[id] = now; delete sigs[id]; } });
+  }
+
   async function loadInvoices(){
     invoices = moneyStore().invoices || [];
+    primeSigs(invoices, _invSig);
   }
 
   async function persistInvoices(){
+    stampChanges(invoices, _invSig);
     moneyStore().invoices = invoices;
     saveShared();
     return true;
@@ -4908,9 +4941,11 @@ function moneyPageHtml(){
   /* ---------- Transactions ---------- */
   async function loadTransactions(){
     transactions = moneyStore().transactions || [];
+    primeSigs(transactions, _txnSig);
   }
 
   async function persistTransactions(){
+    stampChanges(transactions, _txnSig);
     moneyStore().transactions = transactions;
     saveShared();
     return true;
@@ -6759,6 +6794,9 @@ async function init(){
     computeBalances();
   };
   window.moneySwitchTab = function(name){ switchTab(name); };
+  // v129: a sync merge just changed S.shared.money underneath this view -- reload the lists from it (and redraw) so the next
+  // add/edit/delete here builds on the merged data instead of writing this view's older arrays back over it.
+  window.moneyExternalChange = function(){ if(_moneyInitialized) moneyRefresh(); };
 })();
 
 
@@ -8885,7 +8923,10 @@ function startBackgroundPoll(){
         applyRemoteChat(remote, _readStartedAt);
         // Partner's timer AND their logged sessions come from the same read, so when a session ends the live card, their
         // 'Last session ended at' line and today's hours all update together instead of the hours dipping until the next sync.
-        if(refreshOtherProfileDataFromRemote(migrateShared(remote))) changed = true;
+        // v129: Money is applied from the same read (Chinnu adopts Drive's copy; Umang merges, and re-uploads if Drive lost something of his)
+        const _mr = migrateShared(remote);
+        reconcileMoneyFromRemote(_mr, {repair:true});
+        if(refreshOtherProfileDataFromRemote(_mr)) changed = true;
         if(changed){
           renderNav();
           // Timer page needs to reflect the other profile's freshly-polled live status too,
@@ -8990,7 +9031,11 @@ async function refreshPartnerTimerNow(){
     // v128: this is what a push and "app came back to the foreground" call, and it only refreshed the partner's timer -- a new chat
     // message was left waiting for the next background poll (up to 30 s) and nothing happened at all while hidden. Chat is applied here too.
     if(remote) applyRemoteChat(remote, _t0);
-    if(remote && refreshOtherProfileDataFromRemote(migrateShared(remote))){ saveShared(null, {skipDrivePush:true}); renderNav(); onPartnerTimerChanged(); }
+    if(remote){
+      const _mr = migrateShared(remote);
+      reconcileMoneyFromRemote(_mr, {repair:true}); // v129
+      if(refreshOtherProfileDataFromRemote(_mr)){ saveShared(null, {skipDrivePush:true}); renderNav(); onPartnerTimerChanged(); }
+    }
   }catch(e){ console.warn('Partner timer refresh failed', e); }
   finally{ _partnerRefreshBusy = false; }
 }
@@ -9087,6 +9132,149 @@ function refreshOtherProfileDataFromRemote(freshRemote){
   const timerChanged = mergeTimerStateFromRemote(freshRemote); // separate, timestamp-guarded merge — see its own comment above
   return timerChanged || before !== slice();
 }
+// ═══ v129: MONEY SYNC — Money is merged record by record, never replaced as a whole ═════════════════════════════════════
+// What was wrong: Money lives inside the one shared file that EVERY save uploads in full. Chinnu's phone (which never edits Money)
+// holds the copy of it from whenever she last loaded the file, and every chat message / timer tick she saves re-uploaded that old copy
+// -- the other keys are protected by refreshOtherProfileDataFromRemote() (SINGLE_OWNER_SHARED_KEYS), but `money` is not
+// per-profile so nothing refreshed it. Umang's next app open then adopted Drive's (old) copy wholesale, and the transactions he had
+// saved were gone from Drive AND, once adopted, from his own phone. Now:
+//   * the profile that doesn't own Money (Chinnu) always takes Drive's copy before she uploads, so she can never roll it back;
+//   * the owner's phone (and any second device of his) MERGES with Drive by record id: nothing he saved is dropped because an older
+//     copy happens to be newer on Drive, an edit keeps the version with the later `updatedAt`, and a delete leaves a tombstone in
+//     `money.deleted` so a stale copy cannot bring the record back;
+//   * opening the app folds this device's own Money back into whatever Drive returns, and a few seconds after every Money change
+//     the owner's phone looks at Drive again and uploads again if another phone's simultaneous save overwrote it.
+const MONEY_OWNER = 'umang';
+// Key-order-independent text form of any JSON value: two phones that hold the same data must produce the same text.
+function moneyCanon(v){
+  if(Array.isArray(v)) return '[' + v.map(moneyCanon).join(',') + ']';
+  if(v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k=> JSON.stringify(k) + ':' + moneyCanon(v[k])).join(',') + '}';
+  return JSON.stringify(v === undefined ? null : v);
+}
+function moneyRecTime(r){ const t = Date.parse(r && (r.updatedAt || r.createdAt)); return isFinite(t) ? t : 0; }
+// Has the shape of a Money store (not the old flat key/value strings that migrateShared() still has to reshape)?
+function moneyLooksNative(m){ return !!(m && typeof m === 'object' && (m.__nativeSchema || Array.isArray(m.transactions) || Array.isArray(m.invoices))); }
+function moneyNormalise(m){
+  m = (m && typeof m === 'object') ? m : {};
+  return {
+    __nativeSchema: true,
+    settings: (m.settings && typeof m.settings === 'object') ? m.settings : {},
+    settingsUpdatedAt: Number(m.settingsUpdatedAt) || 0,
+    invoices: Array.isArray(m.invoices) ? m.invoices : [],
+    transactions: Array.isArray(m.transactions) ? m.transactions : [],
+    deleted: (m.deleted && typeof m.deleted === 'object' && !Array.isArray(m.deleted)) ? m.deleted : {}
+  };
+}
+// Stable text form of a Money store, used to tell "same" from "different" (order of records does not matter).
+function moneyDigest(m){
+  const n = moneyNormalise(m);
+  const byId = (a,b)=> String(a && a.id) < String(b && b.id) ? -1 : String(a && a.id) > String(b && b.id) ? 1 : 0;
+  return moneyCanon([n.settingsUpdatedAt, n.settings, n.invoices.slice().sort(byId), n.transactions.slice().sort(byId), n.deleted]);
+}
+function moneyMergeList(mine, theirs, deleted){
+  const byId = new Map(), noId = [];
+  const consider = r=>{
+    if(!r || typeof r !== 'object') return;
+    if(r.id === undefined || r.id === null){ noId.push(r); return; }
+    const ex = byId.get(r.id);
+    // later edit wins; on an exact tie the larger text wins, so every phone picks the SAME version (otherwise two phones holding
+    // different versions would each keep their own and keep re-uploading it over the other's)
+    if(!ex || moneyRecTime(r) > moneyRecTime(ex) || (moneyRecTime(r) === moneyRecTime(ex) && moneyCanon(r) > moneyCanon(ex))) byId.set(r.id, r);
+  };
+  mine.forEach(consider); theirs.forEach(r=>{ if(r && (r.id !== undefined && r.id !== null)) consider(r); });
+  if(!mine.some(r=>r && (r.id === undefined || r.id === null))) theirs.forEach(r=>{ if(r && typeof r === 'object' && (r.id === undefined || r.id === null)) noId.push(r); });
+  const out = [];
+  byId.forEach((r,id)=>{
+    const tomb = Date.parse(deleted[id]);
+    if(isFinite(tomb) && tomb >= moneyRecTime(r)) return;  // deleted after its last edit -> stays deleted
+    out.push(r);
+  });
+  // Keep the order the owner is used to (newest first): my own order for what I already had, anything new from Drive by createdAt.
+  const rank = new Map(); mine.forEach((r,i)=>{ if(r && r.id !== undefined) rank.set(r.id, i); });
+  const extra = out.filter(r=>!rank.has(r.id));
+  const kept = out.filter(r=>rank.has(r.id)).sort((a,b)=> rank.get(a.id) - rank.get(b.id));
+  extra.sort((a,b)=> String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const merged = extra.length ? extra.concat(kept) : kept;
+  return merged.concat(noId);
+}
+// mine = this device's copy (decides the display order); theirs = the other copy (Drive's, or this device's older one).
+function moneyMerge(mine, theirs){
+  const a = moneyNormalise(mine), b = moneyNormalise(theirs);
+  const deleted = Object.assign({}, b.deleted);
+  Object.keys(a.deleted).forEach(id=>{ if(!(Date.parse(deleted[id]) >= Date.parse(a.deleted[id]))) deleted[id] = a.deleted[id]; });
+  // tombstones older than ~13 months are dropped (no phone is that far behind)
+  const cutoff = Date.now() - 400*864e5;
+  Object.keys(deleted).forEach(id=>{ const t = Date.parse(deleted[id]); if(isFinite(t) && t < cutoff) delete deleted[id]; });
+  const useTheirSettings = b.settingsUpdatedAt > a.settingsUpdatedAt || (b.settingsUpdatedAt === a.settingsUpdatedAt && moneyCanon(b.settings) > moneyCanon(a.settings));
+  return {
+    __nativeSchema: true,
+    settings: useTheirSettings ? b.settings : a.settings,
+    settingsUpdatedAt: useTheirSettings ? b.settingsUpdatedAt : a.settingsUpdatedAt,
+    invoices: moneyMergeList(a.invoices, b.invoices, deleted),
+    transactions: moneyMergeList(a.transactions, b.transactions, deleted),
+    deleted
+  };
+}
+// Apply a freshly-read Drive copy to this device's Money. Returns true when this device's Money changed.
+//   Chinnu (not the owner): adopt Drive's copy outright -- she never edits Money, so her copy can only ever be the older one.
+//   Umang: merge. If the merge shows Drive is missing something of his, opts.repair uploads it again.
+let _moneyRepairAt = 0;
+function reconcileMoneyFromRemote(remote, opts){
+  try{
+    const me = S.local && S.local.myProfile;
+    if(!me || !S.shared || !remote || !moneyLooksNative(remote.money)) return false;
+    const before = S.shared.money ? moneyDigest(S.shared.money) : null;
+    const remoteDigest = moneyDigest(remote.money);
+    const merged = me === MONEY_OWNER ? moneyMerge(S.shared.money, remote.money) : moneyNormalise(remote.money);
+    const after = moneyDigest(merged);
+    const changed = after !== before;
+    if(changed){
+      S.shared.money = merged;
+      if(typeof window.moneyExternalChange === 'function') window.moneyExternalChange();
+      if(!(opts && opts.skipPersist)) saveShared(null, {skipDrivePush:true});
+    }
+    if(me === MONEY_OWNER && after !== remoteDigest && opts && opts.repair && Date.now() - _moneyRepairAt > 20000){
+      _moneyRepairAt = Date.now();
+      console.warn('Money: Drive is missing recent Money changes (overwritten by another phone\'s save) — uploading again');
+      driveSyncSave();
+    }
+    return changed;
+  }catch(e){ console.warn('reconcileMoneyFromRemote failed', e); return false; }
+}
+// Opening the app / manual Sync adopts Drive's copy of the file: fold this device's own Money back in first (owner only).
+function moneyKeepLocalOnAdopt(adopted, localShared){
+  try{
+    if(!adopted || !localShared || !localShared.money) return false;
+    if(!(S.local && S.local.myProfile === MONEY_OWNER)) return false;
+    if(!moneyLooksNative(localShared.money)) return false;
+    const merged = moneyMerge(localShared.money, adopted.money);
+    const changed = moneyDigest(merged) !== moneyDigest(adopted.money);
+    adopted.money = merged;
+    return changed;
+  }catch(e){ console.warn('moneyKeepLocalOnAdopt failed', e); return false; }
+}
+let _lastSavedMoneyDigest = null, _moneyVerifyToken = 0;
+// A few seconds after an upload that changed Money, look at Drive again: another phone's save that landed at the same moment
+// replaces the whole file, Money included. Merge, and upload again if anything of the owner's is missing.
+function verifyMoneyOnDrive(attempt){
+  if(!S.appSession || !isHosted() || !S.local || S.local.myProfile !== MONEY_OWNER) return;
+  const delays = [4000, 12000, 30000];
+  if(attempt >= delays.length) return;
+  const tok = ++_moneyVerifyToken;
+  setTimeout(async ()=>{
+    if(tok !== _moneyVerifyToken) return;
+    if(_syncPending || _driveSavePromise){ verifyMoneyOnDrive(attempt+1); return; } // an upload is on its way; look after it
+    let remote = null;
+    try{ remote = await driveSyncLoad(); }catch(e){}
+    if(tok !== _moneyVerifyToken) return;
+    if(!remote){ verifyMoneyOnDrive(attempt+1); return; }
+    const mr = migrateShared(remote);
+    _moneyRepairAt = 0; // this IS the repair check -- not rate-limited
+    reconcileMoneyFromRemote(mr, {repair:true});
+    if(moneyDigest(S.shared.money) !== moneyDigest(mr.money)) verifyMoneyOnDrive(attempt+1);
+  }, delays[attempt]);
+}
+
 function mergeChatFromRemote(remoteShared){
   _chatMergeListChanged = false;
   if(!remoteShared || !remoteShared.chat) return false;
@@ -16658,7 +16846,11 @@ async function doSync(manual){
     // cloud read from wiping locally-accumulated data (the "refresh zeros everything" bug) —
     // and only if it isn't older than what we already have.
     if(sharedDataHasContent(loaded) && !localIsNewer){
+      // v129: this phone's own Money is kept in the merge (it may hold entries Drive's copy lacks)
+      const _prevShared = S.shared;
       S.shared = loaded;
+      moneyKeepLocalOnAdopt(S.shared, _prevShared);
+      if(typeof window.moneyExternalChange === 'function') window.moneyExternalChange();
       // Persist what was just adopted — without this, a successful manual sync updated
       // what's shown on screen but never wrote it to local storage or bumped
       // S.local.lastLocalSaveAt, so it could be silently lost again on the very next reload
@@ -16991,6 +17183,8 @@ async function performDriveSaveOnce(){
       if(remote){
         const migratedRemote = migrateShared(remote); // same shape S.shared expects — see doSync()/initAfterLogin()
         const chatChanged = mergeChatFromRemote(migratedRemote);
+        // v129: Money -- Chinnu's phone takes Drive's copy here (it must never upload an old one); Umang's merges by record id
+        reconcileMoneyFromRemote(migratedRemote);
         // v128: rebuild the message list only when a MESSAGE changed; typing / online changes just update the header + typing bubble
         if(chatChanged && S.view==='chat'){
           if(_chatMergeListChanged && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly();
@@ -17016,6 +17210,11 @@ async function performDriveSaveOnce(){
     // Chat: a concurrent upload from the partner's phone can still overwrite this one (the whole file is replaced on every
     // save), so look again a few seconds later and put the messages back if they are gone -- see verifyChatOnDrive().
     if(chatMoved) verifyChatOnDrive(0);
+    // Same for Money (owner's phone only -- verifyMoneyOnDrive() ignores everyone else)
+    const _md = S.shared.money ? moneyDigest(S.shared.money) : '';
+    const _moneyMoved = _md !== _lastSavedMoneyDigest;
+    _lastSavedMoneyDigest = _md;
+    if(_moneyMoved) verifyMoneyOnDrive(0);
     if(hadUndeliveredOut && S.view==='chat' && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly(); // single tick -> double tick
   } catch(e){
     console.warn('Sync save failed:', e);
@@ -17152,10 +17351,15 @@ async function initAfterLogin(){
   const localSnapshot = adoptDrive ? await readLocalSharedQuiet() : null;
   if(adoptDrive){
     S.shared = migratedDrive;
-    if(localSnapshot) unionRecentLocalChat(S.shared, localSnapshot);
+    if(localSnapshot){
+      unionRecentLocalChat(S.shared, localSnapshot);
+      // v129: same for Money -- what was saved on this phone but is missing from Drive's copy (another phone's save replaced it) is folded back in and re-uploaded
+      moneyKeepLocalOnAdopt(S.shared, localSnapshot);
+    }
     await saveShared();
   } else {
     S.shared = await loadShared();
+    if(migratedDrive){ reconcileMoneyFromRemote(migratedDrive, {skipPersist:true}); } // v129: Money from Drive (Chinnu: adopt; Umang: merge)
     if(migratedDrive) mergeChatFromRemote(migratedDrive); // v128: show her latest messages straight away rather than at the first poll
     // Local was ahead — push it back up now instead of leaving Drive stale until the next
     // unrelated change happens to trigger a save.
@@ -17165,6 +17369,7 @@ async function initAfterLogin(){
   // "changed this cycle" (and pay for an unneeded merge round-trip) just because the
   // in-memory fingerprint started out null.
   _lastSavedChatFingerprint = chatFingerprint();
+  _lastSavedMoneyDigest = S.shared.money ? moneyDigest(S.shared.money) : '';
   // One-time heal: celebratedMilestones used to live only on this device (S.local); move
   // whatever's already recorded there into the new synced, per-profile home in S.shared so
   // a badge/milestone doesn't fire again just because this profile opens a second device.

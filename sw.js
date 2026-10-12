@@ -170,7 +170,11 @@
 //  * index.html: save pipeline (serialised uploads, retry with back-off, "not on Drive yet" flag that survives a reload, lost-write repair), chat refresh
 //    from every screen / on return to the foreground, unsynced messages survive a reload, push subscription self-repair + Settings "Send test",
 //    delivered tick reflects Drive, tappable links in chat bubbles, unsent draft kept across reloads.
-const CACHE_VERSION = 'olympus-v128';
+// v129: MONEY -- saved transactions no longer vanish. Chinnu's phone re-uploaded the whole shared file (including its OLD copy of Money) on every chat /
+// timer save, and Umang's next app open adopted that old copy. Now Chinnu's phone always takes Drive's Money before uploading; Umang's phone merges Money
+// with Drive record by record (later edit wins, deletes leave a tombstone so they stay deleted), folds its own Money back in when the app opens, and a few
+// seconds after each Money change checks Drive again and re-uploads if another phone's save overwrote it. Index.html only; no backend change.
+const CACHE_VERSION = 'olympus-v129';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
