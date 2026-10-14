@@ -51,12 +51,19 @@
 // content at the same time. That is ONE Google call for a read and one for a write. A cold start still pays the full price once.
 // Response shapes are unchanged; POST additionally returns modifiedTime.
 //
+// *** v131: LESS DATA ON THE WIRE ***
+//  * GET ?since=<modifiedTime>: when the file has not changed since that moment the answer is { unchanged:true, modifiedTime } and the (large)
+//    content is never sent -- polls, post-save checks and re-opens become one tiny call. A client that does not send `since` gets the old answer.
+//  * POST may send { file, payloadGz: <base64 of gzip(JSON)> } instead of { file, payload }: the whole shared file used to be uploaded as plain text on
+//    every save, which on a mobile uplink is most of the time a save takes. Both forms are accepted.
+//
 // Auth: every request needs `Authorization: Bearer <token>` from a prior /api/auth call.
 // GET  /api/sync?file=<name>  → 200 { data: <JSON, or null if the file doesn't exist yet>, modifiedTime }
 // POST /api/sync              → body { file?: <name>, payload: <JSON to save> }; 200 { ok: true }
 //   (file defaults to the main data file on both GET and POST when omitted)
 
 import { createHmac, timingSafeEqual, createSign } from 'crypto';
+import { gunzipSync } from 'zlib';
 
 const FOLDER_ID = '1Wr2t2KJUw5vEi0Vbi2290m09kacBdM0s';
 const DEFAULT_FILE_NAME = 'olympus-data.json';
@@ -294,11 +301,21 @@ export default async function handler(req, res) {
       res.status(400).json({ error: 'Invalid file name' });
       return;
     }
+    const since = req.query && typeof req.query.since === 'string' && req.query.since.length < 64 ? req.query.since : null;
     try {
       const result = await withDriveToken(async (accessToken) => {
         let file = await resolveFile(accessToken, fileName);
         if (!file) return null;
         try {
+          if (since) {
+            // Ask for the modifiedTime and the content together; if the file is unchanged, answer as soon as the (fast) metadata is back.
+            const metaPromise = file.modifiedTime !== undefined ? Promise.resolve(file.modifiedTime) : fetchModifiedTime(accessToken, file.id);
+            const contentPromise = readFileContent(accessToken, file.id);
+            contentPromise.catch(() => {});
+            const mt = await metaPromise;
+            if (mt && mt === since) return { unchanged: true, modifiedTime: mt };
+            return { raw: await contentPromise, modifiedTime: mt };
+          }
           return await readFileWithMeta(accessToken, file);
         } catch (err) {
           // A remembered id that Drive no longer serves (file deleted / replaced by hand): forget it and look the file up again.
@@ -314,6 +331,10 @@ export default async function handler(req, res) {
       });
       if (!result) {
         res.status(200).json({ data: null, modifiedTime: null });
+        return;
+      }
+      if (result.unchanged) {
+        res.status(200).json({ unchanged: true, modifiedTime: result.modifiedTime });
         return;
       }
       let data;
@@ -335,17 +356,27 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const body = req.body || {};
     const fileName = body.file || DEFAULT_FILE_NAME;
-    const payload = body.payload;
+    let payload = body.payload;
+    let jsonString = null;
     if (!isValidFileName(fileName)) {
       res.status(400).json({ error: 'Invalid file name' });
       return;
+    }
+    if (typeof body.payloadGz === 'string' && payload === undefined) {
+      try {
+        jsonString = gunzipSync(Buffer.from(body.payloadGz, 'base64')).toString('utf8');
+        payload = JSON.parse(jsonString);
+      } catch (e) {
+        res.status(400).json({ error: 'Missing or invalid payload' });
+        return;
+      }
     }
     if (!payload || typeof payload !== 'object') {
       res.status(400).json({ error: 'Missing or invalid payload' });
       return;
     }
     try {
-      const jsonString = JSON.stringify(payload);
+      if (jsonString === null) jsonString = JSON.stringify(payload);
       const saved = await withDriveToken(async (accessToken) => {
         let file = await resolveFile(accessToken, fileName);
         if (file) {
