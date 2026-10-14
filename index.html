@@ -3491,7 +3491,9 @@ async function saveShared(data, opts){
     // completed — this timestamp is what catches that case on the next load, rather than
     // silently trusting whatever stale snapshot Drive happens to have.
     if(S.local){
-      S.local.lastLocalSaveAt = Date.now();
+      // v131: a local-only save (opts.skipDrivePush: merging what Drive just told us, heartbeat ticks) holds nothing Drive lacks, so it must not make
+      // this device look 'ahead of Drive' at the next open -- that made every open upload the whole file for no reason.
+      if(!(opts && opts.skipDrivePush)) S.local.lastLocalSaveAt = Date.now();
       // v128: persisted "there is something here that Drive has not confirmed yet" -- survives a reload/kill, cleared only by an upload
       // that began after this save and succeeded (see performDriveSaveOnce). Heartbeat-style saves that skip the upload don't set it.
       if(!(opts && opts.skipDrivePush) && S.appSession && isHosted()) S.local.driveDirty = true;
@@ -8883,6 +8885,7 @@ function startBackgroundPoll(){
   stopBackgroundPoll();
   _backgroundPollTimer = setInterval(async ()=>{
     if(!S.appSession || !isHosted()) return;
+    if(_driveSavePromise || _syncPending) return; // v131: not while an upload is queued/running (see pollChatTick)
     const me = S.local.myProfile;
     const myTs = me && S.shared.timerState && S.shared.timerState[me];
     const myTimerRunning = !!(myTs && myTs.startTime);
@@ -8960,7 +8963,7 @@ function startBackgroundPoll(){
           // the next successful poll, several seconds later, ran and re-merged it from
           // scratch. Saving here means what this device has already confirmed true survives
           // a reload even if the next Drive read is momentarily behind.
-          saveShared();
+          saveShared(null, {skipDrivePush:true}); // v131: local-only -- this is Drive's own data coming in, uploading it back just burns bandwidth
         }
       }
     }catch(e){ console.warn('Background poll failed', e); }
@@ -8986,7 +8989,7 @@ function mergeTimerStateFromRemote(remoteShared){
   if(!S.shared.timerState) S.shared.timerState = {};
   const localOther = S.shared.timerState[other];
   const remoteTime = remoteOther.lastHeartbeat || 0;
-  const localTime = (localOther && localOther.lastHeartbeat) || -1;
+  const localTime = localOther ? (localOther.lastHeartbeat || 0) : -1; // v131: an existing cached state with a null heartbeat is 0 (same as a null remote), not -1 -- else identical idle states looked 'newer' on every poll
   const sig = t => t ? [t.status,t.startTime,t.lastBreakStart,t.accumulatedBreakMs,t.breakReason,t.itemId,t.countdownTargetMs].join('|') : '';
   const differs = sig(remoteOther) !== sig(localOther);
   // v122: a plain `remote > local` heartbeat comparison ignored the partner STOPPING (legacy stopped states carried a null
@@ -9134,7 +9137,9 @@ function refreshOtherProfileDataFromRemote(freshRemote){
     let h = 0, c = 0;
     for(const l of L){ h += Number(l.hours||0); c = (c*31 + (l.date ? l.date.charCodeAt(9)*7 + l.date.charCodeAt(8) : 0)) | 0; }
     // v124: the partner's daily motivation is part of the slice too, so her card on my Home appears the moment her message lands
-    return L.length+':'+h.toFixed(4)+':'+c+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], ((S.shared.dailyQuote||{})[other]||{}).text]);
+    // v132: her lecture progress and chosen Home paper are drawn on my Home too (Lecture Completion shows both of us)
+    const lecSig = Object.entries((S.shared.lectures||{})[other]||{}).map(([p,ls])=>p+'='+(ls||[]).filter(l=>l.status==='done').length+'/'+(ls||[]).length).join(',');
+    return L.length+':'+h.toFixed(4)+':'+c+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], ((S.shared.dailyQuote||{})[other]||{}).text, lecSig, ((S.shared.prefs||{})[other]||{}).homeLecturePaper]);
   };
   const before = slice();
   SINGLE_OWNER_SHARED_KEYS.forEach(key=>{
@@ -9652,7 +9657,7 @@ let _chatPollTimer = null;
 function startChatPolling(){
   stopChatPolling();
   pollChatUpdates();
-  _chatPollTimer = setInterval(pollChatUpdates, 3000);
+  _chatPollTimer = setInterval(pollChatTick, 3000);
   document.addEventListener('visibilitychange', onChatVisibilityChange);
 }
 function stopChatPolling(){
@@ -9672,7 +9677,7 @@ function onChatVisibilityChange(){
     // backgrounding, which is what the recipient actually is.
     stopChatHeartbeat();
   } else if(S.view==='chat'){
-    if(!_chatPollTimer){ pollChatUpdates(); _chatPollTimer = setInterval(pollChatUpdates, 3000); }
+    if(!_chatPollTimer){ pollChatUpdates(); _chatPollTimer = setInterval(pollChatTick, 3000); }
     // Stamp immediately on return so "Online" comes back at once rather than after 25s,
     // then resume the interval.
     const me = S.local.myProfile;
@@ -9692,6 +9697,8 @@ function onChatVisibilityChange(){
 // which is correct — if a read is already on the way, a second one adds nothing.
 let _chatPollPromise = null;
 // Returns a promise (true = Drive was reached and applied) so the manual refresh button can wait on it and report failure.
+// v131: the timer-driven poll stands aside while an upload is queued or running -- two big transfers at once on a phone connection slow BOTH down.
+function pollChatTick(){ if(_driveSavePromise || _syncPending) return Promise.resolve(false); return pollChatUpdates(); }
 function pollChatUpdates(){
   if(S.view!=='chat' || !S.appSession || !isHosted()) return Promise.resolve(false);
   if(_chatPollPromise) return _chatPollPromise; // one read at a time -- see the note above
@@ -10317,7 +10324,7 @@ async function loadArchive(){
 // it's a separate view function with its own render path).
 function ensureArchiveLoaded(){
   if(S.sharedArchive || !S.appSession || !isHosted()) return;
-  loadArchive().then(()=> renderApp());
+  loadArchive().then(()=> renderAppSoon());
 }
 let _archiveSaveDebounceTimer = null;
 function saveArchive(){
@@ -10377,9 +10384,20 @@ async function loadMcqBank(){
   })();
   try{ return await _mcqBankLoadPromise; } finally { _mcqBankLoadPromise = null; }
 }
+// One redraw for however many background loads finish close together, and never in the middle of typing into a field.
+let _softRenderTimer = null;
+function renderAppSoon(){
+  clearTimeout(_softRenderTimer);
+  const go = (n)=>{
+    const ae = document.activeElement;
+    if(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable) && n < 10){ _softRenderTimer = setTimeout(()=>go(n+1), 500); return; }
+    renderApp();
+  };
+  _softRenderTimer = setTimeout(()=>go(0), 400);
+}
 function ensureMcqBankLoaded(){
   if(S.sharedMcqBank || !S.appSession || !isHosted()) return;
-  loadMcqBank().then(()=> renderApp());
+  loadMcqBank().then(()=> renderAppSoon());
 }
 let _mcqBankSaveDebounceTimer = null;
 function saveMcqBank(){
@@ -12056,18 +12074,38 @@ function sbRow(label, val){
 // is untouched (['dt','idt']) since that constant also gates the Workspace Lectures tab and
 // other lecture-aggregation code elsewhere — IDT's own lecture tracker still works fine from
 // its Workspace page, this only removes the switcher from the Home summary.
-function homeLectureCompletionBlock(profileId){
-  // Chetna sees Paper 5 — IDT here specifically; Umang keeps Paper 4 — DT, unchanged.
-  const paperId = homeLecturePaperFor(profileId); // Settings → Display; defaults to the original DT (Umang) / IDT (Chetna)
-  const paper = paperById(paperId);
-  const lecs = lecturesFor(profileId, paperId);
-  const done = lecs.filter(l=>l.status==='done').length;
-  const pending = lecs.length - done;
-  const pct = lecs.length ? Math.round(done/lecs.length*100) : 0;
+// v132: Lecture Completion now shows BOTH profiles on every Home (each person's own paper, set in Settings → Display). When both
+// have picked the same paper the two are drawn together -- one race track with a lane each, two rings side by side and a
+// "who is ahead" line -- otherwise each gets its own card (race track + ring). `viewedId` only decides which person's
+// lectures page the button(s) open first; the data shown never depends on whose Home it is.
+function homeLectureRows(){
+  const me = S.local.myProfile || 'umang';
+  return [me, otherProfileId(me)].map(pid=>{
+    const paperId = homeLecturePaperFor(pid);
+    const lecs = lecturesFor(pid, paperId);
+    const done = lecs.filter(l=>l.status==='done').length;
+    return {pid, prof:profileById(pid), isMe:pid===me, paperId, paper:paperById(paperId), total:lecs.length, done, pending:lecs.length-done, pct: lecs.length ? Math.round(done/lecs.length*100) : 0};
+  });
+}
+function homeLectureWho(r){ return r.prof.nick + (r.isMe ? ' (you)' : ''); }
+function homeLectureCompletionBlock(viewedId){
+  const rows = homeLectureRows();
+  if(rows[0].paperId === rows[1].paperId) return homeLectureMergedCard(rows, viewedId);
+  // viewed profile's card first (as before it was the only one), the other below it
+  const ordered = rows.slice().sort((a,b)=> (b.pid===viewedId) - (a.pid===viewedId));
   return `
   <div class="section-title">Lecture Completion</div>
-  <div class="card">
-    ${raceTrackSVG(profileId, done, lecs.length, pct)}
+  ${ordered.map(r=>homeLectureSingleCard(r)).join('')}`;
+}
+function homeLectureSingleCard(r){
+  const {pid, prof, paperId, paper, total, done, pending, pct} = r;
+  return `
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:800;color:var(--${prof.color})">${homeLectureWho(r)}</div>
+      <div style="font-size:11.5px;color:var(--text-muted)">${paper.code} · ${paper.nick}</div>
+    </div>
+    ${raceTrackSVG(pid, done, total, pct)}
     <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:14px;margin-top:14px">
       ${pieChart([{value:done, color:'var(--good)'}, {value:pending, color:'var(--surface2)'}], 90, true)}
       <div style="font-size:12.5px">
@@ -12075,8 +12113,65 @@ function homeLectureCompletionBlock(profileId){
         <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:inline-block"></span>Pending — <b>${pending}</b></div>
       </div>
     </div>
-    ${lecs.length===0?`<div style="font-size:11.5px;color:var(--text-faint);margin:-4px 0 10px">No ${paper.nick} lectures added yet — add them on the Lectures page.</div>`:''}
-    <button class="btn btn-accent" style="width:100%" onclick="openWorkspaceFor('${profileId}','${paperId}','lectures')">${lecs.length===0?'Add':'Go to'} ${paper.code} · ${paper.nick} Lectures Page →</button>
+    ${total===0?`<div style="font-size:11.5px;color:var(--text-faint);margin:-4px 0 10px">No ${paper.nick} lectures added yet — add them on the Lectures page.</div>`:''}
+    <button class="btn btn-accent" style="width:100%" onclick="openWorkspaceFor('${pid}','${paperId}','lectures')">${total===0?'Add':'Go to'} ${paper.code} · ${paper.nick} Lectures Page${r.isMe?'':' ('+prof.nick+')'} →</button>
+  </div>`;
+}
+function homeLectureMergedCard(rows, viewedId){
+  const paper = rows[0].paper, paperId = rows[0].paperId;
+  const [a, b] = rows;
+  let lead;
+  if(a.total===0 && b.total===0) lead = `No ${paper.nick} lectures added yet by either of you.`;
+  else if(a.pct === b.pct) lead = `Neck and neck — both at ${a.pct}%. 🤝`;
+  else {
+    const f = a.pct > b.pct ? a : b, t = f===a ? b : a;
+    lead = `${f.prof.nick} leads by ${f.pct - t.pct}% (${f.done}/${f.total} vs ${t.done}/${t.total}) ${f.isMe?'— keep it up! 🏃':'— catch up! 🏃'}`;
+  }
+  const ring = r => `
+    <div style="flex:1;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:6px">
+      ${pieChart([{value:r.done, color:`var(--${r.prof.color})`}, {value:r.pending, color:'var(--surface2)'}], 84, true)}
+      <div style="font-size:12px;font-weight:800;color:var(--${r.prof.color})">${homeLectureWho(r)}</div>
+      <div style="font-size:11.5px;color:var(--text-muted);text-align:center">Completed <b style="color:var(--text)">${r.done}</b> · Pending <b style="color:var(--text)">${r.pending}</b><br>of ${r.total}</div>
+    </div>`;
+  const btns = rows.slice().sort((x,y)=> (y.pid===viewedId) - (x.pid===viewedId)).map((r,i)=>
+    `<button class="btn ${i===0?'btn-accent':''}" style="flex:1;min-width:140px" onclick="openWorkspaceFor('${r.pid}','${paperId}','lectures')">${r.total===0?'Add ':''}${r.isMe?'My':r.prof.nick+"'s"} ${paper.nick} lectures →</button>`).join('');
+  return `
+  <div class="section-title">Lecture Completion</div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:800">Both of you · ${paper.code} · ${paper.nick}</div>
+    </div>
+    ${raceTrackMergedSVG(rows)}
+    <div style="font-size:12.5px;font-weight:700;text-align:center;margin:10px 0 14px">${lead}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">${rows.map(ring).join('')}</div>
+    ${rows.some(r=>r.total===0)?`<div style="font-size:11.5px;color:var(--text-faint);margin:-4px 0 10px">${rows.filter(r=>r.total===0).map(r=>r.prof.nick).join(' and ')} ${rows.filter(r=>r.total===0).length>1?"haven't":"hasn't"} added ${paper.nick} lectures yet.</div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${btns}</div>
+  </div>`;
+}
+// One track with a lane per person (same paper, so the finish line is the same) -- each avatar runs along its own lane.
+function raceTrackMergedSVG(rows){
+  const W=320, laneH=70, trackH=12, r=6, startX=12, endX=W-12, trackW=endX-startX, milestones=[25,50,75,100];
+  const H = laneH*rows.length + 8;
+  const lanes = rows.map((row, i)=>{
+    const prof = row.prof, y0 = i*laneH, trackY = y0 + 58, pct = row.pct;
+    const avatarX = startX + trackW*pct/100;
+    const gid = 'raceGradM'+prof.id;
+    return `
+      <rect x="${startX}" y="${trackY}" width="${trackW}" height="${trackH}" rx="${r}" fill="var(--surface2)" stroke="var(--border)" stroke-width="1"/>
+      <rect x="${startX}" y="${trackY}" width="${Math.max(0,trackW*pct/100)}" height="${trackH}" rx="${r}" fill="url(#${gid})" class="chart-animate summit-fill"/>
+      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--${prof.color})" stop-opacity="0.7"/><stop offset="1" stop-color="var(--${prof.color})"/></linearGradient></defs>
+      ${milestones.map(m=>{ const mx = startX + trackW*(m/100); const reached = pct>=m;
+        return `<line x1="${mx}" y1="${trackY}" x2="${mx}" y2="${trackY+trackH}" stroke="${reached?'#fff':'var(--border)'}" stroke-width="1.5" stroke-dasharray="${reached?'none':'2 2'}"/>${i===0?`<text x="${mx}" y="${trackY-4}" text-anchor="middle" font-size="8" fill="var(--text-faint)">${m}%</text>`:''}`; }).join('')}
+      <text x="${endX}" y="${trackY-4}" font-size="13" text-anchor="middle">🏁</text>
+      <text x="${startX}" y="${trackY-4}" font-size="11" text-anchor="middle">🏃</text>
+      <image href="${prof.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" x="${Math.min(endX-16, Math.max(startX-4, avatarX-16)).toFixed(1)}" y="${(trackY-50).toFixed(1)}" width="30" height="50" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))"/>`;
+  }).join('');
+  return `
+  <div style="position:relative;overflow:hidden;border-radius:10px;background:color-mix(in srgb,var(--umang) 4%,color-mix(in srgb,var(--chetna) 4%,var(--surface2)));padding:8px 6px 6px">
+    <svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">${lanes}</svg>
+    <div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:4px;font-size:10.5px;margin-top:4px">
+      ${rows.map(row=>`<span style="font-weight:800;color:var(--${row.prof.color})">${homeLectureWho(row)}: ${row.done}/${row.total} · ${row.pct}%</span>`).join('')}
+    </div>
   </div>`;
 }
 function raceTrackSVG(profileId, done, total, pct){
@@ -16106,7 +16201,7 @@ function homeLayoutFor(profileId){
   return {order, hidden: pr.homeHidden || {}};
 }
 function homeLecturePaperFor(profileId){
-  const pr = (S.shared.prefs && S.shared.prefs[S.local.myProfile]) || {};
+  const pr = (S.shared.prefs && S.shared.prefs[profileId]) || {}; // v132: each profile's OWN choice (was always the viewer's), so the Home card can show both people
   if(pr.homeLecturePaper && LECTURE_TRACKER_PAPERS.includes(pr.homeLecturePaper)) return pr.homeLecturePaper;
   return profileId === 'chetna' ? 'idt' : 'dt'; // the original defaults
 }
@@ -17029,15 +17124,40 @@ function removeLoginScreen(){
 // for PHOTOS_FILE_NAME/ARCHIVE_FILE_NAME — see findDriveFile/readDriveFile/writeDriveFile
 // below, which target this same endpoint with an explicit fileName). payload (for POST) is
 // whatever JSON should be saved to that file.
-async function appSyncRequest(method, fileName, payload){
+// v131: uploads are gzip-compressed (the whole shared file was sent as plain text on every save -- on a mobile uplink that upload IS most of
+// the time a save takes). Falls back to plain JSON if the browser has no CompressionStream, or if the server answers 400 (an older api/sync.js
+// that does not know `payloadGz` yet -- so deploying the app before the server can never break saving).
+let _gzipOk = (typeof CompressionStream === 'function' && typeof Blob === 'function');
+let _lastPostPayloadStr = null; // exact text of the last main-file upload, kept so a successful upload can be remembered as "what Drive holds"
+async function gzipBase64(str){
+  const blob = await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
+  return await new Promise((resolve, reject)=>{
+    const fr = new FileReader();
+    fr.onload = ()=> resolve(String(fr.result).split(',')[1] || '');
+    fr.onerror = ()=> reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+async function appSyncRequest(method, fileName, payload, opts){
   if(!S.appSession) throw new Error('Not signed in');
   const headers = { 'Authorization': `Bearer ${S.appSession.token}` };
-  let url = '/api/sync', body;
+  let url = '/api/sync', body, usedGzip = false;
   if(method === 'GET'){
-    if(fileName) url += `?file=${encodeURIComponent(fileName)}`;
+    const qs = [];
+    if(fileName) qs.push(`file=${encodeURIComponent(fileName)}`);
+    if(opts && opts.since) qs.push(`since=${encodeURIComponent(opts.since)}`); // v131: "only send it if it changed since this moment"
+    if(qs.length) url += '?' + qs.join('&');
   } else {
     headers['Content-Type'] = 'application/json';
-    body = JSON.stringify({ file: fileName || undefined, payload });
+    const payloadStr = JSON.stringify(payload);
+    if(!fileName) _lastPostPayloadStr = payloadStr;
+    let gz = null;
+    if(_gzipOk && payloadStr.length > 2048){
+      try{ gz = await gzipBase64(payloadStr); }catch(e){ _gzipOk = false; gz = null; }
+    }
+    const filePart = fileName ? `"file":${JSON.stringify(fileName)},` : '';
+    if(gz){ usedGzip = true; body = `{${filePart}"payloadGz":"${gz}"}`; }
+    else body = `{${filePart}"payload":${payloadStr}}`;
   }
   // Bounded wait — without this, a slow or hung request here (flaky mobile signal, a
   // cold-starting serverless function, anything) left every caller waiting forever with no
@@ -17077,6 +17197,7 @@ async function appSyncRequest(method, fileName, payload){
     S.appSession = null;
     throw new Error('Session expired');
   }
+  if(r.status === 400 && usedGzip){ _gzipOk = false; return appSyncRequest(method, fileName, payload, opts); } // server predates compressed uploads
   if(!r.ok) throw new Error(`Sync ${r.status}`);
   return r.json();
 }
@@ -17088,17 +17209,42 @@ async function appSyncRequest(method, fileName, payload){
 // concept anymore from the client's perspective (api/sync.js resolves the file by name on
 // every call), so these just use the fileName itself as a stand-in id — callers only ever
 // check it for truthiness ("do we have a file yet"), never use it as an actual identifier.
+// v131: no network here any more. This used to download the WHOLE file just to learn whether it exists, and the very next line downloaded it again
+// (the archive and the question bank were each fetched twice on every app open). readDriveFile() below returns null for a file that does not exist.
 async function findDriveFile(folderId, fileName){
-  const result = await appSyncRequest('GET', fileName);
-  return result.data ? { id: fileName } : null;
+  return { id: fileName };
 }
-async function readDriveFile(fileId){
-  const result = await appSyncRequest('GET', fileId); // fileId is really just the fileName here — see comment above
+// Local copy of the archive / question bank (IndexedDB), so a re-open asks the server "has it changed?" and, when not, downloads nothing.
+let _fcDbPromise = null;
+function fcDb(){
+  if(!_fcDbPromise) _fcDbPromise = new Promise((resolve, reject)=>{
+    try{
+      const rq = indexedDB.open('olympus-filecache', 1);
+      rq.onupgradeneeded = ()=> rq.result.createObjectStore('f');
+      rq.onsuccess = ()=> resolve(rq.result);
+      rq.onerror = ()=> reject(rq.error);
+    }catch(e){ reject(e); }
+  });
+  return _fcDbPromise;
+}
+async function fcGet(name){
+  try{ const db = await fcDb(); return await new Promise((res)=>{ const rq = db.transaction('f').objectStore('f').get(name); rq.onsuccess = ()=> res(rq.result || null); rq.onerror = ()=> res(null); }); }catch(e){ return null; }
+}
+async function fcSet(name, val){
+  try{ const db = await fcDb(); await new Promise((res)=>{ const tx = db.transaction('f','readwrite'); if(val === null) tx.objectStore('f').delete(name); else tx.objectStore('f').put(val, name); tx.oncomplete = ()=> res(); tx.onerror = ()=> res(); tx.onabort = ()=> res(); }); }catch(e){}
+}
+async function readDriveFile(fileId){ // fileId is really just the fileName here — see comment above
+  const cached = await fcGet(fileId);
+  const result = await appSyncRequest('GET', fileId, undefined, cached && cached.mt ? {since: cached.mt} : undefined);
+  if(result.unchanged && cached){ try{ return JSON.parse(cached.text); }catch(e){ await fcSet(fileId, null); return (await appSyncRequest('GET', fileId)).data; } }
+  if(result.data && result.modifiedTime) fcSet(fileId, { mt: result.modifiedTime, text: JSON.stringify(result.data) });
   return result.data;
 }
 async function writeDriveFile(folderId, fileId, data, fileName){
-  await appSyncRequest('POST', fileName || fileId, data);
-  return fileName || fileId;
+  const name = fileName || fileId;
+  const resp = await appSyncRequest('POST', name, data);
+  if(resp && resp.modifiedTime) fcSet(name, { mt: resp.modifiedTime, text: JSON.stringify(data) }); else fcSet(name, null);
+  return name;
 }
 
 // Habit/chat/timer handlers already mutate state, update the DOM, and call saveShared()
@@ -17177,6 +17323,57 @@ function performDriveSave(){
   })();
   return _driveSavePromise;
 }
+// ═══ v132: my own data can no longer be silently rolled back by the partner's simultaneous save ═══════════════════════════════
+// Every save uploads the WHOLE file. If both phones save within the same second, the later upload can carry the other phone's
+// OLD copy of my part of the file (lectures, logs, targets...) and put it back on Drive; my phone, having "successfully"
+// uploaded, never noticed -- and the next time the app opened it adopted Drive's older copy. Chat, Money and the timer already
+// repaired themselves; this does the same for everything else a person owns (SINGLE_OWNER_SHARED_KEYS): a few seconds after an
+// upload, look at Drive, and if my part there is an OLDER state of mine (one this phone itself uploaded or read before), upload again.
+// A part that matches nothing this phone has seen is another device's genuine newer change and is left alone (no ping-pong).
+const _OWN_SLICE_SKIP = ['pushSubscriptions','pushPrefs']; // these have their own repair paths
+let _ownSliceHist = {}, _ownSliceVerifyToken = 0;
+function _hashStr(t){ let h = 5381; for(let i=0;i<t.length;i++) h = ((h<<5) + h + t.charCodeAt(i)) | 0; return h + ':' + t.length; }
+function ownSliceDigests(src){
+  const me = S.local && S.local.myProfile, out = {};
+  if(!me || !src) return out;
+  SINGLE_OWNER_SHARED_KEYS.forEach(k=>{
+    if(_OWN_SLICE_SKIP.includes(k)) return;
+    const v = src[k] && src[k][me];
+    if(v !== undefined) out[k] = _hashStr(moneyCanon(v));
+  });
+  return out;
+}
+function ownSliceHistoryAdd(src){
+  try{
+    const d = ownSliceDigests(src);
+    Object.keys(d).forEach(k=>{
+      const h = _ownSliceHist[k] || (_ownSliceHist[k] = []);
+      if(h[h.length-1] !== d[k]){ h.push(d[k]); if(h.length > 6) h.shift(); }
+    });
+  }catch(e){ console.warn('ownSliceHistoryAdd failed', e); }
+}
+function verifyOwnSlicesOnDrive(attempt){
+  if(!S.appSession || !isHosted()) return;
+  const tok = ++_ownSliceVerifyToken;
+  setTimeout(async ()=>{
+    if(tok !== _ownSliceVerifyToken) return; // a newer upload has its own check
+    if(S.local && S.local.driveDirty || _syncPending || _driveSavePromise) return; // something newer is already on its way
+    try{
+      const remote = await driveSyncLoad();
+      if(tok !== _ownSliceVerifyToken || !remote || (S.local && S.local.driveDirty) || _syncPending || _driveSavePromise) return;
+      const rem = ownSliceDigests(remote), mine = ownSliceDigests(S.shared);
+      const rolledBack = Object.keys(mine).filter(k=> rem[k] !== mine[k] && (_ownSliceHist[k]||[]).includes(rem[k]));
+      if(rolledBack.length && attempt < 3){
+        console.warn('Drive holds an older copy of my', rolledBack.join(', '), '(overwritten by a simultaneous save) — uploading again');
+        _lastOwnSliceRepairs++; _ownSliceAttemptN++;
+        driveSyncSave();
+      } else if(!rolledBack.length) _ownSliceAttemptN = 0;
+    }catch(e){ console.warn('Own-slice verify failed', e); }
+  }, 5000 + attempt*3000);
+}
+var _lastOwnSliceRepairs = 0, _ownSliceAttemptN = 0;
+// consecutive verify rounds that found a rollback: stops after 3 so two devices can never fight forever
+function _ownSliceAttempt(){ return _ownSliceAttemptN; }
 async function performDriveSaveOnce(){
   _syncPending = false;
   S.syncStatus = 'syncing'; renderNav();
@@ -17197,6 +17394,7 @@ async function performDriveSaveOnce(){
       const remote = await driveSyncLoad();
       if(remote){
         const migratedRemote = migrateShared(remote); // same shape S.shared expects — see doSync()/initAfterLogin()
+        ownSliceHistoryAdd(remote); // v132 (raw copy -- migrateShared() is not idempotent on lectures/tasks): what Drive held just before this upload -- the older states a simultaneous save could put back
         const chatChanged = mergeChatFromRemote(migratedRemote);
         // v129: Money -- Chinnu's phone takes Drive's copy here (it must never upload an old one); Umang's merges by record id
         reconcileMoneyFromRemote(migratedRemote);
@@ -17211,10 +17409,14 @@ async function performDriveSaveOnce(){
     } catch(e){ console.warn('Pre-save refresh failed, proceeding with local copy:', e); }
     await yieldToMain();
     const snapshotAt = Date.now(), seq = _driveSaveSeq; // both taken in the same tick the body is serialised in
-    await appSyncRequest('POST', null, S.shared);
+    const postResp = await appSyncRequest('POST', null, S.shared);
     _lastPostSnapshotAt = snapshotAt; _lastPostDoneAt = Date.now();
+    // v131: Drive now holds exactly what was just uploaded (needs a server that returns modifiedTime; otherwise the next read is simply a full one)
+    _known = (postResp && postResp.modifiedTime && _lastPostPayloadStr) ? { mt: postResp.modifiedTime, text: '{"data":' + _lastPostPayloadStr + ',"modifiedTime":' + JSON.stringify(postResp.modifiedTime) + '}' } : null;
+    _lastPostPayloadStr = null;
     // Only clear the "not on Drive yet" flag when nothing changed since this upload's body was built.
     if(seq === _driveSaveSeq && S.local && S.local.driveDirty){ S.local.driveDirty = false; saveLocal(); }
+    if(seq === _driveSaveSeq){ ownSliceHistoryAdd(S.shared); verifyOwnSlicesOnDrive(_ownSliceAttempt()); } // v132
     _driveRetryN = 0; clearTimeout(_driveRetryTimer);
     const fp = chatFingerprint();
     const chatMoved = fp !== _lastSavedChatFingerprint;
@@ -17292,11 +17494,23 @@ async function driveSyncSaveNow(){
 // pre-save merge) already depend on it returning the shared-data object directly, not a
 // wrapper — changing that would mean touching all of them for one caller's need.
 let _lastDriveModifiedTime = null;
+// v131: the newest state of the shared file this phone knows EXACTLY -- from its last full read, or from its own last successful upload (whose text it
+// still has). Every later read says "send it only if it changed since <modifiedTime>"; when nothing changed the server answers in one tiny call and this
+// copy is used. That covers the 3 s chat poll, the 15 s background poll, the post-upload checks and the read before each save.
+let _known = null; // { mt, text }  text = JSON of {data, modifiedTime}
 async function driveSyncLoad(){
   if(!S.appSession || !isHosted()) return null;
   try{
-    const result = await appSyncRequest('GET');
+    let result = await appSyncRequest('GET', null, undefined, _known && _known.mt ? {since: _known.mt} : undefined);
+    if(result.unchanged){
+      if(_known && _known.mt === result.modifiedTime){
+        _lastDriveModifiedTime = _known.mt;
+        return JSON.parse(_known.text).data;
+      }
+      result = await appSyncRequest('GET'); // answer did not match what we hold -- read it in full
+    }
     _lastDriveModifiedTime = result.modifiedTime || null;
+    _known = (result.data && result.modifiedTime) ? { mt: result.modifiedTime, text: JSON.stringify(result) } : null;
     return result.data; // null if nothing saved yet, otherwise the full shared JSON
   } catch(e){ console.warn('Sync load failed:', e); return null; }
 }
@@ -17387,12 +17601,15 @@ async function initAfterLogin(){
   const localSnapshot = adoptDrive ? await readLocalSharedQuiet() : null;
   if(adoptDrive){
     S.shared = migratedDrive;
+    let _foldedBack = false;
     if(localSnapshot){
-      unionRecentLocalChat(S.shared, localSnapshot);
+      _foldedBack = unionRecentLocalChat(S.shared, localSnapshot);
       // v129: same for Money -- what was saved on this phone but is missing from Drive's copy (another phone's save replaced it) is folded back in and re-uploaded
-      moneyKeepLocalOnAdopt(S.shared, localSnapshot);
+      _foldedBack = moneyKeepLocalOnAdopt(S.shared, localSnapshot) || _foldedBack;
     }
-    await saveShared();
+    // v131: Drive's copy was just adopted, so there is nothing to upload -- unless something of this phone's was folded back in. (This used to upload the
+    // entire file on EVERY app open, with the "Saving…" badge and a full round trip competing with everything else the app does while it starts.)
+    await saveShared(null, _foldedBack ? undefined : {skipDrivePush:true});
   } else {
     S.shared = await loadShared();
     if(migratedDrive){ reconcileMoneyFromRemote(migratedDrive, {skipPersist:true}); } // v129: Money from Drive (Chinnu: adopt; Umang: merge)
@@ -17441,8 +17658,12 @@ function bootStartBackgroundWork(){
   flushDriveIfDirty();          // v128: anything left over from a previous session that Drive never confirmed
   reconcilePushSubscription();  // v128: repair a dropped / renewed push address
   maybeSweepArchive(); // fire-and-forget; gated to once/day/device internally, never blocks load
-  ensureArchiveLoaded(); // fire-and-forget; makes archived (30+ day old) history visible app-wide once it lands
-  ensureMcqBankLoaded(); // fire-and-forget; loads the question bank file (and runs its one-time migration off S.shared) without waiting for someone to open Practice/Mock Tests
+  // v131: these two big files used to start downloading the instant the app opened, in competition with the main data and with any save. They now
+  // start a few seconds later (and come from the local copy unless they changed -- see readDriveFile), and share ONE redraw.
+  setTimeout(()=>{
+    ensureArchiveLoaded(); // fire-and-forget; makes archived (30+ day old) history visible app-wide once it lands
+    ensureMcqBankLoaded(); // fire-and-forget; loads the question bank file (and runs its one-time migration off S.shared) without waiting for someone to open Practice/Mock Tests
+  }, 3000);
   maybeRolloverOverdueTasks(); // same convention — rolls overdue incomplete tasks onto today
   PROFILES.forEach(p=> refreshAllTargets(p.id)); // snapshots progress + fires completion celebrations on every load
   ensureDailyQuote(); // fire-and-forget; gated to once/day (shared, not per-device) internally
@@ -17463,10 +17684,10 @@ async function bootReconcileWithDrive(bootSaveAt){
     if(migratedDrive && sharedDataHasContent(migratedDrive) && !localIsNewer && !changedSinceDraw){
       const mine = S.shared;
       S.shared = migratedDrive;
-      unionRecentLocalChat(S.shared, mine);
-      moneyKeepLocalOnAdopt(S.shared, mine);
+      let folded = unionRecentLocalChat(S.shared, mine);
+      folded = moneyKeepLocalOnAdopt(S.shared, mine) || folded;
       if(typeof window.moneyExternalChange === 'function') window.moneyExternalChange();
-      await saveShared();
+      await saveShared(null, folded ? undefined : {skipDrivePush:true}); // v131: nothing to upload unless something of this phone's was folded back in
       adopted = true;
     } else if(migratedDrive){
       reconcileMoneyFromRemote(migratedDrive, {skipPersist:true});

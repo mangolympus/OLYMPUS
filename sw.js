@@ -182,7 +182,16 @@
 //  * api/sync.js: reuses Google's access token and the file id between requests and reads content + modifiedTime in parallel -- one Google call per read /
 //    write instead of three in a row (POST now also returns modifiedTime). Needs the api/sync.js redeploy to take effect.
 //  * Money tab: one shared number / date formatter (was rebuilt for every row), string-based sort, only the first screenful of rows animates, one click handler.
-const CACHE_VERSION = 'olympus-v130';
+// v131: SPEED -- network traffic. Reads ask "only if changed since <time>" (one tiny call when nothing changed); uploads are gzip-compressed (~178 KB -> ~23 KB;
+//   plain upload is used automatically against an older api/sync.js); the archive / MCQ-bank files are cached on the phone and loaded after the first screen;
+//   opening the app no longer uploads anything, and phones sitting idle no longer re-upload the whole file every ~15 s (a partner-timer comparison treated an
+//   unchanged idle state as new on every poll; background merges are now saved locally only and no longer mark this phone "ahead of Drive").
+//   Needs api/sync.js redeployed for the since/gzip parts (the app works against the old one, just without those savings).
+// v132: HOME -- Lecture Completion shows both of you (each person's own chosen paper): the same paper = one merged card (two-lane race track, two rings,
+//   who-leads line, a lectures button each); different papers = a card each. Her progress / paper choice redraws his Home by itself when it arrives.
+//   Also: a simultaneous save by the partner's phone can no longer roll back my own lectures/logs/targets etc. on Drive -- a few seconds after each upload
+//   the phone checks and uploads again if Drive holds an older copy of its own part (chat, Money and the timer already did this).
+const CACHE_VERSION = 'olympus-v132';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
