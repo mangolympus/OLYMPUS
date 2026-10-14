@@ -192,7 +192,14 @@
 //   Also: a simultaneous save by the partner's phone can no longer roll back my own lectures/logs/targets etc. on Drive -- a few seconds after each upload
 //   the phone checks and uploads again if Drive holds an older copy of its own part (chat, Money and the timer already did this).
 // v133: the merged Lecture Completion card draws both of you on ONE race track (each in your own colour, Mangu's avatar above the bar, Chinnu's below).
-const CACHE_VERSION = 'olympus-v133';
+// v134: TARGETS -- (1) the Targets page has a "Mangu | Chinnu" switch: the other person's targets (and their Home "Needs Attention") are visible, read-only,
+//   and refresh when their phone changes them; (2) every target's page now has Performance: work-vs-time bars, 9 KPIs (schedule gap, finish forecast,
+//   7-day trend, best day, study hours, hours per lecture, consistency, streak), a target chart (actual vs plan vs pace), daily-progress bars and study-hour
+//   bars; the Targets page also has a summary strip. Lecture targets now take their pace from each lecture's completion date (a fresh target no longer looks idle).
+//   Nothing was added to Home. Index.html only.
+// v135: Targets follow the Mangu | Chinnu switch at the top of the app, like Diary / Timer / Planner: view the other profile, then Features -> Targets shows THEIR
+//   targets (read-only). The extra switch inside the Targets page from v134 is removed. Index.html only.
+const CACHE_VERSION = 'olympus-v135';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

@@ -618,6 +618,12 @@ body.targets-mode #targets-root{display:flex}
 .mt-tile{background:var(--surface2);border-radius:10px;padding:10px 4px;text-align:center}
 .mt-tile b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
 .mt-tile span{font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em}
+.mt-ptiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mt-ptile{background:var(--surface2);border-radius:10px;padding:10px 4px;text-align:center}
+.mt-ptile b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
+.mt-ptile span{font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em}
+.mt-tab{padding:9px 6px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;flex:1}
+.mt-tab.active{background:color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--surface2));color:var(--text)}
 .mt-verdict{font-size:12.5px;line-height:1.55;color:var(--text)}
 .mt-note{font-size:10.5px;color:var(--text-faint);line-height:1.45;margin-top:6px}
 .mt-lbl{font-size:10px;color:var(--text-faint);margin-bottom:6px}
@@ -7639,6 +7645,23 @@ function ensureTargetSnapshot(profileId, target){
 // average since the target's startDate — so a brand-new target still gets a sensible number
 // instead of "no data" on day one.
 function targetPace(profileId, target, currentValue){
+  // v134: a lecture target on a tracked paper knows exactly WHEN each lecture was completed, so its pace comes from those dates
+  // (the once-a-day snapshots only start on the day the target was created, which made a fresh target look idle).
+  if(target.type==='lectures'){
+    try{
+      const comps = paperComponents(profileId, target.paperId);
+      if(comps.usesLectureTracker && comps.lecTotal > 0){
+        const done = (lecturesFor(profileId, target.paperId)||[]).filter(l=>l.status==='done');
+        const stamped = done.filter(l=>l.completionDate).map(l=>l.completionDate);
+        const base = done.length - stamped.length, today = todayStr();
+        const at = d => base + stamped.filter(x=>x<=d).length;
+        const age = Math.max(1, daysBetweenDates(target.startDate || today, today));
+        const win = Math.min(7, age);
+        const gain = at(today) - at(tgAddDays(today, -win));
+        return (target.unit==='percent' ? gain/comps.lecTotal*100 : gain) / win;
+      }
+    }catch(e){ /* fall through to the snapshot method */ }
+  }
   const log = (target.progressLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
   const today = todayStr();
   const windowDays = 7;
@@ -7912,6 +7935,7 @@ function targetBrief(profileId, t){
   const sd = targetStatusData(profileId, t);
   const info = targetCountInfo(profileId, t);
   const paper = t.paperId ? paperById(t.paperId) : null;
+  const mine = !S.local || profileId === S.local.myProfile; // v134: the other person's targets are worded "they", not "you"
   const completed = sd.status==='COMPLETED', overdue = sd.status==='OVERDUE';
   const pct = t.unit==='percent' ? '%' : '';
   const dl = sd.daysLeft;
@@ -7935,13 +7959,13 @@ function targetBrief(profileId, t){
   let line, verdict;
   if(completed){ line = `Done ${when}`; verdict = `Completed ${when}.`; }
   else if(overdue){
-    line = 'Overdue — open it to give it more time';
-    verdict = `The deadline passed ${-dl} ${tgPlural(-dl,'day')} ago with ${toGoTxt} still to go. Give it more time below, or keep going.`;
+    line = mine ? 'Overdue — open it to give it more time' : 'Overdue';
+    verdict = `The deadline passed ${-dl} ${tgPlural(-dl,'day')} ago with ${toGoTxt} still to go.` + (mine ? ' Give it more time below, or keep going.' : '');
   } else {
-    line = `Need ${needTxt}` + (pace>0 ? ` · you're doing ${paceTxt}` : ' · no recent progress');
-    if(pace<=0) verdict = `No recent progress yet. Do ${needTxt} to finish by ${fmtShortDate(t.deadline)}.`;
-    else if(proj.diff<=0) verdict = `On pace: at ${paceTxt} you'd finish around ${fmtShortDate(proj.date)}${proj.diff<0 ? `, ${-proj.diff} ${tgPlural(-proj.diff,'day')} early` : ''}.`;
-    else verdict = `At ${paceTxt} you'd finish around ${fmtShortDate(proj.date)}, ${proj.diff} ${tgPlural(proj.diff,'day')} late. To make ${fmtShortDate(t.deadline)} you need ${needTxt}.`;
+    line = `Need ${needTxt}` + (pace>0 ? ` · ${mine?"you're":"they're"} doing ${paceTxt}` : ' · no recent progress');
+    if(pace<=0) verdict = mine ? `No recent progress yet. Do ${needTxt} to finish by ${fmtShortDate(t.deadline)}.` : `No recent progress yet. They need ${needTxt} to finish by ${fmtShortDate(t.deadline)}.`;
+    else if(proj.diff<=0) verdict = `On pace: at ${paceTxt} ${mine?'you':'they'}'d finish around ${fmtShortDate(proj.date)}${proj.diff<0 ? `, ${-proj.diff} ${tgPlural(-proj.diff,'day')} early` : ''}.`;
+    else verdict = `At ${paceTxt} ${mine?'you':'they'}'d finish around ${fmtShortDate(proj.date)}, ${proj.diff} ${tgPlural(proj.diff,'day')} late. To make ${fmtShortDate(t.deadline)} ${mine?'you':'they'} need ${needTxt}.`;
   }
   return {sd, info, paper, completed, overdue, pct, dl, noun, toGo, toGoNum, toGoUnit, toGoTxt, doneTxt, need, pace, needTxt, paceTxt, proj, barPct, tickPct, when, line, verdict};
 }
@@ -7953,7 +7977,8 @@ function mtCardHtml(profileId, target, opts){
   const left = b.completed ? '<b>Goal reached</b>' : `<b>${b.toGoTxt}</b> to go`;
   const right = b.completed ? (target.completedAt ? `done ${fmtShortDate(target.completedAt)}` : '')
     : (b.overdue ? `<b>${-b.dl}</b> ${tgPlural(-b.dl,'day')} overdue` : (b.dl===0 ? '<b>Due today</b>' : `<b>${b.dl}</b> ${tgPlural(b.dl,'day')} left`));
-  return `<div class="card mt-card" data-mt-edit="${target.id}" style="${style}" onclick="openTargetDetail('${target.id}')">
+  const mine = !S.local || profileId === S.local.myProfile; // the other person's cards open read-only and have no press-and-hold edit
+  return `<div class="card mt-card" ${mine?`data-mt-edit="${target.id}"`:''} style="${style}" onclick="openTargetDetail('${target.id}'${mine?'':`,'${profileId}'`})">
     <div class="mt-head">
       <div style="min-width:0"><div class="mt-title">${escChat(target.title)}</div><div class="mt-sub">${sub}</div></div>
       <span class="mt-badge">${b.sd.meta.label}</span>
@@ -7968,8 +7993,7 @@ function mtCardHtml(profileId, target, opts){
 // Surfaces only what needs attention (critical/at-risk/overdue/due-very-soon), soonest and
 // most urgent first — a full target list belongs on the Targets page itself, not Home. ─────
 function targetsNeedsAttentionWidgetHtml(profileId, isMe){
-  if(!isMe) return '';
-  refreshAllTargets(profileId);
+  if(isMe) refreshAllTargets(profileId); // v134: the other person's are shown too, but only their own phone updates them
   const all = milestoneTargetsFor(profileId).filter(t=>!t.completedAt);
   const urgent = all.map(t=>({t, sd:targetStatusData(profileId,t)}))
     .filter(x=> x.sd.status==='OVERDUE' || x.sd.status==='CRITICAL' || x.sd.status==='AT_RISK' || x.sd.daysLeft<=2)
@@ -7979,10 +8003,10 @@ function targetsNeedsAttentionWidgetHtml(profileId, isMe){
     }).slice(0,4);
   if(all.length===0) return ''; // nothing to show at all if no targets exist yet — page-level empty state covers onboarding
   return `
-  <div class="section-title">Needs Attention</div>
+  <div class="section-title">${isMe ? 'Needs Attention' : profileById(profileId).nick+"'s Needs Attention"}</div>
   <div style="margin-bottom:4px">
     ${urgent.length ? urgent.map(x=>mtCardHtml(profileId, x.t, {compact:true})).join('')
-      : `<div class="card" style="padding:16px;text-align:center;font-size:12px;color:var(--text-faint)">All targets on track. 🎯</div>`}
+      : `<div class="card" style="padding:16px;text-align:center;font-size:12px;color:var(--text-faint)">All ${isMe?'':profileById(profileId).nick+"'s "}targets on track. 🎯</div>`}
   </div>`;
 }
 
@@ -7996,7 +8020,7 @@ function plannerTargetsDueHtml(profileId, iso){
     <div style="font-weight:800;font-size:11px;margin-bottom:8px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em">🎯 Targets due this day</div>
     ${due.map(t=>{
       const sd = targetStatusData(profileId, t);
-      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" onclick="openTargetsPopup();openTargetDetail('${t.id}')">
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" onclick="openTargetsPopup('${profileId}');openTargetDetail('${t.id}','${profileId}')">
         <div style="flex:1;min-width:0">${escChat(t.title)}</div>
         <span class="mt-badge" style="--mt-color:${sd.meta.color};--mt-tint:${sd.meta.tint}">${sd.meta.label}</span>
       </div>`;
@@ -8006,7 +8030,13 @@ function plannerTargetsDueHtml(profileId, iso){
 
 // ── Overlay open/close — same history-checkpoint pattern as Diary/Habits/Stats. ────────────
 let _targetsHistoryActive = false;
-function openTargetsPopup(){
+// v134: the Targets page can show either person's targets. Your own are editable; the other person's are read-only (their phone is the only writer).
+function targetsProfileId(){
+  const me = S.local && S.local.myProfile, p = S.targetsProfile;
+  return (p && PROFILES.some(x=>x.id===p)) ? p : me;
+}
+function targetsReadOnly(){ return targetsProfileId() !== (S.local && S.local.myProfile); }
+function openTargetsPopup(profileId){
   if(!_targetsHistoryActive){
     try{ history.pushState({olympusTargets:true}, '', location.href); }catch(e){}
     _targetsHistoryActive = true;
@@ -8016,6 +8046,9 @@ function openTargetsPopup(){
   S.targetsView = 'dashboard';
   S.targetDetailId = null;
   S.targetsDraft = null;
+  // v134/v135: like Diary, Timer and Planner, Targets shows whoever you are viewing (the Mangu | Chinnu switch at the top of the app)
+  S.targetsProfile = (typeof profileId === 'string' && PROFILES.some(x=>x.id===profileId)) ? profileId
+    : ((S.viewingProfile && PROFILES.some(x=>x.id===S.viewingProfile)) ? S.viewingProfile : S.local.myProfile);
   document.body.classList.add('targets-mode');
   refreshAllTargets(S.local.myProfile);
   renderTargetsPopup();
@@ -8041,18 +8074,23 @@ function onTargetsBackButton(){ _targetsHistoryActive = false; closeTargetsPopup
 
 // ── Dashboard (default view) ────────────────────────────────────────────────────────────
 function targetsDashboardHtml(profileId){
+  const ro = profileId !== S.local.myProfile, who = profileById(profileId).nick;
   const all = milestoneTargetsFor(profileId);
   const active = all.filter(t=>!t.completedAt);
   const doneCount = all.length - active.length;
-  const ideas = targetSuggestions(profileId);
+  const ideas = ro ? [] : targetSuggestions(profileId);
   S._targetIdeas = ideas;
+  const tabs = '';
+  if(ro && all.length===0){
+    return `${tabs}<div class="card mt-empty"><div style="font-size:32px">🎯</div><div class="t">${who} hasn't set any targets yet</div><div class="s">Their targets will appear here as soon as they add one on their phone.</div></div>`;
+  }
   if(active.length===0){
-    return `<div class="card mt-empty">
+    return `${tabs}${targetsOverviewHtml(profileId)}<div class="card mt-empty">
       <div style="font-size:32px">${all.length ? '🎉' : '🎯'}</div>
-      <div class="t">${all.length ? 'All targets completed' : 'Set your first target'}</div>
-      <div class="s">${all.length ? 'Nice work. Set the next one while the momentum is there.' : 'Pick what to finish and by when. Progress tracks itself from your lectures, chapters and revision.'}</div>
+      <div class="t">${all.length ? (ro ? 'All of '+who+"'s targets are completed" : 'All targets completed') : 'Set your first target'}</div>
+      <div class="s">${ro ? 'Nothing active right now.' : (all.length ? 'Nice work. Set the next one while the momentum is there.' : 'Pick what to finish and by when. Progress tracks itself from your lectures, chapters and revision.')}</div>
       ${ideas.length ? `<div class="mt-chips">${ideas.map((x,i)=>`<button type="button" class="mt-chip" onclick="applyTargetIdea(${i})">${escChat(x.label)}</button>`).join('')}</div>` : ''}
-      <button class="btn btn-accent" onclick="openTargetCreateForm()">+ New target</button>
+      ${ro ? '' : `<button class="btn btn-accent" onclick="openTargetCreateForm()">+ New target</button>`}
     </div>
     ${doneCount>0?`<div style="text-align:center;margin-top:10px"><button class="btn btn-sm" onclick="openTargetHistory()">Completed (${doneCount})</button></div>`:''}`;
   }
@@ -8061,11 +8099,11 @@ function targetsDashboardHtml(profileId){
     .sort((a,b)=> (rank[a.sd.status]-rank[b.sd.status]) || (a.sd.daysLeft-b.sd.daysLeft));
   const over = items.filter(x=>x.sd.status==='OVERDUE').length;
   const behind = items.filter(x=>x.sd.status==='CRITICAL'||x.sd.status==='AT_RISK').length;
-  return `
+  return `${tabs}${targetsOverviewHtml(profileId)}
   <div class="mt-summary">${items.length} active${over?` · ${over} overdue`:''}${behind?` · ${behind} behind`:''}${!over&&!behind?' · all on track':''}</div>
   ${items.map(x=>mtCardHtml(profileId,x.t)).join('')}
   ${doneCount>0?`<div style="text-align:center;margin-top:6px"><button class="btn btn-sm" onclick="openTargetHistory()">Completed (${doneCount})</button></div>`:''}
-  <div class="mt-hint">Tip: press and hold a target to edit it</div>`;
+  ${ro ? `<div class="mt-hint">Read-only — ${who} edits their own targets</div>` : `<div class="mt-hint">Tip: press and hold a target to edit it</div>`}`;
 }
 
 // ── Ideas: the papers you are weakest in, turned into ready-to-use targets (tap one to fill the form) ──────────────────
@@ -8099,7 +8137,7 @@ function applyTargetIdea(i){
 // ── The form (new + edit share it) ───────────────────────────────────────────────────────────────────────────────────
 // Goal quick-picks, "by when" quick-picks and a live line that says what the goal actually takes (items per day, and how that
 // compares with your recent lecture pace). Start date and priority were dropped: nothing useful depended on them.
-function openTargetCreateForm(draft){ S.targetsView = 'create'; S.targetsDraft = draft || null; renderTargetsPopup(); }
+function openTargetCreateForm(draft){ S.targetsProfile = S.local.myProfile; S.targetsView = 'create'; S.targetsDraft = draft || null; renderTargetsPopup(); }
 function targetFormHtml(profileId, existing, draft){
   const e = existing || null, d = draft || {};
   const type = e ? e.type : (d.type || 'lectures');
@@ -8265,6 +8303,7 @@ function openTargetEdit(targetId, from){
   const me = S.local && S.local.myProfile; if(!me) return;
   if(!targetById(me, targetId)) return;
   if(!S.targetsPopupOpen) openTargetsPopup(); // e.g. held from the Home "Needs Attention" card: open the Targets page first
+  S.targetsProfile = me;
   S.targetEditId = targetId;
   S.targetEditReturn = from === 'detail' ? 'detail' : 'dashboard';
   S.targetDetailId = targetId;
@@ -8354,14 +8393,19 @@ function extendTargetDeadline(profileId, targetId, days){
 }
 
 // ── Detail: where you stand, what it takes, and what you can do about it ───────────────────────────────────────────
-function openTargetDetail(targetId){ S.targetDetailId = targetId; S.targetsView = 'detail'; renderTargetsPopup(); }
+function openTargetDetail(targetId, profileId){
+  if(!S.targetsPopupOpen) openTargetsPopup(profileId); // e.g. a card tapped on Home's "Needs Attention"
+  if(profileId && PROFILES.some(x=>x.id===profileId)) S.targetsProfile = profileId;
+  S.targetDetailId = targetId; S.targetsView = 'detail'; renderTargetsPopup();
+}
 function targetDetailHtml(profileId, targetId){
   const t = targetById(profileId, targetId);
   if(!t) return emptyState('🎯','This target no longer exists.');
+  const ro = profileId !== S.local.myProfile; // v134: the other person's target: everything visible (KPIs, charts), nothing editable
   const b = targetBrief(profileId, t);
   const style = `--mt-color:${b.sd.meta.color};--mt-tint:${b.sd.meta.tint}`;
   const sub = `${b.paper ? b.paper.code+' · '+b.paper.nick : 'General'} · ${targetTypeInfo(t.type).short} · due ${fmtShortDate(t.deadline)}`;
-  const head = `<div class="card mt-card" data-mt-edit="${t.id}" style="${style};cursor:default;margin-bottom:12px">
+  const head = `<div class="card mt-card" ${ro?'':`data-mt-edit="${t.id}"`} style="${style};cursor:default;margin-bottom:12px">
     <div class="mt-head">
       <div style="min-width:0"><div class="mt-title" style="font-size:16px">${escChat(t.title)}</div><div class="mt-sub">${sub}</div></div>
       <span class="mt-badge">${b.sd.meta.label}</span>
@@ -8375,15 +8419,15 @@ function targetDetailHtml(profileId, targetId){
     stand = `<div class="card" style="margin-bottom:12px;text-align:center;padding:18px"><div style="font-size:26px">🎉</div><div style="font-weight:800;font-size:13px;margin-top:2px">Completed ${b.when}</div>${t.completedAt?`<div class="mt-note">Finished ${fmtShortDate(t.completedAt)} · deadline was ${fmtShortDate(t.deadline)}</div>`:''}</div>`;
   } else {
     const tiles = b.overdue
-      ? [[-b.dl,'days overdue'],[b.toGoNum,'to go'],[fmtPerDay(b.pace),'your pace / day']]
-      : [[Math.max(0,b.dl),'days left'],[fmtPerDay(b.need),'need / day'],[fmtPerDay(b.pace),'your pace / day']];
+      ? [[-b.dl,'days overdue'],[b.toGoNum,'to go'],[fmtPerDay(b.pace),(ro?'their':'your')+' pace / day']]
+      : [[Math.max(0,b.dl),'days left'],[fmtPerDay(b.need),'need / day'],[fmtPerDay(b.pace),(ro?'their':'your')+' pace / day']];
     stand = `<div class="card" style="margin-bottom:12px">
       <div class="mt-tiles">${tiles.map(([v,l])=>`<div class="mt-tile"><b>${v}</b><span>${l}</span></div>`).join('')}</div>
       <div class="mt-verdict">${escChat(b.verdict)}</div>
       ${b.info ? `<div class="mt-note">Goal = ${b.info.goal} of ${b.info.total} ${b.info.noun}. ${b.info.paperLeft} still pending in the whole paper.</div>` : ''}
     </div>`;
   }
-  const custom = (t.type==='custom' && !b.completed) ? `
+  const custom = (!ro && t.type==='custom' && !b.completed) ? `
   <div class="card" style="margin-bottom:12px">
     <div class="mt-lbl">Update progress</div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -8392,7 +8436,7 @@ function targetDetailHtml(profileId, targetId){
       <button class="btn btn-accent" onclick="setManualProgress('${profileId}','${t.id}', document.getElementById('mtd-manual').value)">Save</button>
     </div>
   </div>` : '';
-  const needMoreTime = (!b.completed && (b.overdue || b.sd.status==='AT_RISK' || b.sd.status==='CRITICAL')) ? `
+  const needMoreTime = (!ro && !b.completed && (b.overdue || b.sd.status==='AT_RISK' || b.sd.status==='CRITICAL')) ? `
   <div class="card" style="margin-bottom:12px">
     <div class="mt-lbl">Need more time?</div>
     <div class="mt-chips">${[[3,'+3 days'],[7,'+1 week'],[14,'+2 weeks']].map(([n,l])=>`<button type="button" class="mt-chip" onclick="extendTargetDeadline('${profileId}','${t.id}',${n})">${l}</button>`).join('')}</div>
@@ -8409,10 +8453,215 @@ function targetDetailHtml(profileId, targetId){
     ${openSyllabus}
     <button class="btn" onclick="completeTargetNow('${profileId}','${t.id}')">✓ Mark complete</button>
   </div>`;
-  return `${head}${stand}${custom}${needMoreTime}${actions}
+  const perf = targetPerformanceHtml(profileId, t);
+  if(ro) return `${head}${stand}${perf}<div class="mt-hint">Read-only — ${profileById(profileId).nick} edits their own targets</div>`;
+  return `${head}${stand}${perf}${custom}${needMoreTime}${actions}
   <div class="mt-pair" style="margin-top:4px">
     <button class="btn" onclick="openTargetEdit('${t.id}','detail')">✏️ Edit</button>
     <button class="btn" style="color:var(--bad)" onclick="deleteTarget('${profileId}','${t.id}')">🗑 Delete</button>
+  </div>`;
+}
+
+// ═══ v134: TARGET PERFORMANCE — KPIs and charts inside each target (and a summary strip on the Targets page; never on Home) ═══════
+// Everything here is DERIVED and read-only: lecture targets are rebuilt day by day from each lecture's completion date, other targets use
+// the once-a-day progress snapshots (progressLog) the target already keeps, and study hours come from the normal study logs. Nothing new is stored.
+function tgAddDays(iso, n){ const d = new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return localDateStr(d); }
+// The measure the charts use: whole lectures/chapters when the target has a count (so "30 of 83"), otherwise the target's own value (% or hand-entered).
+function tgUnits(profileId, t){
+  const info = targetCountInfo(profileId, t);
+  if(info) return {kind:'count', noun:info.noun, total:info.total, goal:info.goal};
+  return {kind:'value', noun: t.unit==='percent' ? '%' : '', total:null, goal:t.targetValue};
+}
+function targetSeries(profileId, t){
+  const u = tgUnits(profileId, t), today = todayStr(), start = t.startDate || today;
+  const last = (t.completedAt && t.completedAt < today) ? t.completedAt : today;
+  const cur = u.kind==='count' ? targetTotalAndDone(profileId, t).done : targetCurrentValue(profileId, t);
+  let pts = [], exact = false;
+  const comps = (t.type==='lectures' && u.kind==='count') ? paperComponents(profileId, t.paperId) : null;
+  if(comps && comps.usesLectureTracker){
+    const done = (lecturesFor(profileId, t.paperId)||[]).filter(l=>l.status==='done');
+    const stamped = done.filter(l=>l.completionDate).map(l=>l.completionDate).sort();
+    const base = done.length - stamped.length; // done but never dated: counted from the very start
+    let from = start; if(daysBetweenDates(from, last) > 370) from = tgAddDays(last, -370);
+    let i = 0;
+    for(let d = from; d <= last; d = tgAddDays(d, 1)){ while(i < stamped.length && stamped[i] <= d) i++; pts.push({date:d, v:base+i}); }
+    exact = true;
+  } else {
+    const log = (t.progressLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+    pts = log.filter(s=>s.date <= last).map(s=>({date:s.date, v:(u.kind==='count' && t.unit==='percent') ? Math.round(s.value*u.total/100) : s.value}));
+  }
+  const lp = pts[pts.length-1];
+  if(lp && lp.date === last){
+    if(exact) lp.v = cur;                         // day-by-day series: today's point simply is the current value
+    else if(lp.v !== cur) pts.push({date:last, v:cur}); // today's snapshot is older than now: keep it as the baseline, add what changed since
+  } else pts.push({date:last, v:cur});
+  return {pts, exact, unit:u, cur, last, start};
+}
+function tgDayMap(series){
+  const map = {};
+  for(let i = 1; i < series.pts.length; i++){ const dv = series.pts[i].v - series.pts[i-1].v; if(dv > 0) map[series.pts[i].date] = (map[series.pts[i].date]||0) + dv; }
+  return map;
+}
+function tgLastDays(map, last, n){ const out = []; for(let k = n-1; k >= 0; k--){ const d = tgAddDays(last, -k); out.push({date:d, v:map[d]||0}); } return out; }
+function tgFmt(x){ return fmtRate(x); }
+function targetPerformance(profileId, t){
+  const b = targetBrief(profileId, t), s = targetSeries(profileId, t), u = s.unit;
+  const start = t.startDate || todayStr(), last = s.last;
+  const totalDays = Math.max(1, daysBetweenDates(start, t.deadline));
+  const elapsed = Math.min(totalDays, Math.max(0, daysBetweenDates(start, last)));
+  const timePct = Math.round(elapsed/totalDays*100);
+  const startV = s.pts[0].v, goal = u.goal, cur = s.cur;
+  const workPct = goal <= startV ? (cur >= goal ? 100 : 0) : Math.max(0, Math.min(100, Math.round((cur-startV)/(goal-startV)*100)));
+  const expected = startV + (goal-startV)*elapsed/totalDays;
+  const gap = cur - expected;
+  const map = tgDayMap(s);
+  const days14 = tgLastDays(map, last, 14);
+  const week1 = days14.slice(7).reduce((a,x)=>a+x.v, 0), week0 = days14.slice(0,7).reduce((a,x)=>a+x.v, 0);
+  let best = {v:0, date:null};
+  Object.keys(map).forEach(d=>{ if(map[d] > best.v) best = {v:map[d], date:d}; });
+  // study hours on this paper (or all study, for a general target)
+  const logs = (logsFor(profileId)||[]).filter(l=> !t.paperId || l.paperId === t.paperId);
+  const hoursByDay = {}; logs.forEach(l=>{ if(l.date) hoursByDay[l.date] = (hoursByDay[l.date]||0) + Number(l.hours||0); });
+  let hours = 0, studyDays = 0;
+  Object.keys(hoursByDay).forEach(d=>{ if(d >= start && d <= last && hoursByDay[d] > 0){ hours += hoursByDay[d]; studyDays++; } });
+  let streak = 0; { let d = (hoursByDay[last] > 0) ? last : tgAddDays(last, -1); while(hoursByDay[d] > 0){ streak++; d = tgAddDays(d, -1); } }
+  const gained = cur - startV;
+  return {b, s, u, start, last, totalDays, elapsed, timePct, startV, goal, cur, workPct, expected, gap, map, days14, week1, week0, best,
+    hours, studyDays, streak, hoursByDay, hoursPerUnit: (gained > 0 && hours > 0) ? hours/gained : null,
+    consistency: Math.min(100, Math.round(studyDays/Math.max(1, elapsed+1)*100)),
+    hours14: tgLastDays(hoursByDay, last, 14)};
+}
+// ── charts (inline SVG; colours from the app's CSS variables so both themes work) ──
+function tgBurnupSvg(profileId, t, P){
+  const {b, s} = P, pts = s.pts, W = 320, H = 178, L = 30, R = 12, T = 14, B = 24, pw = W-L-R, ph = H-T-B;
+  const x0 = pts[0].date < P.start ? pts[0].date : P.start;
+  const x1 = t.deadline > s.last ? t.deadline : s.last;
+  const span = Math.max(1, daysBetweenDates(x0, x1));
+  const X = d => L + pw*Math.max(0, Math.min(1, daysBetweenDates(x0, d)/span));
+  const vals = pts.map(p=>p.v).concat([P.goal, P.cur, P.startV]);
+  let yMax = Math.max.apply(null, vals), yMin = Math.max(0, P.startV - Math.max(1, (yMax-P.startV))*0.2);
+  if(yMax <= yMin) yMax = yMin + 1;
+  yMax += (yMax-yMin)*0.06;
+  const Y = v => T + ph*(1 - (v-yMin)/(yMax-yMin));
+  const color = 'var(--'+profileById(profileId).color+')';
+  const line = pts.map((p,i)=>(i?'L':'M')+X(p.date).toFixed(1)+' '+Y(p.v).toFixed(1)).join(' ');
+  const area = line + ` L${X(pts[pts.length-1].date).toFixed(1)} ${Y(yMin).toFixed(1)} L${X(pts[0].date).toFixed(1)} ${Y(yMin).toFixed(1)} Z`;
+  let proj = '';
+  if(!b.completed && b.pace > 0 && P.cur < P.goal){
+    const need = (P.goal-P.cur)/b.pace, until = Math.min(need, Math.max(0, daysBetweenDates(s.last, x1)));
+    proj = `<line x1="${X(s.last).toFixed(1)}" y1="${Y(P.cur).toFixed(1)}" x2="${X(tgAddDays(s.last, Math.round(until))).toFixed(1)}" y2="${Y(P.cur + b.pace*until).toFixed(1)}" stroke="${b.sd.meta.color}" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/>`;
+  }
+  const mid = Math.round((yMin+yMax)/2);
+  const ticks = [Math.round(yMin), mid, Math.round(P.goal)].filter((v,i,a)=>a.indexOf(v)===i);
+  const todayX = X(s.last), showToday = !t.completedAt && todayX > L+30 && todayX < W-R-30;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible" role="img" aria-label="Target chart: progress against plan">
+    ${ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--border)" stroke-width="1" ${v===Math.round(P.goal)?'':'stroke-dasharray="2 3"'} opacity="${v===Math.round(P.goal)?0:1}"/><text x="${L-5}" y="${(Y(v)+3).toFixed(1)}" text-anchor="end" font-size="8.5" fill="var(--text-faint)">${v}</text>`).join('')}
+    <line x1="${L}" x2="${W-R}" y1="${Y(P.goal).toFixed(1)}" y2="${Y(P.goal).toFixed(1)}" stroke="var(--good)" stroke-width="1.2" stroke-dasharray="5 3"/>
+    <text x="${W-R}" y="${(Y(P.goal)-4).toFixed(1)}" text-anchor="end" font-size="8.5" font-weight="800" fill="var(--good)">Goal ${tgFmt(P.goal)}</text>
+    <line x1="${X(P.start).toFixed(1)}" y1="${Y(P.startV).toFixed(1)}" x2="${X(t.deadline).toFixed(1)}" y2="${Y(P.goal).toFixed(1)}" stroke="var(--text-faint)" stroke-width="1.5" stroke-dasharray="6 4"/>
+    ${showToday ? `<line x1="${todayX.toFixed(1)}" x2="${todayX.toFixed(1)}" y1="${T}" y2="${H-B}" stroke="var(--border)" stroke-width="1"/><text x="${todayX.toFixed(1)}" y="${T-3}" text-anchor="middle" font-size="8" fill="var(--text-faint)">today</text>` : ''}
+    <path d="${area}" fill="${color}" opacity="0.13"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    ${proj}
+    <circle cx="${X(s.last).toFixed(1)}" cy="${Y(P.cur).toFixed(1)}" r="3.6" fill="${color}" stroke="var(--bg)" stroke-width="1.5"/>
+    <text x="${L}" y="${H-7}" font-size="8.5" fill="var(--text-faint)">${fmtShortDate(x0)}</text>
+    <text x="${W-R}" y="${H-7}" text-anchor="end" font-size="8.5" fill="var(--text-faint)">${fmtShortDate(x1)}</text>
+  </svg>`;
+}
+function tgBarsSvg(days, o){
+  const W = 320, H = 118, L = 26, R = 8, T = 12, B = 22, pw = W-L-R, ph = H-T-B, n = days.length;
+  const max = Math.max(o.ref||0, Math.max.apply(null, days.map(d=>d.v)), 1)*1.18;
+  const Y = v => T + ph*(1 - v/max), bw = pw/n;
+  const refLine = o.ref > 0 ? `<line x1="${L}" x2="${W-R}" y1="${Y(o.ref).toFixed(1)}" y2="${Y(o.ref).toFixed(1)}" stroke="var(--amber)" stroke-width="1.2" stroke-dasharray="5 3"/><text x="${W-R}" y="${(Y(o.ref)-3).toFixed(1)}" text-anchor="end" font-size="8.5" font-weight="800" fill="var(--amber)">${o.refLabel||'need'} ${tgFmt(o.ref)}</text>` : '';
+  const today = todayStr();
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible" role="img" aria-label="${o.label||'Daily chart'}">
+    <line x1="${L}" x2="${W-R}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+    <text x="${L-5}" y="${(Y(0)+3).toFixed(1)}" text-anchor="end" font-size="8.5" fill="var(--text-faint)">0</text>
+    <text x="${L-5}" y="${(Y(max/1.18)+3).toFixed(1)}" text-anchor="end" font-size="8.5" fill="var(--text-faint)">${tgFmt(max/1.18)}</text>
+    ${days.map((d,i)=>{
+      const h = Math.max(d.v > 0 ? 2 : 0, ph*d.v/max), x = L + i*bw + bw*0.19;
+      const label = (days.length - 1 - i) % 2 === 0 ? `<text x="${(x+bw*0.31).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="8" fill="${d.date===today?'var(--text)':'var(--text-faint)'}" font-weight="${d.date===today?800:400}">${Number(d.date.slice(8))}</text>` : '';
+      return `<rect x="${x.toFixed(1)}" y="${(Y(0)-h).toFixed(1)}" width="${(bw*0.62).toFixed(1)}" height="${h.toFixed(1)}" rx="2.5" fill="${o.color}" opacity="${d.v>0?0.95:0.25}"/>
+      ${d.v>0 ? `<text x="${(x+bw*0.31).toFixed(1)}" y="${(Y(0)-h-3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="700" fill="var(--text-muted)">${tgFmt(d.v)}</text>` : ''}${label}`;
+    }).join('')}
+    ${refLine}
+  </svg>`;
+}
+function tgTile(v, l, color){ return `<div class="mt-ptile"><b${color?` style="color:${color}"`:''}>${v}</b><span>${l}</span></div>`; }
+function tgPairBar(label, pct, color, note){
+  return `<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--text-muted)">${label}</span><b style="font-variant-numeric:tabular-nums">${note}</b></div>
+    <div style="height:7px;border-radius:4px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:${Math.max(0,Math.min(100,pct))}%;background:${color};border-radius:4px"></div></div></div>`;
+}
+function targetPerformanceHtml(profileId, t){
+  let P; try{ P = targetPerformance(profileId, t); }catch(e){ console.warn('[Targets] performance failed', e); return ''; }
+  const {b, u} = P, prof = profileById(profileId), color = 'var(--'+prof.color+')';
+  const nounOne = u.kind==='count' ? u.noun.replace(/s$/,'') : (u.noun==='%' ? '1%' : 'unit');
+  const unitWord = u.kind==='count' ? u.noun : (u.noun==='%' ? '%' : 'units');
+  const gapAbs = Math.abs(Math.round(P.gap*10)/10);
+  const onPlan = gapAbs < 0.5;
+  const gapTile = tgTile(onPlan ? 'On plan' : (P.gap>0?'+':'−')+tgFmt(gapAbs), onPlan ? 'vs the plan line' : (P.gap>0 ? unitWord+' ahead of plan' : unitWord+' behind plan'), onPlan ? 'var(--good)' : (P.gap>0 ? 'var(--good)' : 'var(--bad)'));
+  const fcTile = b.completed ? tgTile('Done', b.when || 'completed', 'var(--good)')
+    : (b.proj ? tgTile(fmtShortDate(b.proj.date), b.proj.diff<=0 ? (b.proj.diff===0 ? 'forecast · on time' : -b.proj.diff+'d early (forecast)') : b.proj.diff+'d late (forecast)', b.proj.diff<=0 ? 'var(--good)' : 'var(--bad)') : tgTile('—', 'forecast · no pace yet'));
+  const trend = P.week1 > P.week0 ? '▲' : (P.week1 < P.week0 ? '▼' : '');
+  const weekTile = tgTile(tgFmt(P.week1)+(trend?' <small style="font-size:11px">'+trend+'</small>':''), 'last 7 days · prev '+tgFmt(P.week0));
+  const bestTile = tgTile(P.best.v>0 ? tgFmt(P.best.v) : '—', P.best.date ? 'best day · '+fmtShortDate(P.best.date) : 'best day');
+  const hTile = tgTile(P.hours>0 ? tgFmt(P.hours)+'h' : '—', (t.paperId ? paperById(t.paperId).nick+' ' : '')+'study hours');
+  const avgTile = tgTile(P.studyDays>0 ? tgFmt(P.hours/P.studyDays)+'h' : '—', 'per study day');
+  const hpuTile = tgTile(P.hoursPerUnit ? tgFmt(P.hoursPerUnit)+'h' : '—', 'per '+nounOne);
+  const consTile = tgTile(P.consistency+'%', 'days studied');
+  const streakTile = tgTile(P.streak+'d', 'study streak');
+  const behindTime = P.workPct < P.timePct - 5;
+  const barColor = b.completed ? 'var(--good)' : (behindTime ? 'var(--amber)' : 'var(--good)');
+  const req = !b.completed && b.need > 0 && isFinite(b.need) ? b.need : 0;
+  const barsDays = P.days14;
+  const dayNote = P.s.exact ? '' : '<div class="mt-note">This target is measured from once-a-day snapshots, so a bar shows what changed since the previous snapshot (days the app was not opened count on the next day you open it).</div>';
+  return `
+  <div class="section-title" style="margin-top:4px"><span>Performance${prof.id!==S.local.myProfile?' · '+prof.nick:''}</span></div>
+  <div class="card" style="margin-bottom:12px">
+    ${tgPairBar('Work done (from where you started)', P.workPct, barColor, P.workPct+'%')}
+    ${tgPairBar('Time used', P.timePct, 'var(--text-faint)', P.timePct+'%  ·  '+P.elapsed+' of '+P.totalDays+' days')}
+    <div class="mt-note" style="margin:2px 0 10px">${behindTime ? 'Work is trailing the clock — the time bar is longer than the work bar.' : (P.workPct>=P.timePct ? 'Work is keeping up with (or ahead of) the clock.' : 'Close to the clock.')}</div>
+    <div class="mt-ptiles">${gapTile}${fcTile}${weekTile}${bestTile}${hTile}${avgTile}${hpuTile}${consTile}${streakTile}</div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-weight:800;font-size:12.5px;margin-bottom:6px">Target chart</div>
+    ${tgBurnupSvg(profileId, t, P)}
+    <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-faint);margin-top:6px">
+      <span><i style="display:inline-block;width:14px;height:3px;border-radius:2px;background:${color};vertical-align:middle"></i> Actual</span>
+      <span><i style="display:inline-block;width:14px;border-top:2px dashed var(--text-faint);vertical-align:middle"></i> Plan to the deadline</span>
+      ${!b.completed && b.pace>0 ? `<span><i style="display:inline-block;width:14px;border-top:2px dotted ${b.sd.meta.color};vertical-align:middle"></i> If you keep this pace</span>` : ''}
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-weight:800;font-size:12.5px;margin-bottom:2px">${unitWord.charAt(0).toUpperCase()+unitWord.slice(1)} done per day · last 14 days</div>
+    <div class="mt-note" style="margin:0 0 6px">${req>0 ? 'The dashed line is what you need each day to finish on time.' : 'Each bar is one day.'}</div>
+    ${tgBarsSvg(barsDays, {color, ref:req, refLabel:'need', label:'Progress per day'})}
+    ${dayNote}
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-weight:800;font-size:12.5px;margin-bottom:2px">Study hours${t.paperId ? ' on '+paperById(t.paperId).nick : ''} · last 14 days</div>
+    ${tgBarsSvg(P.hours14, {color:'var(--amber)', label:'Study hours per day'})}
+  </div>`;
+}
+// Summary strip at the top of the Targets page (this is the Targets page, not Home).
+function targetsOverviewHtml(profileId){
+  const all = milestoneTargetsFor(profileId);
+  if(!all.length) return '';
+  const sds = all.map(t=>({t, sd:targetStatusData(profileId,t)}));
+  const active = sds.filter(x=>x.sd.status!=='COMPLETED');
+  const done = sds.filter(x=>x.sd.status==='COMPLETED');
+  const onTrack = active.filter(x=>x.sd.status==='ON_TRACK').length;
+  const behind = active.length - onTrack;
+  const onTime = done.filter(x=> !x.t.completedAt || x.t.completedAt <= x.t.deadline).length;
+  const avg = active.length ? Math.round(active.reduce((a,x)=>a + Math.min(100, x.sd.goal>0 ? x.sd.currentValue/x.sd.goal*100 : 0), 0)/active.length) : 0;
+  const seg = (n,c)=> n ? `<div style="flex:${n};background:${c}"></div>` : '';
+  return `<div class="card" style="margin-bottom:12px">
+    <div class="mt-ptiles" style="margin-bottom:10px">
+      ${tgTile(active.length, 'active')}${tgTile(onTrack, 'on track', 'var(--good)')}${tgTile(behind, 'behind / overdue', behind ? 'var(--bad)' : '')}
+      ${tgTile(done.length, 'completed')}${tgTile(done.length ? Math.round(onTime/done.length*100)+'%' : '—', 'finished on time')}${tgTile(active.length ? avg+'%' : '—', 'avg. of goal reached')}
+    </div>
+    <div style="display:flex;height:8px;border-radius:5px;overflow:hidden;background:var(--surface2)">${seg(onTrack,'var(--good)')}${seg(behind,'var(--bad)')}${seg(done.length,'var(--text-faint)')}</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-faint);margin-top:6px"><span style="color:var(--good)">● on track</span><span style="color:var(--bad)">● behind</span><span>● completed</span></div>
   </div>`;
 }
 
@@ -8428,23 +8677,29 @@ function targetHistoryHtml(profileId){
 function renderTargetsPopup(){
   const root = document.getElementById('targets-root');
   if(!root) return;
-  const profileId = S.local.myProfile;
+  const me = S.local.myProfile;
   const view = S.targetsView || 'dashboard';
-  const titles = {dashboard:'Targets', create:'New target', edit:'Edit target', detail:'Target', history:'Completed'};
+  // create / edit are always about my own targets; everything else follows the Mangu | Chinnu switch
+  const profileId = (view==='create' || view==='edit') ? me : targetsProfileId();
+  const ro = profileId !== me, otherNick = profileById(profileId).nick;
+  const titles = {dashboard: ro ? otherNick+"'s targets" : 'Targets', create:'New target', edit:'Edit target', detail: ro ? otherNick+"'s target" : 'Target', history: ro ? otherNick+"'s completed" : 'Completed'};
   const body = view==='create' ? targetFormHtml(profileId, null, S.targetsDraft)
     : view==='edit' ? (targetById(profileId, S.targetEditId) ? targetFormHtml(profileId, targetById(profileId, S.targetEditId)) : emptyState('🎯','This target no longer exists.'))
     : view==='detail' ? targetDetailHtml(profileId, S.targetDetailId)
     : view==='history' ? targetHistoryHtml(profileId)
     : targetsDashboardHtml(profileId);
+  const _prevScroll = document.getElementById('targets-scroll'), _viewKey = view+'|'+profileId+'|'+(S.targetDetailId||'');
+  const _keepTop = (_prevScroll && S._tgViewKey === _viewKey) ? _prevScroll.scrollTop : 0; // a redraw of the same page (partner's data arrived) keeps your place
+  S._tgViewKey = _viewKey;
   root.innerHTML = `
     <div class="stats-exit-bar">
       <button onclick="exitTargetsPopup()">${CHAT_ICONS.back || '&larr;'} <span>${titles[view]||'Targets'}</span></button>
-      ${view==='dashboard'?`<button onclick="openTargetCreateForm()" style="color:var(--active-accent,var(--umang))">+ <span>New</span></button>`:''}
+      ${view==='dashboard' && !ro ?`<button onclick="openTargetCreateForm()" style="color:var(--active-accent,var(--umang))">+ <span>New</span></button>`:''}
     </div>
     <div class="stats-scroll" id="targets-scroll">${body}</div>`;
   if(view==='create' || view==='edit') onTargetTypeChange(); // locks the unit for "overall", fills the live preview + chip highlights
   const scroll = document.getElementById('targets-scroll');
-  if(scroll) animateCountUps(scroll);
+  if(scroll){ if(_keepTop) scroll.scrollTop = _keepTop; animateCountUps(scroll); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8950,6 +9205,8 @@ function startBackgroundPoll(){
           // not just Home — otherwise their status only visibly updates when you navigate
           // away and back, even though the underlying data was already refreshed here.
           if(S.view==='home' || S.view==='timer') renderApp();
+          // v134: the Targets page (when open on a list / detail, never on a form being typed into) shows the other person's targets too
+          if(S.targetsPopupOpen && ['dashboard','detail','history'].includes(S.targetsView||'dashboard')) renderTargetsPopup();
           // Persist what was just merged — this was missing before, and mattered a lot more
           // than it looks like it should: mergeChatFromRemote()/mergeTimerStateFromRemote()
           // only mutate S.shared in memory, so a successful merge here (e.g. picking up the
@@ -9139,7 +9396,9 @@ function refreshOtherProfileDataFromRemote(freshRemote){
     // v124: the partner's daily motivation is part of the slice too, so her card on my Home appears the moment her message lands
     // v132: her lecture progress and chosen Home paper are drawn on my Home too (Lecture Completion shows both of us)
     const lecSig = Object.entries((S.shared.lectures||{})[other]||{}).map(([p,ls])=>p+'='+(ls||[]).filter(l=>l.status==='done').length+'/'+(ls||[]).length).join(',');
-    return L.length+':'+h.toFixed(4)+':'+c+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], ((S.shared.dailyQuote||{})[other]||{}).text, lecSig, ((S.shared.prefs||{})[other]||{}).homeLecturePaper]);
+    // v134: her targets are readable on my Targets page / Home, so a change to them counts too
+    const tgSig = ((S.shared.milestoneTargets||{})[other]||[]).map(t=>[t.id,t.title,t.deadline,t.targetValue,t.unit,t.completedAt,t.manualProgress,t.paperId,t.type].join('~')).join('|');
+    return L.length+':'+h.toFixed(4)+':'+c+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], ((S.shared.dailyQuote||{})[other]||{}).text, lecSig, ((S.shared.prefs||{})[other]||{}).homeLecturePaper, tgSig]);
   };
   const before = slice();
   SINGLE_OWNER_SHARED_KEYS.forEach(key=>{
