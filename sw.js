@@ -191,7 +191,8 @@
 //   who-leads line, a lectures button each); different papers = a card each. Her progress / paper choice redraws his Home by itself when it arrives.
 //   Also: a simultaneous save by the partner's phone can no longer roll back my own lectures/logs/targets etc. on Drive -- a few seconds after each upload
 //   the phone checks and uploads again if Drive holds an older copy of its own part (chat, Money and the timer already did this).
-const CACHE_VERSION = 'olympus-v132';
+// v133: the merged Lecture Completion card draws both of you on ONE race track (each in your own colour, Mangu's avatar above the bar, Chinnu's below).
+const CACHE_VERSION = 'olympus-v133';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

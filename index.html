@@ -12148,27 +12148,37 @@ function homeLectureMergedCard(rows, viewedId){
     <div style="display:flex;gap:8px;flex-wrap:wrap">${btns}</div>
   </div>`;
 }
-// One track with a lane per person (same paper, so the finish line is the same) -- each avatar runs along its own lane.
+// ONE track for both of you (same paper = same finish line): each person's progress is filled in their own colour on the same bar (the
+// leader's fill underneath, the other's on top), Mangu's avatar stands above the bar and Chinnu's hangs below it so they never cover each other.
 function raceTrackMergedSVG(rows){
-  const W=320, laneH=70, trackH=12, r=6, startX=12, endX=W-12, trackW=endX-startX, milestones=[25,50,75,100];
-  const H = laneH*rows.length + 8;
-  const lanes = rows.map((row, i)=>{
-    const prof = row.prof, y0 = i*laneH, trackY = y0 + 58, pct = row.pct;
-    const avatarX = startX + trackW*pct/100;
-    const gid = 'raceGradM'+prof.id;
-    return `
-      <rect x="${startX}" y="${trackY}" width="${trackW}" height="${trackH}" rx="${r}" fill="var(--surface2)" stroke="var(--border)" stroke-width="1"/>
-      <rect x="${startX}" y="${trackY}" width="${Math.max(0,trackW*pct/100)}" height="${trackH}" rx="${r}" fill="url(#${gid})" class="chart-animate summit-fill"/>
-      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--${prof.color})" stop-opacity="0.7"/><stop offset="1" stop-color="var(--${prof.color})"/></linearGradient></defs>
-      ${milestones.map(m=>{ const mx = startX + trackW*(m/100); const reached = pct>=m;
-        return `<line x1="${mx}" y1="${trackY}" x2="${mx}" y2="${trackY+trackH}" stroke="${reached?'#fff':'var(--border)'}" stroke-width="1.5" stroke-dasharray="${reached?'none':'2 2'}"/>${i===0?`<text x="${mx}" y="${trackY-4}" text-anchor="middle" font-size="8" fill="var(--text-faint)">${m}%</text>`:''}`; }).join('')}
-      <text x="${endX}" y="${trackY-4}" font-size="13" text-anchor="middle">🏁</text>
-      <text x="${startX}" y="${trackY-4}" font-size="11" text-anchor="middle">🏃</text>
-      <image href="${prof.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" x="${Math.min(endX-16, Math.max(startX-4, avatarX-16)).toFixed(1)}" y="${(trackY-50).toFixed(1)}" width="30" height="50" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))"/>`;
+  const W=320, trackY=62, trackH=12, r=6, startX=12, endX=W-12, trackW=endX-startX, milestones=[25,50,75,100];
+  const H = trackY + trackH + 56;
+  const byPct = rows.slice().sort((x,y)=> y.pct - x.pct); // leader first = drawn first = underneath
+  const maxPct = byPct[0].pct;
+  const fills = byPct.map(row=>{
+    const gid = 'raceGradM'+row.prof.id;
+    return `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--${row.prof.color})" stop-opacity="0.75"/><stop offset="1" stop-color="var(--${row.prof.color})"/></linearGradient></defs>
+      <rect x="${startX}" y="${trackY}" width="${Math.max(0,trackW*row.pct/100)}" height="${trackH}" rx="${r}" fill="url(#${gid})" class="chart-animate summit-fill"/>`;
   }).join('');
+  const marks = milestones.map(m=>{ const mx = startX + trackW*(m/100); const reached = maxPct>=m;
+    return `<line x1="${mx}" y1="${trackY}" x2="${mx}" y2="${trackY+trackH}" stroke="${reached?'#fff':'var(--border)'}" stroke-width="1.5" stroke-dasharray="${reached?'none':'2 2'}"/>
+      <text x="${mx}" y="${trackY-4}" text-anchor="middle" font-size="8" fill="var(--text-faint)">${m}%</text>`; }).join('');
+  const avatar = row=>{
+    const x = Math.min(endX-16, Math.max(startX-4, startX + trackW*row.pct/100 - 16));
+    const below = row.prof.id !== 'umang'; // Mangu above the bar, Chinnu below it
+    const y = below ? trackY + trackH + 2 : trackY - 52;
+    const tip = below ? `<path d="M${(x+16).toFixed(1)} ${trackY+trackH} l-3 3 l6 0 z" fill="var(--${row.prof.color})"/>` : '';
+    return `${tip}<image href="${row.prof.id==='umang'?AVATAR_MANGU:AVATAR_CHETNA}" x="${x.toFixed(1)}" y="${y}" width="32" height="52" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))"/>`;
+  };
   return `
   <div style="position:relative;overflow:hidden;border-radius:10px;background:color-mix(in srgb,var(--umang) 4%,color-mix(in srgb,var(--chetna) 4%,var(--surface2)));padding:8px 6px 6px">
-    <svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">${lanes}</svg>
+    <svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
+      <rect x="${startX}" y="${trackY}" width="${trackW}" height="${trackH}" rx="${r}" fill="var(--surface2)" stroke="var(--border)" stroke-width="1"/>
+      ${fills}${marks}
+      <text x="${endX}" y="${trackY-4}" font-size="14" text-anchor="middle">🏁</text>
+      <text x="${startX}" y="${trackY-4}" font-size="12" text-anchor="middle">🏃</text>
+      ${rows.map(avatar).join('')}
+    </svg>
     <div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:4px;font-size:10.5px;margin-top:4px">
       ${rows.map(row=>`<span style="font-weight:800;color:var(--${row.prof.color})">${homeLectureWho(row)}: ${row.done}/${row.total} · ${row.pct}%</span>`).join('')}
     </div>
