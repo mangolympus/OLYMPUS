@@ -210,7 +210,11 @@
 //   at most one quiet line of facts under the date, and tappable drafts built from the day's data that go into the writing box. "Close day" is one tap.
 //   New History view: streak, a 5-week "did I write" map and every past entry, searchable. Stored entries are unchanged; days that have the older prompt answers
 //   still show them. Index.html only.
-const CACHE_VERSION = 'olympus-v137';
+// v138: yesterday's Diary must be closed before today's timer can start. Every way of starting a session (Start Studying, a Planner / Home quick start,
+//   Strict Countdown) shows a "Close yesterday's diary first" popup with a button that opens yesterday's page, and the Timer page shows a notice above the Start
+//   button. Closing the day unlocks it straight away. Running sessions, pause / resume / stop and manual logging are untouched; an account with no history is never
+//   blocked. Index.html only.
+const CACHE_VERSION = 'olympus-v138';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

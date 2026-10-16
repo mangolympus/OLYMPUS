@@ -7338,7 +7338,12 @@ function toggleDayClosed(){
   const refl = ensureDiaryReflection(me, S.diarySelectedDate);
   refl.closedAt = refl.closedAt ? null : Date.now();
   driveSyncSaveNow();
-  showToast(refl.closedAt ? 'Day closed.' : 'Day reopened.');
+  const _g = diaryYesterdayGate();
+  if(refl.closedAt && S._diaryGateReturn && S.diarySelectedDate === _g.date && !_g.blocked){
+    S._diaryGateReturn = false;
+    showToast("Yesterday's diary is closed. You can start your timer now.");
+  } else showToast(refl.closedAt ? 'Day closed.' : 'Day reopened.');
+  if(S.diarySelectedDate === _g.date) renderApp(); // the Start button / notice behind the Diary follows the new state
   renderDiaryPage();
 }
 function diaryBack(){ if(S.diaryView === 'history'){ S.diaryView = 'day'; renderDiaryPage(); } else exitDiaryPopup(); }
@@ -7471,6 +7476,42 @@ function renderDiaryPage(){
   if(scroll){ if(_keepTop) scroll.scrollTop = _keepTop; diaryAutoGrow(document.getElementById('diary-textarea')); }
 }
 
+
+// ── v138: yesterday's diary must be closed before today's timer can start ──────────────────────────────────────────────
+// "Closed" = the Close day button on that day's Diary page (one tap after writing). Only a NEW session is blocked; a running one,
+// Pause/Resume/Stop, manual "Log study time" and everything else work as before. An account with no history at all (nothing logged
+// before today, no diary entries) has no yesterday to close, so it is never blocked.
+function diaryYesterdayGate(){
+  const me = S.local && S.local.myProfile;
+  if(!me || !S.shared) return {blocked:false};
+  const today = todayStr(), y = tgAddDays(today, -1);
+  const hasHistory = logsFor(me).some(l=>l.date && l.date < today) || Object.keys((S.shared.diaryReflections||{})[me]||{}).length > 0 || Object.keys((S.shared.diary||{})[me]||{}).length > 0;
+  if(!hasHistory) return {blocked:false, date:y};
+  return {blocked: !getDiaryReflection(me, y).closedAt, date:y};
+}
+function showDiaryGate(date){
+  hideDiaryGate();
+  const label = new Date(date+'T00:00:00').toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
+  const el = document.createElement('div');
+  el.id = 'diary-gate'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true');
+  el.style.cssText = 'position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px';
+  el.innerHTML = `<div style="width:100%;max-width:360px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 20px;box-shadow:var(--shadow-sm,0 10px 40px rgba(0,0,0,.4));text-align:center">
+    <div style="font-size:34px;margin-bottom:6px">📓</div>
+    <div style="font-size:16px;font-weight:800;margin-bottom:6px">Close yesterday's diary first</div>
+    <div style="font-size:12.5px;color:var(--text-muted);line-height:1.5;margin-bottom:16px">Before today's timer can start, write a few lines about <b style="color:var(--text)">${label}</b> and tap <b style="color:var(--text)">Close day</b>.</div>
+    <button class="btn btn-accent" style="width:100%" onclick="diaryGateOpenDiary('${date}')">Open yesterday's diary</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="hideDiaryGate()">Not now</button>
+  </div>`;
+  document.body.appendChild(el);
+}
+function hideDiaryGate(){ const el = document.getElementById('diary-gate'); if(el) el.remove(); }
+function diaryGateOpenDiary(date){
+  hideDiaryGate();
+  const me = S.local.myProfile;
+  S._diaryGateReturn = true; // so closing it can say "you can start now"
+  if(S.viewingProfile !== me){ try{ setViewingProfile(me); }catch(e){ S.viewingProfile = me; } }
+  if(!S.diaryPopupOpen) openDiary(date); else selectDiaryDate(date);
+}
 
 // ═══════════════════════════════════════════════════════════
 // TARGETS — full-screen overlay, same pattern as Diary/Habits above. Rebuilt from scratch as
@@ -11712,7 +11753,10 @@ function fmtHMS(totalSeconds){
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 function timerStart(paperId, category, itemId, itemLabel, countdownTargetMs){
-  const me = S.local.myProfile; if(!me) return;
+  const me = S.local.myProfile; if(!me) return false;
+  // v138: yesterday's diary has to be closed before today's timer can start (every way of starting a session comes through here)
+  const _gate = diaryYesterdayGate();
+  if(_gate.blocked){ showDiaryGate(_gate.date); return false; }
   paperId = paperId||null; category = category||null; itemId = itemId||null; itemLabel = itemLabel||null;
   countdownTargetMs = countdownTargetMs||0;
   const now = Date.now();
@@ -12074,7 +12118,7 @@ function startTimerFromPicker(){
     const match = timerCategoryItemsFor(me, paperId, category).find(it=>it.id===itemId);
     itemLabel = match ? match.label : null;
   }
-  timerStart(paperId, category, itemId, itemLabel);
+  if(timerStart(paperId, category, itemId, itemLabel) === false) return;
   scrollToTimerCard();
 }
 function quickStartFromPlan(paperId, category, itemId){
@@ -12088,7 +12132,7 @@ function quickStartFromPlan(paperId, category, itemId){
     const c = chapterById(me, paperId, itemId);
     itemLabel = c ? c.name : null;
   }
-  timerStart(paperId, category, itemId, itemLabel);
+  if(timerStart(paperId, category, itemId, itemLabel) === false) return;
   scrollToTimerCard();
 }
 function scrollToTimerCard(){
@@ -12216,7 +12260,8 @@ function timerCardHtml(){
         <div id="timer-category-select-wrap"></div>
         <div id="timer-item-select-wrap"></div>
       </div>
-      <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="startTimerFromPicker()">▶ Start Studying</button>
+      ${diaryYesterdayGate().blocked ? `<div onclick="showDiaryGate('${diaryYesterdayGate().date}')" style="margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--amber-tint);border:1px solid var(--amber);color:var(--text);font-size:12px;line-height:1.45;cursor:pointer"><b>Close yesterday's diary to start.</b> Tap to open it — it takes a minute.</div>` : ''}
+      <button class="btn btn-accent" style="width:100%;margin-top:${diaryYesterdayGate().blocked?'8':'12'}px" onclick="startTimerFromPicker()">▶ Start Studying</button>
       <button class="btn" style="width:100%;margin-top:8px" onclick="toggleStrictCountdownPicker()">⏳ Strict Countdown</button>
       ${S._showCountdownPicker ? `
       <div style="margin-top:2px">
