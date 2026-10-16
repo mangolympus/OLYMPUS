@@ -205,7 +205,12 @@
 //   revision-window setting). Diary: 5-week heatmap with closed-day streak, a Mistakes & learnings log with a revisit list (send to the Planner / mark fixed),
 //   and auto-drafted "went well / went wrong" suggestions from the day's data. The Diary's reflections and the daily-challenge records are now protected from a
 //   partner's simultaneous save like the other per-person data, and her Diary refreshes on your phone by itself. Index.html only.
-const CACHE_VERSION = 'olympus-v136';
+// v137: DIARY rebuilt around writing about the day. One page per day: a one-tap mood row, a big writing box (autosaves), a short Mistakes & learnings list.
+//   Removed the cards that repeated the Timer / Planner / Targets (Daily Summary, Study Timeline, Planned vs Actual, Tomorrow, the 3 sliders, the Close-Day wizard):
+//   at most one quiet line of facts under the date, and tappable drafts built from the day's data that go into the writing box. "Close day" is one tap.
+//   New History view: streak, a 5-week "did I write" map and every past entry, searchable. Stored entries are unchanged; days that have the older prompt answers
+//   still show them. Index.html only.
+const CACHE_VERSION = 'olympus-v137';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
