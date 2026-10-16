@@ -556,6 +556,29 @@ body.diary-mode #diary-root{display:flex}
 .diary-dot.diary.partial{background:var(--amber)}
 .diary-dot.diary.closed{background:var(--active-accent,var(--umang));box-shadow:0 0 4px color-mix(in srgb, var(--active-accent,var(--umang)) 70%, transparent)}
 .diary-save-hint{flex:0 0 auto;padding:2px 2px 10px;font-size:10px;color:var(--text-faint);text-align:right}
+/* v136: 5-week heatmap (colour = share of the day's study target; dot = day closed) */
+.dh-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dh-dow{font-size:9px;font-weight:700;text-align:center;color:var(--text-faint);text-transform:uppercase}
+.dh-cell{position:relative;height:27px;border-radius:7px;border:none;background:var(--surface2);color:var(--text-muted);font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer;padding:0}
+.dh-cell.h1{background:color-mix(in srgb,var(--good) 24%,var(--surface2))}
+.dh-cell.h2{background:color-mix(in srgb,var(--good) 46%,var(--surface2));color:var(--text)}
+.dh-cell.h3{background:color-mix(in srgb,var(--good) 78%,var(--surface2));color:#fff}
+.dh-cell.future{opacity:.35}
+.dh-cell.today{box-shadow:inset 0 0 0 1.5px var(--text-faint)}
+.dh-cell.sel{box-shadow:inset 0 0 0 2px var(--active-accent,var(--umang))}
+.dh-cell.closed::after{content:'';position:absolute;left:50%;bottom:3px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--active-accent,var(--umang))}
+.dh-cell.h3.closed::after{background:#fff}
+.dl-row{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)}
+.dl-row:last-child{border-bottom:none}
+.dl-main{flex:1;min-width:0}
+.dl-text{font-size:12.5px;line-height:1.4;overflow-wrap:anywhere}
+.dl-row.done .dl-text{text-decoration:line-through;color:var(--text-faint)}
+.dl-meta{font-size:10px;color:var(--text-faint);margin-top:2px}
+.dl-btn{flex:0 0 auto;padding:5px 9px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.dl-btn.good{color:var(--good)}
+.dl-tag{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;margin-right:6px;vertical-align:1px}
+.dl-tag.mistake{background:var(--bad-tint);color:var(--bad)}
+.dl-tag.learning{background:var(--umang-tint);color:var(--active-accent,var(--umang))}
 /* Reflection sliders — a real range input (best touch/drag behaviour) styled as a track,
    paired with a big live emoji + label above it driven by oninput for instant feedback, and
    committed to state on 'change' (i.e. once, on release) rather than on every drag tick. */
@@ -611,6 +634,10 @@ body.targets-mode #targets-root{display:flex}
 .mt-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--text-muted)}
 .mt-row b{color:var(--text);font-variant-numeric:tabular-nums;font-size:13px}
 .mt-line{font-size:11px;color:var(--mt-color,var(--text-muted));margin-top:5px;line-height:1.4}
+.mt-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border)}
+.mt-foot-t{font-size:11px;font-weight:700;color:var(--text-muted);text-align:right;line-height:1.35;min-width:0}
+.mt-foot-t.done{color:var(--good)}
+.mt-group{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin:14px 2px 8px}
 .mt-big{font-size:13px;color:var(--text-muted);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:10px}
 .mt-big b{font-size:28px;font-weight:800;line-height:1;color:var(--mt-color,var(--text));font-variant-numeric:tabular-nums}
 .mt-summary{font-size:11.5px;color:var(--text-faint);margin:0 2px 10px}
@@ -6951,6 +6978,7 @@ function blankDiaryReflection(){
   return {
     energy:null, focus:null, mood:null,      // 1–5 each, null = not set yet
     wentWell:'', wentWrong:'', why:'', improvement:'',
+    learnings:[],         // v136: mistakes & learnings log [{id,type:'mistake'|'learning',text,paperId,done,taskId,createdAt}]
     carriedTaskId:null,   // Planner task id created from "improvement" via Add to Tomorrow's
                            // Plan — re-clicking updates that same task instead of duplicating.
     closedAt:null,        // epoch ms once Close Day is completed for this date; also drives
@@ -7201,6 +7229,7 @@ let _diaryReflectionSaveTimer = null;
 let _diaryReflectionDirty = {};
 function onDiaryReflectionInput(field, value){
   _diaryReflectionDirty[field] = value;
+  const sg = document.getElementById('dsg-'+field); if(sg) sg.style.display = (value||'').trim() ? 'none' : '';
   const hint = document.getElementById('diary-save-hint');
   if(hint) hint.textContent = 'Saving…';
   if(_diaryReflectionSaveTimer) clearTimeout(_diaryReflectionSaveTimer);
@@ -7251,6 +7280,8 @@ function diaryReflectionCardHtml(profileId, dateStr){
   const refl = getDiaryReflection(profileId, dateStr);
   const legacyText = (S.shared.diary && S.shared.diary[profileId] && S.shared.diary[profileId][dateStr]) || '';
   const readOnly = profileId !== S.local.myProfile;
+  const sugg = readOnly ? {} : diarySuggestions(profileId, dateStr);
+  S._diarySugg = sugg;
   return `
   <div class="section-title">Reflection</div>
   <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:14px">
@@ -7262,7 +7293,8 @@ function diaryReflectionCardHtml(profileId, dateStr){
     ${DIARY_REFLECTION_PROMPTS.map(p=>`
       <div style="display:flex;flex-direction:column;gap:4px">
         <label style="font-size:10.5px;font-weight:700;color:var(--text-faint)">${p.label}</label>
-        <textarea rows="2" placeholder="${p.placeholder}" ${readOnly?'readonly':''} oninput="onDiaryReflectionInput('${p.field}', this.value)" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:12.5px;resize:vertical">${escChat(refl[p.field]||'')}</textarea>
+        ${(!readOnly && sugg[p.field] && sugg[p.field].length && !(refl[p.field]||'').trim()) ? `<div class="mt-chips" id="dsg-${p.field}">${sugg[p.field].map((x,i)=>`<button type="button" class="mt-chip" style="white-space:normal;text-align:left;font-weight:600" onclick="applyDiarySuggestion('${p.field}',${i})">+ ${escChat(x)}</button>`).join('')}</div>` : ''}
+        <textarea id="dr-${p.field}" rows="2" placeholder="${p.placeholder}" ${readOnly?'readonly':''} oninput="onDiaryReflectionInput('${p.field}', this.value)" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:12.5px;resize:vertical">${escChat(refl[p.field]||'')}</textarea>
         ${(p.field==='improvement' && !readOnly)?`<button class="btn btn-sm" style="align-self:flex-start;margin-top:2px" onclick="addImprovementToTomorrowPlan()">${refl.carriedTaskId?"↻ Update in Tomorrow's Plan":"+ Add to Tomorrow's Plan"}</button>`:''}
       </div>`).join('')}
     <div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--border);padding-top:12px">
@@ -7304,6 +7336,156 @@ function flushDiarySave(){
 // navigating away from the day currently being edited (switching dates, closing the popup,
 // or stepping through the Close Day wizard) so nothing mid-debounce is ever silently dropped.
 function flushDiaryAllSaves(){ flushDiarySave(); flushDiaryReflectionSave(); }
+// ═══ v136: heatmap + closed-day streak, mistakes & learnings log, auto-drafted prompts ═══════════════════════════════════
+function diaryStreakInfo(profileId){
+  const by = (S.shared.diaryReflections && S.shared.diaryReflections[profileId]) || {};
+  const closed = new Set(Object.keys(by).filter(d=>by[d] && by[d].closedAt));
+  const today = todayStr(), yest = tgAddDays(today, -1);
+  let cur = 0; { let d = closed.has(today) ? today : yest; while(closed.has(d)){ cur++; d = tgAddDays(d, -1); } }
+  const sorted = Array.from(closed).sort();
+  let best = 0, run = 0, prev = null;
+  sorted.forEach(d=>{ run = (prev && tgAddDays(prev, 1) === d) ? run+1 : 1; if(run > best) best = run; prev = d; });
+  const month = today.slice(0,7);
+  return {cur, best, month: sorted.filter(d=>d.slice(0,7)===month).length, total: sorted.length, closed};
+}
+function diaryHeatmapHtml(profileId){
+  const today = todayStr(), info = diaryStreakInfo(profileId);
+  const dow = new Date(today+'T00:00:00').getDay(), monday = tgAddDays(today, dow===0 ? -6 : 1-dow), start = tgAddDays(monday, -28);
+  const cells = [];
+  for(let i = 0; i < 35; i++){
+    const d = tgAddDays(start, i), future = d > today, hrs = future ? 0 : hoursOnDate(profileId, d), tgt = effectiveTargetForDate(profileId, d);
+    const ratio = tgt > 0 ? hrs/tgt : (hrs>0 ? 1 : 0), lvl = hrs<=0 ? 0 : (ratio<0.5 ? 1 : (ratio<1 ? 2 : 3));
+    const isClosed = info.closed.has(d);
+    const tip = `${fmtShortDate(d)} · ${hrs>0 ? formatHoursAsHM(hrs) : 'no study'}${isClosed ? ' · day closed' : ''}`;
+    cells.push(`<button class="dh-cell h${lvl}${future?' future':''}${d===today?' today':''}${d===S.diarySelectedDate?' sel':''}${isClosed?' closed':''}" title="${tip}" aria-label="${tip}" onclick="selectDiaryDate('${d}')">${Number(d.slice(8))}</button>`);
+  }
+  const who = profileId === S.local.myProfile ? '' : profileById(profileId).nick+"'s ";
+  return `<div class="section-title" style="margin-top:0"><span>${who}last 5 weeks</span></div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="mt-ptiles" style="margin-bottom:12px">${tgTile(info.cur+'d', 'closed-day streak', info.cur>0 ? 'var(--good)' : '')}${tgTile(info.best+'d', 'best streak')}${tgTile(info.month, 'days closed this month')}</div>
+    <div class="dh-grid" style="margin-bottom:4px">${['M','T','W','T','F','S','S'].map(x=>`<div class="dh-dow">${x}</div>`).join('')}</div>
+    <div class="dh-grid">${cells.join('')}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:10px;color:var(--text-faint);margin-top:9px">
+      <span>Less</span><span class="dh-cell h0" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></span><span class="dh-cell h1" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></span><span class="dh-cell h2" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></span><span class="dh-cell h3" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></span><span>More of the day's target</span>
+      <span style="margin-left:auto"><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--active-accent,var(--umang));vertical-align:middle"></i> day closed</span>
+    </div>
+  </div>`;
+}
+// ── mistakes & learnings ──
+function diaryLearningDone(profileId, e){
+  if(e.done) return true;
+  if(e.taskId){ const t = manualTasksFor(profileId).find(x=>x.id===e.taskId); if(t && t.done) return true; }
+  return false;
+}
+function diaryOpenMistakes(profileId){
+  const by = (S.shared.diaryReflections && S.shared.diaryReflections[profileId]) || {}, out = [];
+  Object.keys(by).forEach(d=>{ ((by[d] && by[d].learnings)||[]).forEach(e=>{ if(e.type==='mistake' && !diaryLearningDone(profileId, e)) out.push({date:d, e}); }); });
+  return out.sort((a,b)=> a.date.localeCompare(b.date) || (a.e.createdAt||0)-(b.e.createdAt||0));
+}
+function diaryLearningRowHtml(profileId, date, e, opts){
+  const own = profileId === S.local.myProfile, done = diaryLearningDone(profileId, e), paper = e.paperId ? paperById(e.paperId) : null;
+  const inPlanner = e.taskId && manualTasksFor(profileId).some(t=>t.id===e.taskId);
+  return `<div class="dl-row${done?' done':''}">
+    <div class="dl-main"><div class="dl-text">${opts && opts.tag ? `<span class="dl-tag ${e.type}">${e.type==='mistake'?'Mistake':'Learning'}</span>` : ''}${escChat(e.text)}</div>
+    <div class="dl-meta">${paper ? paper.nick+' · ' : ''}${fmtShortDate(date)}${inPlanner ? ' · in Planner' : ''}</div></div>
+    ${own && e.type==='mistake' && !done && !inPlanner ? `<button class="dl-btn" onclick="diaryLearningToPlanner('${date}','${e.id}')">→ Planner</button>` : ''}
+    ${own && e.type==='mistake' ? `<button class="dl-btn good" onclick="diaryLearningToggle('${date}','${e.id}')">${done ? 'Reopen' : '✓ Fixed'}</button>` : ''}
+    ${own && opts && opts.del ? `<button class="dl-btn" aria-label="Delete" onclick="diaryLearningDelete('${date}','${e.id}')">✕</button>` : ''}
+  </div>`;
+}
+function diaryRevisitHtml(profileId){
+  const open = diaryOpenMistakes(profileId);
+  if(!open.length) return '';
+  const all = !!S._diaryRevisitAll, shown = all ? open : open.slice(0, 4), who = profileId === S.local.myProfile ? '' : profileById(profileId).nick+"'s ";
+  return `<div class="section-title"><span>${who}revisit list · ${open.length}</span></div>
+  <div class="card" style="margin-bottom:14px;padding-top:4px;padding-bottom:4px">
+    ${shown.map(x=>diaryLearningRowHtml(profileId, x.date, x.e)).join('')}
+    ${open.length>4 ? `<div style="text-align:center;padding:6px 0"><button class="dl-btn" onclick="S._diaryRevisitAll=!S._diaryRevisitAll;renderDiaryPage()">${all ? 'Show fewer' : 'Show all '+open.length}</button></div>` : ''}
+  </div>`;
+}
+function diaryLearningsCardHtml(profileId, dateStr){
+  const own = profileId === S.local.myProfile, list = (getDiaryReflection(profileId, dateStr).learnings)||[];
+  if(!own && !list.length) return '';
+  const type = S._dlType === 'learning' ? 'learning' : 'mistake';
+  return `<div class="section-title">Mistakes &amp; learnings</div>
+  <div class="card" style="margin-bottom:14px">
+    ${list.length ? `<div style="margin-bottom:${own?10:0}px">${list.map(e=>diaryLearningRowHtml(profileId, dateStr, e, {tag:true, del:true})).join('')}</div>` : (own ? '' : '')}
+    ${own ? `<div class="mt-chips" style="margin-bottom:8px"><button type="button" id="dl-t-mistake" class="mt-chip${type==='mistake'?' active':''}" onclick="setDiaryLearnType('mistake')">Mistake</button><button type="button" id="dl-t-learning" class="mt-chip${type==='learning'?' active':''}" onclick="setDiaryLearnType('learning')">Learning</button>
+      <select id="dl-paper" style="margin-left:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface2);color:var(--text);font-size:11.5px;padding:5px 8px;font-family:inherit"><option value="">No paper</option>${PAPERS.map(p=>`<option value="${p.id}">${p.nick}</option>`).join('')}</select></div>
+      <div style="display:flex;gap:6px"><input type="text" id="dl-text" maxlength="200" placeholder="${type==='mistake' ? 'What went wrong, e.g. forgot the 50% rule in a question' : 'What you learned, e.g. how to set up the DTAA relief'}" style="flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:12.5px" onkeydown="if(event.key==='Enter'){event.preventDefault();addDiaryLearning();}"><button class="btn btn-sm btn-accent" onclick="addDiaryLearning()">Add</button></div>
+      <div style="font-size:10px;color:var(--text-faint);margin-top:6px">Open mistakes stay on your revisit list at the top until you mark them fixed — or send them to the Planner.</div>` : ''}
+  </div>`;
+}
+function setDiaryLearnType(t){
+  S._dlType = t === 'learning' ? 'learning' : 'mistake';
+  const a = document.getElementById('dl-t-mistake'), b = document.getElementById('dl-t-learning'), i = document.getElementById('dl-text');
+  if(a) a.classList.toggle('active', S._dlType==='mistake'); if(b) b.classList.toggle('active', S._dlType==='learning');
+  if(i) i.placeholder = S._dlType==='mistake' ? 'What went wrong, e.g. forgot the 50% rule in a question' : 'What you learned, e.g. how to set up the DTAA relief';
+}
+function diaryFindLearning(date, id){
+  const by = (S.shared.diaryReflections && S.shared.diaryReflections[S.local.myProfile]) || {};
+  const r = by[date]; return r && r.learnings ? r.learnings.find(x=>x.id===id) : null;
+}
+function addDiaryLearning(){
+  const me = S.local.myProfile; if(S.viewingProfile !== me) return;
+  const inp = document.getElementById('dl-text'), text = ((inp && inp.value)||'').trim();
+  if(!text){ showToast('Write what happened first.'); return; }
+  const paper = document.getElementById('dl-paper');
+  flushDiaryAllSaves();
+  const refl = ensureDiaryReflection(me, S.diarySelectedDate);
+  if(!Array.isArray(refl.learnings)) refl.learnings = [];
+  refl.learnings.push({id:uid(), type: S._dlType==='learning' ? 'learning' : 'mistake', text:text.slice(0,200), paperId: paper ? paper.value : '', done:false, taskId:null, createdAt:Date.now()});
+  driveSyncSaveNow();
+  renderDiaryPage();
+}
+function diaryLearningToggle(date, id){
+  const e = diaryFindLearning(date, id); if(!e) return;
+  const nowDone = !diaryLearningDone(S.local.myProfile, e);
+  e.done = nowDone;
+  if(e.taskId){ const t = manualTasksFor(S.local.myProfile).find(x=>x.id===e.taskId); if(t) t.done = nowDone; }
+  driveSyncSaveNow(); renderDiaryPage();
+}
+function diaryLearningToPlanner(date, id){
+  const me = S.local.myProfile, e = diaryFindLearning(date, id); if(!e || e.taskId) return;
+  const paper = e.paperId ? paperById(e.paperId) : null;
+  if(!S.shared.tasks) S.shared.tasks = {}; if(!S.shared.tasks[me]) S.shared.tasks[me] = [];
+  const task = {id:uid(), title:`Revisit${paper ? ' ('+paper.nick+')' : ''}: ${e.text}`.slice(0,120), date:addOneDay(todayStr()), done:false, linkType:null, priority:'med', notes:'From the Diary mistakes log'};
+  S.shared.tasks[me].push(task); e.taskId = task.id;
+  saveShared(); showToast("Added to tomorrow's plan."); renderDiaryPage();
+}
+function diaryLearningDelete(date, id){
+  const me = S.local.myProfile, r = (S.shared.diaryReflections[me]||{})[date]; if(!r || !r.learnings) return;
+  r.learnings = r.learnings.filter(x=>x.id!==id); driveSyncSaveNow(); renderDiaryPage();
+}
+// ── auto-drafted "went well" / "went wrong": from what the day's data actually says ──
+function diarySuggestions(profileId, dateStr){
+  const well = [], wrong = [], today = todayStr();
+  if(dateStr > today) return {};
+  let d; try{ d = diarySummaryData(profileId, dateStr); }catch(e){ return {}; }
+  const sess = diaryTimelineEntries(profileId, dateStr), longest = sess.reduce((m,l)=>Math.max(m, Number(l.hours||0)), 0);
+  const hh = h => fmtRate(h)+'h';
+  const pl = (n, w) => n+' '+w+(n===1?'':'s');
+  const closedOut = dateStr < today || new Date().getHours() >= 20; // a day still in progress isn't "short" yet
+  if(d.hours > 0 && d.target > 0 && d.targetPct >= 100) well.push(`Hit my ${fmtRate(d.target)}h study target (${hh(d.hours)} done)`);
+  else if(d.hours > 0 && d.targetPct >= 70) well.push(`Got ${hh(d.hours)} of study in`);
+  if(d.lecturesCompleted.length) well.push(`Finished ${pl(d.lecturesCompleted.length,'lecture')}: ${d.lecturesCompleted.slice(0,3).map(x=>x.paper.nick+' L'+x.lec.num).join(', ')}`);
+  if(longest >= 1.5) well.push(`Stayed focused through a ${hh(longest)} session`);
+  if(d.tasksCompleted.length) well.push(`Completed ${pl(d.tasksCompleted.length,'planned task')}`);
+  d.mocks.forEach(x=>{ (Number(x.m.score) >= 50 ? well : wrong).push(Number(x.m.score) >= 50 ? `Wrote a ${x.paper.nick} mock and scored ${x.m.score}%` : `Low mock score: ${x.paper.nick} ${x.m.score}%`); });
+  if(closedOut){
+    if(d.hours <= 0) wrong.push('No study logged today');
+    else if(d.target > 0 && d.targetPct < 70) wrong.push(`Fell short of the ${fmtRate(d.target)}h target (${hh(d.hours)})`);
+  }
+  if(d.tasksMissed.length) wrong.push(`Missed ${pl(d.tasksMissed.length,'planned task')}${d.tasksMissed[0] && d.tasksMissed[0].title ? ': '+String(d.tasksMissed[0].title).slice(0,50) : ''}`);
+  return {wentWell: well.slice(0,3), wentWrong: wrong.slice(0,3)};
+}
+function applyDiarySuggestion(field, i){
+  const txt = ((S._diarySugg||{})[field]||[])[i]; if(!txt) return;
+  const ta = document.getElementById('dr-'+field); if(!ta) return;
+  ta.value = ta.value.trim() ? ta.value.trim().replace(/[.;]?$/, '; ')+txt : txt;
+  onDiaryReflectionInput(field, ta.value);
+  ta.focus();
+}
 // ── Tomorrow — Feature 5. "Tomorrow" is always relative to whichever date is selected (not
 // hardcoded to the real today), so browsing yesterday's entry usefully shows what's due
 // today, while Close Day on today's entry shows genuine tomorrow. Overdue / due-tomorrow /
@@ -7435,7 +7617,7 @@ function diaryDayStatus(profileId, dateStr){
   const legacyText = (S.shared.diary && S.shared.diary[profileId] && S.shared.diary[profileId][dateStr]) || '';
   const hasContent = !!(refl.energy || refl.focus || refl.mood ||
     (refl.wentWell&&refl.wentWell.trim()) || (refl.wentWrong&&refl.wentWrong.trim()) ||
-    (refl.why&&refl.why.trim()) || (refl.improvement&&refl.improvement.trim()) || legacyText.trim());
+    (refl.why&&refl.why.trim()) || (refl.improvement&&refl.improvement.trim()) || legacyText.trim() || (refl.learnings&&refl.learnings.length));
   return {studied, diaryState: refl.closedAt ? 'closed' : (hasContent ? 'partial' : 'none')};
 }
 function openDiary(dateStr){
@@ -7528,6 +7710,9 @@ function renderDiaryPage(){
   const dateStr = S.diarySelectedDate;
   const dateLabel = new Date(dateStr+'T00:00:00').toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
   const status = diaryDayStatus(profileId, dateStr);
+  const _prevSc = document.getElementById('diary-scroll'), _dKey = profileId+'|'+dateStr+'|'+(S.diaryCloseDayActive?1:0);
+  const _keepTop = (_prevSc && S._diaryViewKey === _dKey) ? _prevSc.scrollTop : 0; // an edit on the same day keeps your place
+  S._diaryViewKey = _dKey;
   root.innerHTML = `
     <div class="stats-exit-bar">
       <button onclick="exitDiaryPopup()">${CHAT_ICONS.back || '&larr;'} <span>${isOwn?'Diary':profileById(profileId).nick+"'s Diary"}</span></button>
@@ -7537,17 +7722,20 @@ function renderDiaryPage(){
     ${diaryWeekStripHtml()}
     <div class="stats-scroll" id="diary-scroll">
       ${(S.diaryCloseDayActive && isOwn) ? closeDayWizardHtml(profileId, dateStr) : `
+        ${diaryHeatmapHtml(profileId)}
+        ${diaryRevisitHtml(profileId)}
         <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);margin-bottom:10px">${dateLabel}${dateStr===todayStr()?' · <span style="color:var(--active-accent,var(--umang))">Today</span>':''}</div>
         ${diarySummaryCardHtml(profileId,dateStr)}
         ${diaryTimelineCardHtml(profileId,dateStr)}
         ${diaryPlannedVsActualCardHtml(profileId,dateStr)}
         ${diaryReflectionCardHtml(profileId,dateStr)}
+        ${diaryLearningsCardHtml(profileId,dateStr)}
         ${diaryTomorrowCardHtml(profileId,dateStr)}
         <div class="diary-save-hint" id="diary-save-hint">${isOwn?'Saved':''}</div>
       `}
     </div>`;
   const scroll = document.getElementById('diary-scroll');
-  if(scroll){ animateCountUps(scroll); triggerChartAnimations(scroll); }
+  if(scroll){ if(_keepTop) scroll.scrollTop = _keepTop; animateCountUps(scroll); triggerChartAnimations(scroll); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -7582,6 +7770,8 @@ const TARGET_TYPES = [
   {id:'rev1', label:'Revision (1st)', flag:'rev1', short:'Revision 1'},
   {id:'rev2', label:'Revision (2nd)', flag:'rev2', short:'Revision 2'},
   {id:'practice', label:'Practice / Questions', flag:'practice', short:'Practice / questions'},
+  {id:'hours', label:'Study hours', short:'Study hours'},                     // v136: hours logged (any paper, or one paper) between the start and the deadline
+  {id:'mock', label:'Mock test average', short:'Mock average (score %)'},     // v136: the paper's mock-score average reaching a score
   {id:'overall', label:'Percentage completion (overall paper)', short:'Overall readiness'},
   {id:'custom', label:'Custom milestone', short:'Custom (track by hand)'},
 ];
@@ -7598,7 +7788,43 @@ function daysBetweenDates(a, b){ return Math.round((new Date(b+'T00:00:00') - ne
 // {done, total} in the target's NATIVE count unit (lectures done/total, or chapters
 // with the relevant flag set/total chapters). For 'overall' this is a pseudo-count out of
 // 100 since paperComponents().prepScore is already a composite percentage.
+// v136: hours and mock targets, and lecture targets on a tracked paper, can be rebuilt for ANY past day from data that is already dated
+// (study logs, mock-score dates, lecture completion dates), so their history and pace never depend on the once-a-day snapshots.
+function tgRound1(x){ return Math.round(x*10)/10; }
+function tgLogsForTarget(profileId, paperId){ return (logsFor(profileId)||[]).filter(l=>l.date && (!paperId || l.paperId===paperId)); }
+function targetHoursSince(profileId, t, upto){
+  const from = t.startDate || '', to = upto || '9999-12-31'; let h = 0;
+  tgLogsForTarget(profileId, t.paperId).forEach(l=>{ if(l.date>=from && l.date<=to) h += Number(l.hours||0); });
+  return h;
+}
+function mockAvgAt(profileId, paperId, upto){
+  const L = (mockScoresFor(profileId, paperId)||[]).filter(m=> !upto || !m.date || m.date<=upto);
+  return L.length ? L.reduce((a,m)=>a+Number(m.score||0),0)/L.length : 0;
+}
+// { at(date) -> value that day, total? } or null when this target is not date-reconstructible
+function targetExactFn(profileId, t){
+  if(t.type==='lectures'){
+    const comps = paperComponents(profileId, t.paperId);
+    if(!comps.usesLectureTracker || !(comps.lecTotal>0)) return null;
+    const done = (lecturesFor(profileId, t.paperId)||[]).filter(l=>l.status==='done');
+    const stamped = done.filter(l=>l.completionDate).map(l=>l.completionDate).sort();
+    const base = done.length - stamped.length; // done but never dated: counted from the start
+    return {total: comps.lecTotal, at: d=>{ let n = 0; for(const x of stamped){ if(x<=d) n++; else break; } return base+n; }};
+  }
+  if(t.type==='hours'){
+    const byDay = {}; tgLogsForTarget(profileId, t.paperId).forEach(l=>{ if(l.date >= (t.startDate||'')) byDay[l.date] = (byDay[l.date]||0) + Number(l.hours||0); });
+    const days = Object.keys(byDay).sort();
+    return {at: d=>{ let h = 0; for(const x of days){ if(x<=d) h += byDay[x]; else break; } return h; }};
+  }
+  if(t.type==='mock'){
+    const L = (mockScoresFor(profileId, t.paperId)||[]).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    return {at: d=>{ const k = L.filter(m=>!m.date || m.date<=d); return k.length ? k.reduce((a,m)=>a+Number(m.score||0),0)/k.length : 0; }};
+  }
+  return null;
+}
 function targetTotalAndDone(profileId, target){
+  if(target.type==='hours') return {done: tgRound1(targetHoursSince(profileId, target)), total: target.targetValue||1};
+  if(target.type==='mock') return {done: Math.round(mockAvgAt(profileId, target.paperId)), total: 100};
   if(target.type==='overall'){
     const comps = paperComponents(profileId, target.paperId);
     return {done: comps.prepScore, total: 100};
@@ -7616,12 +7842,14 @@ function targetTotalAndDone(profileId, target){
 }
 function targetCurrentValue(profileId, target){
   if(target.type==='custom') return target.manualProgress||0;
+  if(target.type==='hours' || target.type==='mock') return targetTotalAndDone(profileId, target).done;
   const {done, total} = targetTotalAndDone(profileId, target);
   return target.unit==='percent' ? (total>0 ? Math.round(done/total*100) : 0) : done;
 }
 // Ceiling for the progress bar / "x of y" display — the GOAL (targetValue) can be less than
 // this (e.g. "5 of 8 chapters"), so the two are shown separately rather than conflated.
 function targetCeilingValue(profileId, target){
+  if(target.type==='hours') return target.targetValue||1;
   if(target.unit==='percent') return 100;
   const {total} = targetTotalAndDone(profileId, target);
   return target.type==='custom' ? (target.targetValue||1) : total;
@@ -7645,23 +7873,18 @@ function ensureTargetSnapshot(profileId, target){
 // average since the target's startDate — so a brand-new target still gets a sensible number
 // instead of "no data" on day one.
 function targetPace(profileId, target, currentValue){
-  // v134: a lecture target on a tracked paper knows exactly WHEN each lecture was completed, so its pace comes from those dates
-  // (the once-a-day snapshots only start on the day the target was created, which made a fresh target look idle).
-  if(target.type==='lectures'){
-    try{
-      const comps = paperComponents(profileId, target.paperId);
-      if(comps.usesLectureTracker && comps.lecTotal > 0){
-        const done = (lecturesFor(profileId, target.paperId)||[]).filter(l=>l.status==='done');
-        const stamped = done.filter(l=>l.completionDate).map(l=>l.completionDate);
-        const base = done.length - stamped.length, today = todayStr();
-        const at = d => base + stamped.filter(x=>x<=d).length;
-        const age = Math.max(1, daysBetweenDates(target.startDate || today, today));
-        const win = Math.min(7, age);
-        const gain = at(today) - at(tgAddDays(today, -win));
-        return (target.unit==='percent' ? gain/comps.lecTotal*100 : gain) / win;
-      }
-    }catch(e){ /* fall through to the snapshot method */ }
-  }
+  // v134/v136: a target whose history is reconstructible from dated data (lectures on a tracked paper, study hours, mock scores) takes its pace
+  // from that data (the once-a-day snapshots only start on the day the target was created, which made a fresh target look idle).
+  try{
+    const ex = targetExactFn(profileId, target);
+    if(ex){
+      const today = todayStr();
+      const age = Math.max(1, daysBetweenDates(target.startDate || today, today));
+      const win = Math.min(7, age);
+      const gain = ex.at(today) - ex.at(tgAddDays(today, -win));
+      return ((target.type==='lectures' && target.unit==='percent') ? gain/ex.total*100 : gain) / win;
+    }
+  }catch(e){ /* fall through to the snapshot method */ }
   const log = (target.progressLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
   const today = todayStr();
   const windowDays = 7;
@@ -7674,6 +7897,15 @@ function targetPace(profileId, target, currentValue){
   const start = log[0] || {date: target.startDate, value: 0};
   const lifetimeDays = Math.max(1, daysBetweenDates(start.date, today));
   return (currentValue - start.value) / lifetimeDays;
+}
+function tgMockList(profileId, paperId){ return (mockScoresFor(profileId, paperId)||[]).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')); }
+function tgMockStatus(profileId, t, avg, daysLeft){
+  const L = tgMockList(profileId, t.paperId), n = L.length, gap = t.targetValue - avg;
+  if(gap <= 5) return 'ON_TRACK';
+  const last3 = L.slice(-3), l3 = last3.length ? last3.reduce((a,m)=>a+Number(m.score||0),0)/last3.length : 0;
+  if(n >= 3 && l3 >= t.targetValue - 3) return 'ON_TRACK';
+  if(n === 0) return daysLeft <= 14 ? 'AT_RISK' : 'ON_TRACK';
+  return daysLeft <= 3 ? 'CRITICAL' : 'AT_RISK';
 }
 const TARGET_STATUS_META = {
   ON_TRACK:  {label:'On track',  color:'var(--good)',  tint:'var(--good-tint, var(--surface2))'},
@@ -7698,6 +7930,8 @@ function targetStatusData(profileId, target){
     status = 'COMPLETED';
   } else if(daysLeft < 0){
     status = 'OVERDUE';
+  } else if(target.type==='mock'){
+    status = tgMockStatus(profileId, target, currentValue, daysLeft); // a score target is judged by the scores themselves, not by "points per day"
   } else if(currentPace <= 0){
     status = daysLeft <= 3 ? 'CRITICAL' : (daysLeft <= 7 ? 'AT_RISK' : 'AT_RISK');
   } else {
@@ -7816,7 +8050,7 @@ function computeTargetNotifications(profileId){
     if(st==='OVERDUE'){
       out.push({type:'warn', ic:'flag', title:`${t.title} — overdue`, text:`${b.toGoTxt} still to go. Open Targets to give it more time or keep going.`});
     } else {
-      out.push({type:'warn', ic:'flag', title:`${t.title} — ${b.dl} ${tgPlural(b.dl,'day')} left`, text:`Behind pace: ${b.toGoTxt} to go. You need ${b.needTxt}.`});
+      out.push({type:'warn', ic:'flag', title:`${t.title} — ${b.dl} ${tgPlural(b.dl,'day')} left`, text: b.mock ? `Mock average ${b.sd.currentValue}% (goal ${t.targetValue}%)${b.mock.n1<=100 ? ` — aim for ${b.mock.nextTxt} on your next mock.` : '.'}` : `Behind pace: ${b.toGoTxt} to go. You need ${b.needTxt}.`});
     }
   });
   return out;
@@ -7843,7 +8077,30 @@ function planThisTarget(profileId, targetId){
   // Always guard the tasks array — it could be missing for a profile on first use
   if(!S.shared.tasks) S.shared.tasks = {};
   if(!S.shared.tasks[profileId]) S.shared.tasks[profileId] = [];
-  if(t.type==='overall' || t.type==='custom'){
+  if(t.type==='hours' || t.type==='mock'){
+    if(existingOpen.length===0){
+      const dlGap = daysBetweenDates(todayStr(), t.deadline), spanDays = dlGap>=0 ? dlGap+1 : 7, b0 = targetBrief(profileId, t);
+      const paper = t.paperId ? paperById(t.paperId) : null, newIds = [];
+      if(t.type==='hours'){
+        const per = Math.max(0.5, Math.round(Math.max(0, b0.need)*2)/2 || 1); // half-hour steps
+        for(let i = 0; i < Math.min(spanDays, 14); i++){
+          const d = new Date(); d.setDate(d.getDate()+i);
+          const task = {id:uid(), title:`Study ${paper ? paper.nick : ''}${paper ? ': ' : 'for '}${tgFmt(per)}h`, date:todayStr(d), done:false, linkType:null, priority:t.priority, notes:'Created from Targets — "Plan This Target".'};
+          S.shared.tasks[profileId].push(task); newIds.push(task.id);
+        }
+        spreadNote = `, ${tgFmt(per)}h a day for ${newIds.length} days`;
+      } else {
+        const weeks = Math.max(1, Math.min(6, Math.ceil(spanDays/7)));
+        for(let i = 0; i < weeks; i++){
+          const d = new Date(); d.setDate(d.getDate()+Math.min(spanDays-1, i*7));
+          const task = {id:uid(), title:`Take a ${paper ? paper.nick : ''} mock test (aim ${b0.mock && b0.mock.n1<=100 ? b0.mock.nextTxt : t.targetValue+'%'})`.replace('  ',' '), date:todayStr(d), done:false, linkType:null, priority:t.priority, notes:'Created from Targets — "Plan This Target".'};
+          S.shared.tasks[profileId].push(task); newIds.push(task.id);
+        }
+        spreadNote = `, one a week`;
+      }
+      t.plannedTaskIds = newIds; created = newIds.length;
+    }
+  } else if(t.type==='overall' || t.type==='custom'){
     if(existingOpen.length===0){
       const paper = t.paperId ? paperById(t.paperId) : null;
       const title = t.type==='custom' ? `Work on target: ${t.title}` : `Push overall ${paper?paper.code:''} prep toward ${t.targetValue}%`;
@@ -7907,7 +8164,11 @@ function planThisTarget(profileId, targetId){
 // in the whole paper. The goal count uses the same round-half-up rule targetStatusData() applies to percent
 // targets (a 75% target is met at 74.5%), so this never disagrees with the status badge. null for overall/custom.
 function targetCountInfo(profileId, target){
-  if(target.type==='overall' || target.type==='custom') return null;
+  if(target.type==='overall' || target.type==='custom' || target.type==='mock') return null;
+  if(target.type==='hours'){
+    const done = tgRound1(targetHoursSince(profileId, target)), goal = target.targetValue||0;
+    return {noun:'hours', done, total:goal, goal, toGoal: Math.max(0, tgRound1(goal-done)), paperLeft: Math.max(0, tgRound1(goal-done))};
+  }
   const {done, total} = targetTotalAndDone(profileId, target);
   if(!total) return null;
   const noun = (target.type==='lectures' && paperComponents(profileId, target.paperId).usesLectureTracker) ? 'lectures' : 'chapters';
@@ -7937,6 +8198,7 @@ function targetBrief(profileId, t){
   const paper = t.paperId ? paperById(t.paperId) : null;
   const mine = !S.local || profileId === S.local.myProfile; // v134: the other person's targets are worded "they", not "you"
   const completed = sd.status==='COMPLETED', overdue = sd.status==='OVERDUE';
+  if(t.type==='mock') return targetMockBrief(profileId, t, sd, paper, mine, completed, overdue);
   const pct = t.unit==='percent' ? '%' : '';
   const dl = sd.daysLeft;
   const noun = info ? info.noun : '';
@@ -7969,6 +8231,30 @@ function targetBrief(profileId, t){
   }
   return {sd, info, paper, completed, overdue, pct, dl, noun, toGo, toGoNum, toGoUnit, toGoTxt, doneTxt, need, pace, needTxt, paceTxt, proj, barPct, tickPct, when, line, verdict};
 }
+// v136: a mock-average target. Progress is the paper's average mock score; the useful number is "what must my next mock score".
+function tgNeedNext(avg, n, goal, k){ return k>0 ? (goal*(n+k) - avg*n)/k : Infinity; } // score needed on each of the next k mocks
+function targetMockBrief(profileId, t, sd, paper, mine, completed, overdue){
+  const L = tgMockList(profileId, t.paperId), n = L.length, avg = sd.currentValue, goal = t.targetValue, dl = sd.daysLeft;
+  const you = mine ? 'you' : 'they';
+  const rawAvg = n ? L.reduce((a,m)=>a+Number(m.score||0),0)/n : 0;
+  const toGo = completed ? 0 : Math.max(0, Math.ceil(goal-avg));
+  const n1 = n ? Math.ceil(tgNeedNext(rawAvg, n, goal, 1)) : Math.ceil(goal), n2 = n ? Math.ceil(tgNeedNext(rawAvg, n, goal, 2)) : Math.ceil(goal), n3 = Math.ceil(tgNeedNext(rawAvg, n, goal, 3));
+  const ceil = 100, barPct = Math.min(100, Math.round(avg/ceil*100)), tickPct = Math.min(100, Math.round(goal));
+  const when = completed ? (t.completedAt ? (()=>{ const e = daysBetweenDates(t.completedAt, t.deadline); return e>0 ? `${e} ${tgPlural(e,'day')} early` : (e<0 ? `${-e} ${tgPlural(-e,'day')} late` : 'on time'); })() : 'done') : '';
+  let line, verdict, nextTxt = '';
+  if(n1 <= 100) nextTxt = n1 <= 0 ? 'any score' : n1+'%+';
+  else if(n2 <= 100) nextTxt = n2+'%+ on each of the next 2';
+  else nextTxt = n3 <= 100 ? n3+'%+ on each of the next 3' : 'a few strong mocks';
+  if(completed){ line = `Average ${avg}% — goal reached`; verdict = `The mock average reached ${goal}%${when ? ' ('+when+')' : ''}.`; }
+  else if(overdue){ line = mine ? 'Overdue — open it to give it more time' : 'Overdue'; verdict = `The deadline passed ${-dl} ${tgPlural(-dl,'day')} ago with the average at ${avg}% (goal ${goal}%).` + (mine ? ' Give it more time below, or keep going.' : ''); }
+  else if(!n){ line = `No mocks yet · goal ${goal}% average`; verdict = `No mock scores yet for ${paper ? paper.nick : 'this paper'}. Take one and add it under Mocks. To average ${goal}% ${you} need ${goal}%+ on the mocks ${you} take.`; }
+  else {
+    line = `Average ${avg}% of ${goal}% · ${n} mock${n===1?'':'s'}` + (n1<=100 ? ` · next: ${nextTxt}` : '');
+    verdict = `The average is ${avg}% across ${n} mock${n===1?'':'s'}. ` + (n1<=100 ? `A ${nextTxt} on the next mock lifts it to ${goal}%.` : `One mock can't get there; ${nextTxt} would.`) + (dl>0 ? ` ${dl} ${tgPlural(dl,'day')} left.` : '');
+  }
+  return {sd, info:null, paper, completed, overdue, pct:'%', dl, noun:'', toGo, toGoNum:String(toGo)+'%', toGoUnit:'points', toGoTxt:`${toGo} points`, doneTxt:`${avg}% / ${goal}%`,
+    need:0, pace:0, needTxt:'', paceTxt:'', proj:null, barPct, tickPct, when, line, verdict, mock:{n, avg, rawAvg, n1, n2, n3, nextTxt, L}};
+}
 // The one card used everywhere (Targets list, Completed list, Home "Needs Attention"): name + status, bar, "N to go / N days left", one line.
 function mtCardHtml(profileId, target, opts){
   const b = targetBrief(profileId, target);
@@ -7986,7 +8272,22 @@ function mtCardHtml(profileId, target, opts){
     <div class="mt-bar"><div class="mt-fill" style="width:${b.barPct}%"></div>${!b.completed && b.tickPct<99 ? `<i class="mt-tick" style="left:${b.tickPct}%"></i>` : ''}</div>
     <div class="mt-row"><span>${left}</span><span>${right}</span></div>
     <div class="mt-line">${escChat(b.line)}</div>
+    ${opts && opts.compact ? '' : tgCardFootHtml(profileId, target, b)}
   </div>`;
+}
+// v136: a 14-day bar sparkline and today's share, at the bottom of each full card
+function tgCardFootHtml(profileId, t, b){
+  if(b.completed) return '';
+  let plan = null, days = [];
+  try{ const s = targetSeries(profileId, t); plan = targetTodayPlan(profileId, t, b, s); days = tgLastDays(tgDayMap(s), s.last, 14); }catch(e){ return ''; }
+  if(!plan) return '';
+  let txt = '', done = false;
+  if(plan.kind==='mock') txt = plan.text;
+  else if(plan.goalToday > 0 && plan.remaining <= 0){ txt = "✓ today's share is done"; done = true; }
+  else if(plan.light) txt = plan.text;
+  else if(plan.goalToday > 0) txt = `Today: ${tgFmt(plan.remaining)}${plan.unitTxt} to go`;
+  else txt = plan.text;
+  return `<div class="mt-foot">${plan.kind==='mock' ? '' : tgSparkSvg(days, b.sd.meta.color)}<div class="mt-foot-t${done?' done':''}" style="${plan.kind==='mock'?'text-align:left':''}">${escChat(txt)}</div></div>`;
 }
 
 // ── Home dashboard widget — Feature: replaces the old "Pending Targets" checklist widget.
@@ -8097,13 +8398,27 @@ function targetsDashboardHtml(profileId){
   const rank = {OVERDUE:0, CRITICAL:1, AT_RISK:2, ON_TRACK:3};
   const items = active.map(t=>({t, sd:targetStatusData(profileId,t)}))
     .sort((a,b)=> (rank[a.sd.status]-rank[b.sd.status]) || (a.sd.daysLeft-b.sd.daysLeft));
-  const over = items.filter(x=>x.sd.status==='OVERDUE').length;
-  const behind = items.filter(x=>x.sd.status==='CRITICAL'||x.sd.status==='AT_RISK').length;
-  return `${tabs}${targetsOverviewHtml(profileId)}
-  <div class="mt-summary">${items.length} active${over?` · ${over} overdue`:''}${behind?` · ${behind} behind`:''}${!over&&!behind?' · all on track':''}</div>
-  ${items.map(x=>mtCardHtml(profileId,x.t)).join('')}
+  const attn = items.filter(x=>x.sd.status!=='ON_TRACK'), ok = items.filter(x=>x.sd.status==='ON_TRACK');
+  const grp = (label, list) => list.length ? `<div class="mt-group">${label} · ${list.length}</div>${list.map(x=>mtCardHtml(profileId,x.t)).join('')}` : '';
+  return `${tabs}${targetsTodayCardHtml(profileId)}${targetsOverviewHtml(profileId)}${targetsReadinessEntryHtml(profileId)}
+  ${attn.length && ok.length ? grp('Needs attention', attn)+grp('On track', ok) : items.map(x=>mtCardHtml(profileId,x.t)).join('')}
   ${doneCount>0?`<div style="text-align:center;margin-top:6px"><button class="btn btn-sm" onclick="openTargetHistory()">Completed (${doneCount})</button></div>`:''}
   ${ro ? `<div class="mt-hint">Read-only — ${who} edits their own targets</div>` : `<div class="mt-hint">Tip: press and hold a target to edit it</div>`}`;
+}
+// One-line entry to the exam-readiness page
+function targetsReadinessEntryHtml(profileId){
+  let R; try{ R = readinessData(profileId); }catch(e){ console.warn('[Targets] readiness failed', e); return ''; }
+  if(!(R.rows.length)) return '';
+  let line, color = 'var(--text-muted)';
+  if(R.daysToExam < 0) line = 'Exam date has passed';
+  else if(R.totalLeft === 0) line = 'All lectures done · revision time';
+  else if(R.allFinish){ const f = R.allFinish; line = `Lectures done ~${fmtShortDate(f.date)}${f.afterExam ? ' (after the exam)' : (f.diff<=0 ? '' : ' · '+f.diff+'d into revision window')}`; color = f.afterExam ? 'var(--bad)' : (f.diff<=0 ? 'var(--good)' : 'var(--amber)'); }
+  else line = `${R.totalLeft} lectures left · no recent pace`;
+  return `<div class="card" style="padding:12px 14px;margin-bottom:14px;cursor:pointer;display:flex;align-items:center;gap:10px" onclick="openTargetsReadiness()">
+    <div style="min-width:0;flex:1"><div style="font-size:12.5px;font-weight:800">Exam readiness</div>
+    <div style="font-size:11.5px;margin-top:2px;color:${color}">${R.daysToExam>=0 ? R.daysToExam+' days to the exam · ' : ''}${escChat(line)}</div></div>
+    <span style="color:var(--text-faint);font-size:18px">›</span>
+  </div>`;
 }
 
 // ── Ideas: the papers you are weakest in, turned into ready-to-use targets (tap one to fill the form) ──────────────────
@@ -8120,6 +8435,7 @@ function targetSuggestions(profileId){
     if(have.some(t=>!t.completedAt && t.paperId===p.id && t.type===type)) return; // already chasing that one
     out.push({paperId:p.id, type, unit:'percent', value:100, days:14, label:`${p.nick} ${what} · 2 weeks`});
   });
+  if(!have.some(t=>!t.completedAt && t.type==='hours')) out.push({paperId:'', type:'hours', unit:'count', value:20, days:7, label:'20 study hours · 1 week'});
   return out;
 }
 function applyTargetIdea(i){
@@ -8128,6 +8444,7 @@ function applyTargetIdea(i){
   if(S.targetsView==='create' && g('mtc-paper')){
     g('mtc-paper').value = x.paperId; g('mtc-type').value = x.type; g('mtc-value').value = x.value; g('mtc-deadline').value = targetDateFromToday(x.days);
     g('mtc-title').value = '';
+    g('mtc-value').dataset.kind = tgFormKind(x.type); // the idea already carries a sensible goal: don't swap it for the default
     setTargetUnitToggle(x.unit); onTargetTypeChange();
   } else {
     openTargetCreateForm({paperId:x.paperId, type:x.type, unit:x.unit, value:x.value, days:x.days});
@@ -8141,9 +8458,10 @@ function openTargetCreateForm(draft){ S.targetsProfile = S.local.myProfile; S.ta
 function targetFormHtml(profileId, existing, draft){
   const e = existing || null, d = draft || {};
   const type = e ? e.type : (d.type || 'lectures');
-  const paperId = (e ? e.paperId : d.paperId) || PAPERS[0].id;
-  const unit = type==='overall' ? 'percent' : (e ? (e.unit||'percent') : (d.unit||'percent'));
-  const val = e ? e.targetValue : (d.value!=null ? d.value : 75);
+  const kind = tgFormKind(type);
+  const paperId = (e ? e.paperId : d.paperId) || (type==='hours' ? '' : PAPERS[0].id);
+  const unit = type==='overall' || type==='mock' ? 'percent' : (type==='hours' ? 'count' : (e ? (e.unit||'percent') : (d.unit||'percent')));
+  const val = e ? e.targetValue : (d.value!=null ? d.value : tgFormDefault(kind));
   const dl = e ? e.deadline : ((d.deadline && d.deadline>=todayStr()) ? d.deadline : targetDateFromToday(d.days||14));
   const title = e ? e.title : (d.title||'');
   const ideas = e ? [] : targetSuggestions(profileId);
@@ -8153,14 +8471,14 @@ function targetFormHtml(profileId, existing, draft){
   <div class="card mt-form">
     <div class="mt-pair">
       <div class="mt-form-row" style="flex:1"><label>Paper</label>
-        <select id="mtc-paper" onchange="refreshTargetFormPreview()">${PAPERS.map(p=>`<option value="${p.id}" ${p.id===paperId?'selected':''}>${p.code} — ${p.nick}</option>`).join('')}</select></div>
+        <select id="mtc-paper" onchange="refreshTargetFormPreview()"><option value="" id="mtc-allpapers" ${paperId===''?'selected':''}>All papers</option>${PAPERS.map(p=>`<option value="${p.id}" ${p.id===paperId?'selected':''}>${p.code} — ${p.nick}</option>`).join('')}</select></div>
       <div class="mt-form-row" style="flex:1"><label>What to finish</label>
         <select id="mtc-type" onchange="onTargetTypeChange()">${TARGET_TYPES.map(t=>`<option value="${t.id}" ${t.id===type?'selected':''}>${t.short}</option>`).join('')}</select></div>
     </div>
-    <div class="mt-form-row"><label>Goal</label>
-      <div class="mt-chips" id="mtc-goal-chips">${[50,75,100].map(v=>`<button type="button" class="mt-chip" data-goal="${v}" onclick="setTargetGoal(${v})">${v}%</button>`).join('')}</div>
+    <div class="mt-form-row"><label id="mtc-goal-label">${tgFormGoalLabel(kind)}</label>
+      <div class="mt-chips" id="mtc-goal-chips">${tgGoalChipsHtml(kind)}</div>
       <div style="display:flex;gap:8px;align-items:center">
-        <input type="number" id="mtc-value" min="1" inputmode="decimal" style="flex:1" value="${val}" oninput="refreshTargetFormPreview()">
+        <input type="number" id="mtc-value" data-kind="${kind}" min="1" inputmode="decimal" style="flex:1" value="${val}" oninput="refreshTargetFormPreview()">
         <div class="mt-unit-toggle" id="mtc-unit-toggle" data-unit="${unit}">
           <button type="button" class="${unit==='percent'?'active':''}" onclick="setTargetUnitToggle('percent')" id="mtc-unit-percent">%</button>
           <button type="button" class="${unit==='count'?'active':''}" onclick="setTargetUnitToggle('count')" id="mtc-unit-count">Count</button>
@@ -8182,30 +8500,50 @@ function targetFormHtml(profileId, existing, draft){
     </div>` : `<button class="btn btn-accent" onclick="submitCreateTarget('${profileId}')">Create target</button>`}
   </div>`;
 }
+// v136: hours and mock targets use their own goal wording, chips and default; everything else is "items" (lectures, chapters, revision ...)
+function tgFormKind(type){ return type==='hours' ? 'hours' : (type==='mock' ? 'mock' : 'items'); }
+function tgFormDefault(kind){ return kind==='hours' ? 20 : (kind==='mock' ? 60 : 75); }
+function tgFormGoalLabel(kind){ return kind==='hours' ? 'Goal (study hours)' : (kind==='mock' ? 'Goal (mock average, %)' : 'Goal'); }
+function tgGoalChipsHtml(kind){
+  const list = kind==='hours' ? [10,25,50] : (kind==='mock' ? [50,60,70] : [50,75,100]), suf = kind==='hours' ? 'h' : '%';
+  return list.map(v=>`<button type="button" class="mt-chip" data-goal="${v}" onclick="setTargetGoal(${v})">${v}${suf}</button>`).join('');
+}
 function targetFormDraft(){
   const g = id => document.getElementById(id);
   const type = g('mtc-type') ? g('mtc-type').value : 'lectures';
   const tog = g('mtc-unit-toggle');
   return {
     paperId: g('mtc-paper').value, type,
-    unit: type==='overall' ? 'percent' : ((tog && tog.dataset.unit) || 'percent'),
+    unit: (type==='overall' || type==='mock') ? 'percent' : (type==='hours' ? 'count' : ((tog && tog.dataset.unit) || 'percent')),
     targetValue: Number(g('mtc-value').value), deadline: g('mtc-deadline').value, title: (g('mtc-title').value||'').trim(),
   };
 }
 function autoTargetTitle(d){
   const p = paperById(d.paperId); const nick = p ? p.nick : '';
+  if(d.type==='hours') return `${p ? nick : 'All papers'}: ${d.targetValue} study hours`;
+  if(d.type==='mock') return `${nick} mock average to ${d.targetValue}%`;
   const what = {lectures:'lectures', chapters:'chapters', rev1:'revision 1', rev2:'revision 2', practice:'practice', overall:'overall readiness', custom:'milestone'}[d.type] || 'target';
   return d.unit==='percent' ? `${nick} ${what} to ${d.targetValue}%` : `${nick}: ${d.targetValue} ${what}`;
 }
 function onTargetTypeChange(){
   const type = document.getElementById('mtc-type') && document.getElementById('mtc-type').value;
   const toggle = document.getElementById('mtc-unit-toggle'); if(!toggle) return;
-  if(type==='overall'){
-    toggle.dataset.unit = 'percent';
-    const pb = document.getElementById('mtc-unit-percent'), cb = document.getElementById('mtc-unit-count');
-    if(pb) pb.classList.add('active'); if(cb) cb.classList.remove('active');
+  const kind = tgFormKind(type), g = id => document.getElementById(id), inp = g('mtc-value');
+  // switching between "items", hours and mock swaps in that kind's default goal; the first draw (edit form) keeps the saved one
+  if(inp && inp.dataset.kind && inp.dataset.kind !== kind){ inp.value = tgFormDefault(kind); }
+  if(inp) inp.dataset.kind = kind;
+  const gl = g('mtc-goal-label'); if(gl) gl.textContent = tgFormGoalLabel(kind);
+  const gc = g('mtc-goal-chips'); if(gc && gc.dataset.kind !== kind){ gc.innerHTML = tgGoalChipsHtml(kind); gc.dataset.kind = kind; }
+  // "All papers" only makes sense for study hours; a mock average needs a paper
+  const ap = g('mtc-allpapers'), ps = g('mtc-paper');
+  if(ap){ ap.hidden = type!=='hours'; ap.disabled = type!=='hours'; if(type!=='hours' && ps && ps.value==='') ps.value = PAPERS[0].id; }
+  if(type==='overall' || kind!=='items'){
+    toggle.dataset.unit = type==='hours' ? 'count' : 'percent';
+    const pb = g('mtc-unit-percent'), cb = g('mtc-unit-count');
+    if(pb) pb.classList.toggle('active', type!=='hours'); if(cb) cb.classList.toggle('active', type==='hours');
     toggle.style.opacity = '.5'; toggle.style.pointerEvents = 'none';
-  } else { toggle.style.opacity = ''; toggle.style.pointerEvents = ''; }
+    toggle.style.display = kind!=='items' ? 'none' : '';
+  } else { toggle.style.opacity = ''; toggle.style.pointerEvents = ''; toggle.style.display = ''; }
   refreshTargetFormPreview();
 }
 function setTargetUnitToggle(unit){
@@ -8214,7 +8552,7 @@ function setTargetUnitToggle(unit){
   const tog = document.getElementById('mtc-unit-toggle'); if(tog) tog.dataset.unit = unit;
   refreshTargetFormPreview();
 }
-function setTargetGoal(v){ const i = document.getElementById('mtc-value'); if(i) i.value = v; setTargetUnitToggle('percent'); }
+function setTargetGoal(v){ const i = document.getElementById('mtc-value'); if(i) i.value = v; const ty = document.getElementById('mtc-type'); if(ty && tgFormKind(ty.value)!=='items') refreshTargetFormPreview(); else setTargetUnitToggle('percent'); }
 function setTargetDue(n){ const i = document.getElementById('mtc-deadline'); if(i) i.value = targetDateFromToday(n); refreshTargetFormPreview(); }
 // items/day you have actually been finishing lately (lectures carry a completion date; chapters do not)
 function recentLecturePace(profileId, paperId){
@@ -8229,12 +8567,33 @@ function targetPreview(profileId, d, existing){
   const today = todayStr();
   if(!(d.targetValue>0)) return {html:'Enter a goal to see what it takes.'};
   if(d.unit==='percent' && d.targetValue>100) return {warn:true, html:"A percentage goal can't be above 100%."};
+  if(d.type==='mock' && !d.paperId) return {warn:true, html:'Pick the paper for the mock average.'};
   if(!d.deadline) return {html:'Pick a deadline to see the daily pace this needs.'};
   const dl = daysBetweenDates(today, d.deadline);
   const timeTxt = dl===0 ? 'today' : `${dl} ${tgPlural(dl,'day')}`;
   const passed = dl<0 ? ' That date has already passed.' : '';
   const tmp = Object.assign({}, existing||{}, {id:'preview', type:d.type, paperId:d.paperId, unit:d.unit, targetValue:d.targetValue, deadline:d.deadline,
     manualProgress: (existing && existing.type==='custom') ? (existing.manualProgress||0) : 0});
+  if(d.type==='hours'){
+    const start = (existing && existing.startDate) || today, done = tgRound1(targetHoursSince(profileId, {paperId:d.paperId, startDate:start}));
+    const left = Math.max(0, tgRound1(d.targetValue - done)), where = d.paperId ? (paperById(d.paperId)||{}).nick : 'all papers';
+    if(left<=0) return {warn:true, html:`You have already logged <b>${done}h</b> on ${where} since this started. Set a higher goal.`};
+    let html = `<b>${left}h</b> to go on ${where} (${done}h logged since the start).`, warn = dl<0;
+    const from = tgAddDays(today, -13);
+    const rec = tgLogsForTarget(profileId, d.paperId).filter(l=>l.date>=from && l.date<=today).reduce((a,l)=>a+Number(l.hours||0),0)/14;
+    if(dl>0){
+      const need = left/dl; html += ` In ${timeTxt} that's <b>${tgFmt(need)}h a day</b>.`;
+      if(rec>0){ if(need>1.5*rec){ warn = true; html += ` Your last 14 days average ${tgFmt(rec)}h a day, so this is a stretch. Consider a later date.`; } else html += ` Your last 14 days average ${tgFmt(rec)}h a day.`; }
+    } else if(dl===0) html += ' All of it is due today.'; else html += passed;
+    return {warn, html};
+  }
+  if(d.type==='mock'){
+    const L = tgMockList(profileId, d.paperId), n = L.length, avg = n ? L.reduce((a,m)=>a+Number(m.score||0),0)/n : 0, nick = (paperById(d.paperId)||{}).nick || '';
+    if(!n) return {html:`No ${nick} mock scores yet. Your first mock sets the average; the goal is <b>${d.targetValue}%</b>.${passed}`, warn: dl<0};
+    if(avg >= d.targetValue) return {warn:true, html:`The ${nick} mock average is already <b>${Math.round(avg)}%</b> (${n} mock${n===1?'':'s'}). Set a higher goal.`};
+    const n1 = tgNeedNext(avg, n, d.targetValue, 1);
+    return {warn: dl<0, html:`The ${nick} mock average is <b>${Math.round(avg)}%</b> across ${n} mock${n===1?'':'s'}. ${n1<=100 ? `One mock at <b>${Math.ceil(n1)}%</b> lifts it to ${d.targetValue}%.` : `One mock can't get there; it takes a few good ones.`}${passed}`};
+  }
   if(d.type==='custom'){
     const left = Math.max(0, d.targetValue - (tmp.manualProgress||0));
     return {warn: dl<0, html:`Tracked by hand: you update the number as you go. <b>${left}${d.unit==='percent'?'%':''}</b> to go${dl>0?` in ${timeTxt} (about ${fmtPerDay(left/dl)} a day)`:''}.${passed}`};
@@ -8269,9 +8628,9 @@ function refreshTargetFormPreview(){
   const me = S.local.myProfile;
   const d = targetFormDraft();
   const existing = S.targetsView==='edit' ? targetById(me, S.targetEditId) : null;
-  document.querySelectorAll('#targets-root [data-goal]').forEach(b=> b.classList.toggle('active', d.unit==='percent' && Number(b.dataset.goal)===d.targetValue));
+  document.querySelectorAll('#targets-root [data-goal]').forEach(b=> b.classList.toggle('active', (tgFormKind(d.type)!=='items' || d.unit==='percent') && Number(b.dataset.goal)===d.targetValue));
   document.querySelectorAll('#targets-root [data-due]').forEach(b=> b.classList.toggle('active', d.deadline===targetDateFromToday(Number(b.dataset.due))));
-  const gc = document.getElementById('mtc-goal-chips'); if(gc) gc.style.display = d.unit==='percent' ? '' : 'none';
+  const gc = document.getElementById('mtc-goal-chips'); if(gc) gc.style.display = (tgFormKind(d.type)!=='items' || d.unit==='percent') ? '' : 'none';
   const ti = document.getElementById('mtc-title'); if(ti) ti.placeholder = d.type==='custom' ? 'Name this target (e.g. 10 mock tests)' : autoTargetTitle(d);
   const r = targetPreview(me, d, existing);
   pv.className = 'mt-preview' + (r.warn ? ' warn' : '');
@@ -8282,6 +8641,8 @@ function readTargetForm(existing){
   const d = targetFormDraft();
   if(!(d.targetValue>0)){ showToast('Enter a goal greater than 0.'); return null; }
   if(d.unit==='percent' && d.targetValue>100){ showToast("A percentage goal can't be above 100."); return null; }
+  if(d.type==='hours' && d.targetValue>2000){ showToast('That is a lot of hours. Pick a goal under 2000.'); return null; }
+  if(d.type==='mock' && !d.paperId){ showToast('Pick the paper for the mock average.'); return null; }
   if(!d.deadline){ showToast('Pick a deadline.'); return null; }
   if(d.deadline < todayStr() && !(existing && existing.deadline===d.deadline)){ showToast('Pick a deadline from today onward.'); return null; }
   if(d.type==='custom' && !d.title){ showToast('Name this custom target.'); return null; }
@@ -8418,15 +8779,26 @@ function targetDetailHtml(profileId, targetId){
   if(b.completed){
     stand = `<div class="card" style="margin-bottom:12px;text-align:center;padding:18px"><div style="font-size:26px">🎉</div><div style="font-weight:800;font-size:13px;margin-top:2px">Completed ${b.when}</div>${t.completedAt?`<div class="mt-note">Finished ${fmtShortDate(t.completedAt)} · deadline was ${fmtShortDate(t.deadline)}</div>`:''}</div>`;
   } else {
-    const tiles = b.overdue
-      ? [[-b.dl,'days overdue'],[b.toGoNum,'to go'],[fmtPerDay(b.pace),(ro?'their':'your')+' pace / day']]
-      : [[Math.max(0,b.dl),'days left'],[fmtPerDay(b.need),'need / day'],[fmtPerDay(b.pace),(ro?'their':'your')+' pace / day']];
+    const tiles = b.mock
+      ? [[Math.max(0,b.dl),'days left'],[b.mock.n1<=100 ? (b.mock.n1<=0?'any':b.mock.n1+'%') : '—','next mock needs'],[b.mock.n,'mocks taken']]
+      : (b.overdue
+        ? [[-b.dl,'days overdue'],[b.toGoNum,'to go'],[fmtPerDay(b.pace),(ro?'their':'your')+' pace / day']]
+        : [[Math.max(0,b.dl),'days left'],[fmtPerDay(b.need),'need / day'],[fmtPerDay(b.pace),(ro?'their':'your')+' pace / day']]);
+    const pj = targetProjection(profileId, t, b);
+    const riskColor = pj ? ({Low:'var(--good)', Medium:'var(--amber)', High:'var(--bad)'})[pj.risk] : '';
+    const projLine = pj && pj.likely ? `<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:11.5px;color:var(--text-muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <span>Likely finish <b style="color:var(--text)">${fmtShortDate(pj.likely.date)}</b></span>
+        ${pj.fast && pj.slow && pj.fast.date !== pj.slow.date ? `<span>range <b style="color:var(--text)">${fmtShortDate(pj.fast.date)} – ${fmtShortDate(pj.slow.date)}</b></span>` : ''}
+        <span>risk of missing <b style="color:${riskColor}">${pj.risk}</b></span></div>`
+      : (pj ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">No recent pace to project a finish from · risk of missing <b style="color:var(--bad)">High</b></div>` : '');
     stand = `<div class="card" style="margin-bottom:12px">
       <div class="mt-tiles">${tiles.map(([v,l])=>`<div class="mt-tile"><b>${v}</b><span>${l}</span></div>`).join('')}</div>
       <div class="mt-verdict">${escChat(b.verdict)}</div>
-      ${b.info ? `<div class="mt-note">Goal = ${b.info.goal} of ${b.info.total} ${b.info.noun}. ${b.info.paperLeft} still pending in the whole paper.</div>` : ''}
+      ${b.info && !b.info.noun.startsWith('hour') ? `<div class="mt-note">Goal = ${b.info.goal} of ${b.info.total} ${b.info.noun}. ${b.info.paperLeft} still pending in the whole paper.</div>` : ''}
+      ${projLine}
     </div>`;
   }
+  const todayWeek = targetTodayWeekHtml(profileId, t, b, ro);
   const custom = (!ro && t.type==='custom' && !b.completed) ? `
   <div class="card" style="margin-bottom:12px">
     <div class="mt-lbl">Update progress</div>
@@ -8454,8 +8826,9 @@ function targetDetailHtml(profileId, targetId){
     <button class="btn" onclick="completeTargetNow('${profileId}','${t.id}')">✓ Mark complete</button>
   </div>`;
   const perf = targetPerformanceHtml(profileId, t);
-  if(ro) return `${head}${stand}${perf}<div class="mt-hint">Read-only — ${profileById(profileId).nick} edits their own targets</div>`;
-  return `${head}${stand}${perf}${custom}${needMoreTime}${actions}
+  const compare = targetCompareHtml(profileId, t);
+  if(ro) return `${head}${todayWeek}${stand}${perf}${compare}<div class="mt-hint">Read-only — ${profileById(profileId).nick} edits their own targets</div>`;
+  return `${head}${todayWeek}${stand}${perf}${compare}${custom}${needMoreTime}${actions}
   <div class="mt-pair" style="margin-top:4px">
     <button class="btn" onclick="openTargetEdit('${t.id}','detail')">✏️ Edit</button>
     <button class="btn" style="color:var(--bad)" onclick="deleteTarget('${profileId}','${t.id}')">🗑 Delete</button>
@@ -8469,7 +8842,7 @@ function tgAddDays(iso, n){ const d = new Date(iso+'T00:00:00'); d.setDate(d.get
 // The measure the charts use: whole lectures/chapters when the target has a count (so "30 of 83"), otherwise the target's own value (% or hand-entered).
 function tgUnits(profileId, t){
   const info = targetCountInfo(profileId, t);
-  if(info) return {kind:'count', noun:info.noun, total:info.total, goal:info.goal};
+  if(info) return {kind:'count', noun:info.noun, total:info.total, goal:info.goal, hours: t.type==='hours'};
   return {kind:'value', noun: t.unit==='percent' ? '%' : '', total:null, goal:t.targetValue};
 }
 function targetSeries(profileId, t){
@@ -8477,14 +8850,10 @@ function targetSeries(profileId, t){
   const last = (t.completedAt && t.completedAt < today) ? t.completedAt : today;
   const cur = u.kind==='count' ? targetTotalAndDone(profileId, t).done : targetCurrentValue(profileId, t);
   let pts = [], exact = false;
-  const comps = (t.type==='lectures' && u.kind==='count') ? paperComponents(profileId, t.paperId) : null;
-  if(comps && comps.usesLectureTracker){
-    const done = (lecturesFor(profileId, t.paperId)||[]).filter(l=>l.status==='done');
-    const stamped = done.filter(l=>l.completionDate).map(l=>l.completionDate).sort();
-    const base = done.length - stamped.length; // done but never dated: counted from the very start
+  const ex = targetExactFn(profileId, t);
+  if(ex){
     let from = start; if(daysBetweenDates(from, last) > 370) from = tgAddDays(last, -370);
-    let i = 0;
-    for(let d = from; d <= last; d = tgAddDays(d, 1)){ while(i < stamped.length && stamped[i] <= d) i++; pts.push({date:d, v:base+i}); }
+    for(let d = from; d <= last; d = tgAddDays(d, 1)) pts.push({date:d, v: t.type==='hours' ? tgRound1(ex.at(d)) : ex.at(d)});
     exact = true;
   } else {
     const log = (t.progressLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
@@ -8547,9 +8916,20 @@ function tgBurnupSvg(profileId, t, P){
   const line = pts.map((p,i)=>(i?'L':'M')+X(p.date).toFixed(1)+' '+Y(p.v).toFixed(1)).join(' ');
   const area = line + ` L${X(pts[pts.length-1].date).toFixed(1)} ${Y(yMin).toFixed(1)} L${X(pts[0].date).toFixed(1)} ${Y(yMin).toFixed(1)} Z`;
   let proj = '';
-  if(!b.completed && b.pace > 0 && P.cur < P.goal){
-    const need = (P.goal-P.cur)/b.pace, until = Math.min(need, Math.max(0, daysBetweenDates(s.last, x1)));
-    proj = `<line x1="${X(s.last).toFixed(1)}" y1="${Y(P.cur).toFixed(1)}" x2="${X(tgAddDays(s.last, Math.round(until))).toFixed(1)}" y2="${Y(P.cur + b.pace*until).toFixed(1)}" stroke="${b.sd.meta.color}" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/>`;
+  const ray = pace => { // from today at `pace` per day until the goal is reached or the chart ends
+    const need = (P.goal-P.cur)/pace, until = Math.min(need, Math.max(0, daysBetweenDates(s.last, x1)));
+    return {x: X(tgAddDays(s.last, Math.round(until))), y: Y(P.cur + pace*until)};
+  };
+  if(!b.completed && !b.mock && P.cur < P.goal){
+    const pj = P.proj;
+    if(pj && pj.fast && pj.slow && pj.fast.date !== pj.slow.date){
+      const hi = ray(Math.max(pj.p7, pj.p14, pj.plife)), lo = ray(Math.min.apply(null, [pj.p7, pj.p14, pj.plife].filter(p=>p>0)));
+      proj += `<polygon points="${X(s.last).toFixed(1)},${Y(P.cur).toFixed(1)} ${hi.x.toFixed(1)},${hi.y.toFixed(1)} ${lo.x.toFixed(1)},${lo.y.toFixed(1)}" fill="${b.sd.meta.color}" opacity="0.13"/>`;
+    }
+    if(b.pace > 0){
+      const e = ray(b.pace);
+      proj += `<line x1="${X(s.last).toFixed(1)}" y1="${Y(P.cur).toFixed(1)}" x2="${e.x.toFixed(1)}" y2="${e.y.toFixed(1)}" stroke="${b.sd.meta.color}" stroke-width="2" stroke-dasharray="1 4" stroke-linecap="round"/>`;
+    }
   }
   const mid = Math.round((yMin+yMax)/2);
   const ticks = [Math.round(yMin), mid, Math.round(P.goal)].filter((v,i,a)=>a.indexOf(v)===i);
@@ -8592,57 +8972,348 @@ function tgPairBar(label, pct, color, note){
   return `<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--text-muted)">${label}</span><b style="font-variant-numeric:tabular-nums">${note}</b></div>
     <div style="height:7px;border-radius:4px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:${Math.max(0,Math.min(100,pct))}%;background:${color};border-radius:4px"></div></div></div>`;
 }
+function tgMockBarsSvg(list, goal, color){
+  const L = list.slice(-10), W = 320, H = 132, Lm = 26, R = 8, T = 14, B = 26, pw = W-Lm-R, ph = H-T-B, n = Math.max(1, L.length);
+  const Y = v => T + ph*(1 - Math.max(0, Math.min(100, v))/100), bw = pw/Math.max(n, 4);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible" role="img" aria-label="Mock scores">
+    ${[0,50,100].map(v=>`<line x1="${Lm}" x2="${W-R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 3"/><text x="${Lm-5}" y="${(Y(v)+3).toFixed(1)}" text-anchor="end" font-size="8.5" fill="var(--text-faint)">${v}</text>`).join('')}
+    <line x1="${Lm}" x2="${W-R}" y1="${Y(goal).toFixed(1)}" y2="${Y(goal).toFixed(1)}" stroke="var(--good)" stroke-width="1.2" stroke-dasharray="5 3"/>
+    <text x="${W-R}" y="${(Y(goal)-4).toFixed(1)}" text-anchor="end" font-size="8.5" font-weight="800" fill="var(--good)">Goal ${tgFmt(goal)}%</text>
+    ${L.map((m,i)=>{ const x = Lm + i*bw + bw*0.2, v = Number(m.score||0), h = ph*v/100;
+      return `<rect x="${x.toFixed(1)}" y="${(Y(0)-h).toFixed(1)}" width="${(bw*0.6).toFixed(1)}" height="${h.toFixed(1)}" rx="2.5" fill="${v>=goal?'var(--good)':color}" opacity="0.92"/>
+      <text x="${(x+bw*0.3).toFixed(1)}" y="${(Y(0)-h-3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="700" fill="var(--text-muted)">${Math.round(v)}</text>
+      <text x="${(x+bw*0.3).toFixed(1)}" y="${H-12}" text-anchor="middle" font-size="7.5" fill="var(--text-faint)">${m.date ? m.date.slice(8)+'/'+m.date.slice(5,7) : ''}</text>`; }).join('')}
+  </svg>`;
+}
 function targetPerformanceHtml(profileId, t){
-  let P; try{ P = targetPerformance(profileId, t); }catch(e){ console.warn('[Targets] performance failed', e); return ''; }
+  let P; try{ P = targetPerformance(profileId, t); P.proj = targetProjection(profileId, t, P.b, P.s); }catch(e){ console.warn('[Targets] performance failed', e); return ''; }
   const {b, u} = P, prof = profileById(profileId), color = 'var(--'+prof.color+')';
+  const isHours = t.type==='hours', isMock = !!b.mock;
   const nounOne = u.kind==='count' ? u.noun.replace(/s$/,'') : (u.noun==='%' ? '1%' : 'unit');
   const unitWord = u.kind==='count' ? u.noun : (u.noun==='%' ? '%' : 'units');
-  const gapAbs = Math.abs(Math.round(P.gap*10)/10);
-  const onPlan = gapAbs < 0.5;
+  const gapAbs = Math.abs(Math.round(P.gap*10)/10), onPlan = gapAbs < 0.5;
   const gapTile = tgTile(onPlan ? 'On plan' : (P.gap>0?'+':'−')+tgFmt(gapAbs), onPlan ? 'vs the plan line' : (P.gap>0 ? unitWord+' ahead of plan' : unitWord+' behind plan'), onPlan ? 'var(--good)' : (P.gap>0 ? 'var(--good)' : 'var(--bad)'));
   const fcTile = b.completed ? tgTile('Done', b.when || 'completed', 'var(--good)')
     : (b.proj ? tgTile(fmtShortDate(b.proj.date), b.proj.diff<=0 ? (b.proj.diff===0 ? 'forecast · on time' : -b.proj.diff+'d early (forecast)') : b.proj.diff+'d late (forecast)', b.proj.diff<=0 ? 'var(--good)' : 'var(--bad)') : tgTile('—', 'forecast · no pace yet'));
   const trend = P.week1 > P.week0 ? '▲' : (P.week1 < P.week0 ? '▼' : '');
-  const weekTile = tgTile(tgFmt(P.week1)+(trend?' <small style="font-size:11px">'+trend+'</small>':''), 'last 7 days · prev '+tgFmt(P.week0));
-  const bestTile = tgTile(P.best.v>0 ? tgFmt(P.best.v) : '—', P.best.date ? 'best day · '+fmtShortDate(P.best.date) : 'best day');
+  const hSfx = isHours ? 'h' : '';
+  const weekTile = tgTile(tgFmt(P.week1)+hSfx+(trend?' <small style="font-size:11px">'+trend+'</small>':''), 'last 7 days · prev '+tgFmt(P.week0)+hSfx);
+  const bestTile = tgTile(P.best.v>0 ? tgFmt(P.best.v)+hSfx : '—', P.best.date ? 'best day · '+fmtShortDate(P.best.date) : 'best day');
   const hTile = tgTile(P.hours>0 ? tgFmt(P.hours)+'h' : '—', (t.paperId ? paperById(t.paperId).nick+' ' : '')+'study hours');
   const avgTile = tgTile(P.studyDays>0 ? tgFmt(P.hours/P.studyDays)+'h' : '—', 'per study day');
   const hpuTile = tgTile(P.hoursPerUnit ? tgFmt(P.hoursPerUnit)+'h' : '—', 'per '+nounOne);
   const consTile = tgTile(P.consistency+'%', 'days studied');
   const streakTile = tgTile(P.streak+'d', 'study streak');
+  const riskTile = P.proj ? tgTile(P.proj.risk, 'risk of missing', ({Low:'var(--good)', Medium:'var(--amber)', High:'var(--bad)'})[P.proj.risk]) : tgTile('—', 'risk of missing');
+  const needTile = tgTile(!b.completed && b.need>0 && isFinite(b.need) ? tgFmt(b.need)+(isHours?'h':'') : '—', 'needed / day');
+  const paceVs = P.proj ? tgTile(P.proj.paceVsNeed+'%', 'pace vs needed', P.proj.paceVsNeed>=100 ? 'var(--good)' : (P.proj.paceVsNeed>=75 ? 'var(--amber)' : 'var(--bad)')) : tgTile('—', 'pace vs needed');
+  let tiles;
+  if(isMock){
+    const k = b.mock, sc = k.L.map(m=>Number(m.score||0));
+    const best = sc.length ? Math.max.apply(null, sc) : null, latest = sc.length ? sc[sc.length-1] : null;
+    const l3 = sc.slice(-3), p3 = sc.slice(-6, -3);
+    const l3a = l3.length ? l3.reduce((a,x)=>a+x,0)/l3.length : null, p3a = p3.length ? p3.reduce((a,x)=>a+x,0)/p3.length : null;
+    const tr = (l3a!==null && p3a!==null) ? Math.round(l3a-p3a) : null;
+    tiles = [tgTile(b.sd.currentValue+'%', 'average'), tgTile(latest!==null ? Math.round(latest)+'%' : '—', 'latest mock'), tgTile(best!==null ? Math.round(best)+'%' : '—', 'best mock'),
+      tgTile(k.n, 'mocks taken'), tgTile(tr!==null ? (tr>0?'+':'')+tr+'%' : '—', 'last 3 vs the 3 before', tr===null ? '' : (tr>=0 ? 'var(--good)' : 'var(--bad)')), tgTile(P.hours>0 ? tgFmt(P.hours)+'h' : '—', (t.paperId ? paperById(t.paperId).nick+' ' : '')+'study hours since start')];
+  } else if(isHours){
+    tiles = [gapTile, fcTile, weekTile, bestTile, avgTile, needTile, paceVs, consTile, streakTile, riskTile, tgTile(tgFmt(b.sd.currentValue)+'h', 'logged so far'), tgTile(Math.max(0, b.dl), b.dl===1 ? 'day left' : 'days left')];
+  } else {
+    tiles = [gapTile, fcTile, weekTile, bestTile, hTile, avgTile, hpuTile, paceVs, riskTile, consTile, streakTile, needTile];
+  }
   const behindTime = P.workPct < P.timePct - 5;
   const barColor = b.completed ? 'var(--good)' : (behindTime ? 'var(--amber)' : 'var(--good)');
-  const req = !b.completed && b.need > 0 && isFinite(b.need) ? b.need : 0;
-  const barsDays = P.days14;
+  const req = !b.completed && !isMock && b.need > 0 && isFinite(b.need) ? b.need : 0;
   const dayNote = P.s.exact ? '' : '<div class="mt-note">This target is measured from once-a-day snapshots, so a bar shows what changed since the previous snapshot (days the app was not opened count on the next day you open it).</div>';
-  return `
-  <div class="section-title" style="margin-top:4px"><span>Performance${prof.id!==S.local.myProfile?' · '+prof.nick:''}</span></div>
+  const proof = (isMock ? '' : `
   <div class="card" style="margin-bottom:12px">
-    ${tgPairBar('Work done (from where you started)', P.workPct, barColor, P.workPct+'%')}
-    ${tgPairBar('Time used', P.timePct, 'var(--text-faint)', P.timePct+'%  ·  '+P.elapsed+' of '+P.totalDays+' days')}
-    <div class="mt-note" style="margin:2px 0 10px">${behindTime ? 'Work is trailing the clock — the time bar is longer than the work bar.' : (P.workPct>=P.timePct ? 'Work is keeping up with (or ahead of) the clock.' : 'Close to the clock.')}</div>
-    <div class="mt-ptiles">${gapTile}${fcTile}${weekTile}${bestTile}${hTile}${avgTile}${hpuTile}${consTile}${streakTile}</div>
-  </div>
-  <div class="card" style="margin-bottom:12px">
-    <div style="font-weight:800;font-size:12.5px;margin-bottom:6px">Target chart</div>
-    ${tgBurnupSvg(profileId, t, P)}
-    <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-faint);margin-top:6px">
-      <span><i style="display:inline-block;width:14px;height:3px;border-radius:2px;background:${color};vertical-align:middle"></i> Actual</span>
-      <span><i style="display:inline-block;width:14px;border-top:2px dashed var(--text-faint);vertical-align:middle"></i> Plan to the deadline</span>
-      ${!b.completed && b.pace>0 ? `<span><i style="display:inline-block;width:14px;border-top:2px dotted ${b.sd.meta.color};vertical-align:middle"></i> If you keep this pace</span>` : ''}
-    </div>
-  </div>
-  <div class="card" style="margin-bottom:12px">
-    <div style="font-weight:800;font-size:12.5px;margin-bottom:2px">${unitWord.charAt(0).toUpperCase()+unitWord.slice(1)} done per day · last 14 days</div>
+    <div style="font-weight:800;font-size:12.5px;margin-bottom:2px">${unitWord.charAt(0).toUpperCase()+unitWord.slice(1)} ${isHours?'studied':'done'} per day · last 14 days</div>
     <div class="mt-note" style="margin:0 0 6px">${req>0 ? 'The dashed line is what you need each day to finish on time.' : 'Each bar is one day.'}</div>
-    ${tgBarsSvg(barsDays, {color, ref:req, refLabel:'need', label:'Progress per day'})}
+    ${tgBarsSvg(P.days14, {color, ref:req, refLabel:'need', label:'Progress per day'})}
     ${dayNote}
-  </div>
+  </div>`);
+  const hoursCard = isHours ? '' : `
   <div class="card" style="margin-bottom:12px">
     <div style="font-weight:800;font-size:12.5px;margin-bottom:2px">Study hours${t.paperId ? ' on '+paperById(t.paperId).nick : ''} · last 14 days</div>
     ${tgBarsSvg(P.hours14, {color:'var(--amber)', label:'Study hours per day'})}
   </div>`;
+  const mockCard = isMock ? `
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-weight:800;font-size:12.5px;margin-bottom:2px">Mock scores${t.paperId ? ' · '+paperById(t.paperId).nick : ''}</div>
+    <div class="mt-note" style="margin:0 0 6px">Green bars are at or above the goal. Add scores under Mocks in the paper's page.</div>
+    ${b.mock.L.length ? tgMockBarsSvg(b.mock.L, t.targetValue, color) : '<div class="mt-note" style="padding:10px 0">No mock scores yet.</div>'}
+  </div>` : '';
+  return `
+  <div class="section-title" style="margin-top:4px"><span>Performance${prof.id!==S.local.myProfile?' · '+prof.nick:''}</span></div>
+  <div class="card" style="margin-bottom:12px">
+    ${tgPairBar(isMock ? 'Average vs goal' : (profileId===S.local.myProfile ? 'Work done (from where you started)' : 'Work done (from where they started)'), isMock ? Math.round(b.sd.currentValue/Math.max(1,t.targetValue)*100) : P.workPct, barColor, isMock ? b.sd.currentValue+'% of '+t.targetValue+'%' : P.workPct+'%')}
+    ${tgPairBar('Time used', P.timePct, 'var(--text-faint)', P.timePct+'%  ·  '+P.elapsed+' of '+P.totalDays+' days')}
+    <div class="mt-note" style="margin:2px 0 10px">${isMock ? '' : (behindTime ? 'Work is trailing the clock — the time bar is longer than the work bar.' : (P.workPct>=P.timePct ? 'Work is keeping up with (or ahead of) the clock.' : 'Close to the clock.'))}</div>
+    <div class="mt-ptiles">${tiles.join('')}</div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-weight:800;font-size:12.5px;margin-bottom:6px">${isMock ? 'Average over time' : 'Target chart'}</div>
+    ${tgBurnupSvg(profileId, t, P)}
+    <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-faint);margin-top:6px">
+      <span><i style="display:inline-block;width:14px;height:3px;border-radius:2px;background:${color};vertical-align:middle"></i> Actual</span>
+      <span><i style="display:inline-block;width:14px;border-top:2px dashed var(--text-faint);vertical-align:middle"></i> Plan to the deadline</span>
+      ${!b.completed && b.pace>0 && !isMock ? `<span><i style="display:inline-block;width:14px;border-top:2px dotted ${b.sd.meta.color};vertical-align:middle"></i> If you keep this pace</span>${P.proj && P.proj.fast && P.proj.slow && P.proj.fast.date!==P.proj.slow.date ? `<span><i style="display:inline-block;width:14px;height:8px;background:${b.sd.meta.color};opacity:.22;vertical-align:middle"></i> Likely range</span>` : ''}` : ''}
+    </div>
+  </div>
+  ${proof}${mockCard}${hoursCard}`;
 }
+// ═══ v136: projections, today's plan, weekly checkpoint, sparkline, same-paper comparison, exam readiness ═══════════════════════
+function tgSeriesValueAt(s, d){
+  let v = s.pts[0].v;
+  for(const p of s.pts){ if(p.date <= d) v = p.v; else break; }
+  return v;
+}
+// How fast the target has really moved over three windows, and what each would mean for the finish date.
+function targetProjection(profileId, t, b, s){
+  if(b.completed || b.mock) return null;
+  s = s || targetSeries(profileId, t);
+  const last = s.last, startAge = Math.max(1, daysBetweenDates(s.start, last));
+  const per = w => { const ww = Math.max(1, Math.min(w, startAge)); return Math.max(0, (s.cur - tgSeriesValueAt(s, tgAddDays(last, -ww)))/ww); };
+  const p7 = per(7), p14 = per(14), plife = per(startAge);
+  const toGo = b.toGo, dl = b.dl;
+  const at = p => p > 0 ? {days: Math.ceil(toGo/p), date: targetDateFromToday(Math.ceil(toGo/p)), diff: Math.ceil(toGo/p) - dl} : null;
+  const likelyPace = b.pace > 0 ? b.pace : 0;
+  const likely = likelyPace > 0 ? at(likelyPace) : null;
+  const paces = [p7, p14, plife].filter(p=>p>0);
+  const fast = paces.length ? at(Math.max.apply(null, paces)) : null, slow = paces.length ? at(Math.min.apply(null, paces)) : null;
+  let risk = 'High';
+  if(likely){ risk = likely.diff <= 0 ? 'Low' : (likely.diff <= Math.max(2, Math.round(0.25*Math.max(1, dl))) ? 'Medium' : 'High'); }
+  if(dl < 0) risk = 'High';
+  const need = b.need;
+  const paceVsNeed = need > 0 ? Math.round(likelyPace/need*100) : (toGo<=0 ? 100 : 0);
+  return {p7, p14, plife, likely, fast, slow, risk, paceVsNeed};
+}
+// What to do today for this target, and where the plan says you should be by Sunday.
+function targetTodayPlan(profileId, t, b, s){
+  if(b.completed) return null;
+  s = s || targetSeries(profileId, t);
+  const today = todayStr(), map = tgDayMap(s), doneToday = map[today] || 0;
+  if(b.mock){
+    const k = b.mock;
+    const thisWeek = k.L.filter(m=>m.date && daysBetweenDates(m.date, today) >= 0 && daysBetweenDates(m.date, today) < 7).length;
+    return {kind:'mock', text: k.n ? (k.n1<=100 ? `Next mock: aim for ${k.nextTxt}` : `Next mock: ${k.nextTxt}`) : 'Take your first mock', sub: thisWeek ? `${thisWeek} mock${thisWeek===1?'':'s'} this week` : 'No mock this week yet', doneToday:0, goalToday:0, items:[]};
+  }
+  const hours = t.type==='hours', noun = b.noun || '';
+  const need = b.dl > 0 ? b.need : b.pace; // overdue / due today: aim at your own pace rather than "everything today"
+  let goalToday = 0, light = false;
+  if(hours) goalToday = tgRound1(Math.max(0, need));
+  else if(b.info){ if(need >= 1) goalToday = Math.ceil(need - 1e-9); else if(need > 0){ goalToday = 1; light = true; } }
+  else goalToday = Math.max(0, tgRound1(need));
+  if(b.dl === 0 && b.toGo > 0){ goalToday = hours ? b.toGo : (b.info ? b.info.toGoal : b.toGo); light = false; }
+  const remaining = Math.max(0, tgRound1(goalToday - doneToday));
+  let items = [];
+  if(!hours && b.info && remaining > 0){
+    const cap = Math.min(4, Math.ceil(remaining));
+    if(t.type==='lectures' && paperComponents(profileId, t.paperId).usesLectureTracker){
+      items = (lecturesFor(profileId, t.paperId)||[]).filter(l=>l.status!=='done').slice(0, cap).map(l=>`L${l.num}${l.topic ? ' · '+l.topic : ''}`);
+    } else if(targetTypeInfo(t.type).flag){
+      const flag = targetTypeInfo(t.type).flag;
+      items = (chaptersFor(profileId, t.paperId)||[]).filter(c=>!c[flag]).slice(0, cap).map(c=>c.name);
+    }
+  }
+  const unitTxt = hours ? 'h' : (b.info ? ' '+(goalToday===1 ? noun.replace(/s$/,'') : noun) : (t.unit==='percent' ? '%' : ''));
+  let text;
+  if(light) text = `Next up: one ${noun.replace(/s$/,'')} (about ${fmtNeed(need, noun).replace(/^~/,'')})`;
+  else if(goalToday <= 0) text = 'Nothing needed today';
+  else text = `Today: ${tgFmt(goalToday)}${unitTxt}`;
+  return {kind:'units', text, doneToday, goalToday, remaining, light, items, unitTxt};
+}
+function targetWeekCheckpoint(profileId, t, b, s){
+  if(b.completed || b.mock) return null;
+  s = s || targetSeries(profileId, t);
+  const today = todayStr(), dow = new Date(today+'T00:00:00').getDay(), wk = tgAddDays(today, dow === 0 ? 0 : 7-dow);
+  if(wk >= t.deadline || b.dl <= 0) return null; // the deadline falls inside this week: no separate checkpoint
+  const total = Math.max(1, daysBetweenDates(s.start, t.deadline)), el = Math.max(0, daysBetweenDates(s.start, wk));
+  const startV = s.pts[0].v, goal = s.unit.goal;
+  const expected = startV + (goal-startV)*el/total;
+  return {date: wk, expected, actual: s.cur, gap: s.cur - expected, unit: s.unit};
+}
+// 14 daily values for the card sparkline
+function targetSparkDays(profileId, t){
+  try{ const s = targetSeries(profileId, t); return tgLastDays(tgDayMap(s), s.last, 14); }catch(e){ return []; }
+}
+function tgSparkSvg(days, color){
+  if(!days.length) return '';
+  const W = 84, H = 24, n = days.length, max = Math.max(1e-9, Math.max.apply(null, days.map(d=>d.v))), bw = W/n;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="flex-shrink:0" aria-hidden="true">${days.map((d,i)=>{
+    const h = d.v > 0 ? Math.max(2, (H-2)*d.v/max) : 1.2;
+    return `<rect x="${(i*bw+0.8).toFixed(1)}" y="${(H-h).toFixed(1)}" width="${(bw-1.6).toFixed(1)}" height="${h.toFixed(1)}" rx="1" fill="${color}" opacity="${d.v>0?0.9:0.22}"/>`;
+  }).join('')}</svg>`;
+}
+function targetTodayWeekHtml(profileId, t, b, ro){
+  if(b.completed) return '';
+  let plan, wk;
+  try{ const s = targetSeries(profileId, t); plan = targetTodayPlan(profileId, t, b, s); wk = targetWeekCheckpoint(profileId, t, b, s); }catch(e){ console.warn('[Targets] today plan failed', e); return ''; }
+  if(!plan && !wk) return '';
+  const who = ro ? profileById(profileId).nick+"'s " : '';
+  const pct = plan && plan.kind==='units' && plan.goalToday>0 ? Math.min(100, Math.round(plan.doneToday/plan.goalToday*100)) : null;
+  const done = pct !== null && plan.remaining <= 0;
+  const gapAbs = wk ? Math.abs(Math.round(wk.gap*10)/10) : 0;
+  const wkUnit = wk ? (wk.unit.hours ? 'h' : (wk.unit.kind==='count' ? ' '+wk.unit.noun : (wk.unit.noun==='%' ? '%' : ''))) : '';
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px">${who}Today</div>
+    ${plan ? `<div style="font-size:15px;font-weight:800;color:${done?'var(--good)':'var(--text)'}">${done?'✓ ':''}${escChat(plan.text)}</div>
+    ${plan.kind==='units' && plan.goalToday>0 ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">done so far today: <b>${tgFmt(plan.doneToday)}${plan.unitTxt}</b>${plan.remaining>0 ? ` · <b>${tgFmt(plan.remaining)}${plan.unitTxt}</b> to go` : ' · today\'s share is done'}</div>` : ''}
+    ${plan.kind==='mock' ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">${escChat(plan.sub)}</div>` : ''}
+    ${pct!==null ? `<div style="height:6px;border-radius:3px;background:var(--surface2);overflow:hidden;margin-top:8px"><div style="height:100%;width:${pct}%;background:${done?'var(--good)':b.sd.meta.color};border-radius:3px"></div></div>` : ''}
+    ${plan.items && plan.items.length ? `<div style="margin-top:9px;display:flex;flex-direction:column;gap:4px">${plan.items.map(x=>`<div style="font-size:11.5px;color:var(--text-muted)">▸ ${escChat(x)}</div>`).join('')}</div>` : ''}` : ''}
+    ${wk ? `<div style="margin-top:${plan?'12px':'0'};padding-top:${plan?'10px':'0'};${plan?'border-top:1px solid var(--border);':''}font-size:11.5px;color:var(--text-muted);line-height:1.5">
+      <b style="color:var(--text)">Checkpoint · ${new Date(wk.date+'T00:00:00').toLocaleDateString('en-IN',{weekday:'short', day:'numeric', month:'short'})}</b><br>
+      The plan puts ${ro?'them':'you'} at <b style="color:var(--text)">${tgFmt(wk.expected)}${wkUnit}</b> by then; ${ro?'they are':'you are'} at <b style="color:var(--text)">${tgFmt(wk.actual)}${wkUnit}</b> — ${gapAbs<0.5 ? '<span style="color:var(--good)">right on plan</span>' : (wk.gap>0 ? `<span style="color:var(--good)">${tgFmt(gapAbs)}${wkUnit} ahead</span>` : `<span style="color:var(--bad)">${tgFmt(gapAbs)}${wkUnit} to catch up</span>`)}.
+    </div>` : ''}
+  </div>`;
+}
+// ── "Today's plan" card at the top of the Targets page: one row per active target ──
+function targetsTodayCardHtml(profileId){
+  const ro = profileId !== S.local.myProfile, who = profileById(profileId).nick;
+  const active = milestoneTargetsFor(profileId).filter(t=>!t.completedAt);
+  if(!active.length) return '';
+  const rows = active.map(t=>{
+    const b = targetBrief(profileId, t), plan = targetTodayPlan(profileId, t, b);
+    if(!plan) return null;
+    return {t, b, plan};
+  }).filter(Boolean);
+  if(!rows.length) return '';
+  const rank = {OVERDUE:0, CRITICAL:1, AT_RISK:2, ON_TRACK:3};
+  rows.sort((a,b2)=> (rank[a.b.sd.status]-rank[b2.b.sd.status]) || (a.b.dl-b2.b.dl));
+  const fin = rows.filter(r=>r.plan.kind==='units' && r.plan.goalToday>0 && r.plan.remaining<=0).length;
+  const withGoal = rows.filter(r=>r.plan.kind==='units' && r.plan.goalToday>0).length;
+  return `<div class="section-title" style="margin-top:2px"><span>${ro ? who+"'s plan for today" : "Today's plan"}</span><span style="font-size:11px;font-weight:700;color:var(--text-faint)">${withGoal ? fin+' of '+withGoal+' done' : ''}</span></div>
+  <div class="card" style="padding:4px 14px;margin-bottom:14px">
+    ${rows.map(({t,b,plan})=>{
+      const pct = plan.kind==='units' && plan.goalToday>0 ? Math.min(100, Math.round(plan.doneToday/plan.goalToday*100)) : null;
+      const done = pct !== null && plan.remaining <= 0;
+      const paper = t.paperId ? paperById(t.paperId).nick : 'General';
+      return `<div style="padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openTargetDetail('${t.id}'${ro?`,'${profileId}'`:''})">
+        <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+          <div style="min-width:0"><div style="font-size:12.5px;font-weight:800;overflow-wrap:anywhere">${done?'✓ ':''}${escChat(t.title)}</div>
+          <div style="font-size:11.5px;color:${done?'var(--good)':'var(--text-muted)'};margin-top:1px">${escChat(plan.text)}${plan.kind==='units' && plan.goalToday>0 ? ` · done ${tgFmt(plan.doneToday)}${plan.unitTxt}` : ''}${plan.kind==='mock' ? ' · '+escChat(plan.sub) : ''}</div></div>
+          <span class="mt-badge" style="--mt-color:${b.sd.meta.color};--mt-tint:${b.sd.meta.tint}">${paper}</span>
+        </div>
+        ${pct!==null ? `<div style="height:5px;border-radius:3px;background:var(--surface2);overflow:hidden;margin-top:7px"><div style="height:100%;width:${pct}%;background:${done?'var(--good)':b.sd.meta.color};border-radius:3px"></div></div>` : ''}
+        ${plan.items && plan.items.length ? `<div style="font-size:10.5px;color:var(--text-faint);margin-top:6px;line-height:1.5">${plan.items.map(x=>escChat(x)).join(' &nbsp;·&nbsp; ')}</div>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+// ── Same paper, same kind of target, both of you ──
+function targetCompareHtml(profileId, t){
+  const other = otherProfileId(profileId);
+  const mate = milestoneTargetsFor(other).find(x=>!x.completedAt && x.type===t.type && (x.paperId||'')===(t.paperId||''));
+  if(!mate || t.completedAt) return '';
+  const pair = [{pid:profileId, t}, {pid:other, t:mate}].map(({pid,t:tt})=>{
+    const b = targetBrief(pid, tt), prof = profileById(pid);
+    const pct = tt.targetValue > 0 ? Math.max(0, Math.min(100, Math.round(b.sd.currentValue/tt.targetValue*100))) : 0;
+    const proj = targetProjection(pid, tt, b);
+    return {pid, prof, tt, b, pct, proj, mine: pid===S.local.myProfile};
+  });
+  const [a, c] = pair;
+  const lead = a.pct === c.pct ? 'Neck and neck.' : (a.pct > c.pct ? `${a.prof.nick} is ahead by ${a.pct-c.pct}% of goal.` : `${c.prof.nick} is ahead by ${c.pct-a.pct}% of goal.`);
+  const col = p => `
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:800;color:var(--${p.prof.color})">${p.prof.nick}${p.mine?' (you)':''}</div>
+      <div style="font-size:20px;font-weight:800;margin:2px 0 6px;font-variant-numeric:tabular-nums">${p.pct}%<span style="font-size:10px;font-weight:600;color:var(--text-faint)"> of goal</span></div>
+      <div style="height:7px;border-radius:4px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:${p.pct}%;background:var(--${p.prof.color});border-radius:4px"></div></div>
+      <div style="font-size:10.5px;color:var(--text-muted);line-height:1.6;margin-top:7px">
+        <div>${p.b.doneTxt}</div>
+        <div>${p.b.mock ? 'Next: '+escChat(p.b.mock.nextTxt) : (p.b.pace>0 ? tgFmt(p.b.pace)+(p.b.noun?' '+p.b.noun:'')+'/day' : 'no recent pace')}</div>
+        <div>${p.b.completed ? 'done' : (p.b.dl>=0 ? p.b.dl+' '+tgPlural(p.b.dl,'day')+' left' : -p.b.dl+' days overdue')} · <span style="color:${p.b.sd.meta.color}">${p.b.sd.meta.label}</span></div>
+        ${p.proj && p.proj.likely ? `<div>finish ~${fmtShortDate(p.proj.likely.date)}</div>` : ''}
+      </div>
+    </div>`;
+  const paper = t.paperId ? paperById(t.paperId).nick+' · ' : '';
+  return `<div class="section-title" style="margin-top:4px"><span>You vs ${profileById(other).nick}</span></div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px">${paper}${targetTypeInfo(t.type).short} — you both have this target.</div>
+    <div style="display:flex;gap:16px">${col(a)}${col(c)}</div>
+    <div style="font-size:12px;font-weight:700;text-align:center;margin-top:10px">${lead}</div>
+  </div>`;
+}
+// ── Exam readiness: every paper against the exam date ──
+function readinessBuffer(){ const pr = (S.shared.prefs && S.shared.prefs[S.local.myProfile]) || {}; return [30,45,60,75].includes(pr.readinessBuffer) ? pr.readinessBuffer : 45; }
+function setReadinessBuffer(n){ const pr = homePrefsMut(); if(!pr) return; pr.readinessBuffer = n; saveShared(); renderTargetsPopup(); }
+function openTargetsReadiness(){ S.targetsView = 'readiness'; renderTargetsPopup(); }
+function tgLecturePace14(profileId, paperId){
+  const today = todayStr();
+  const n = (lecturesFor(profileId, paperId)||[]).filter(l=>{ if(l.status!=='done' || !l.completionDate) return false; const g = daysBetweenDates(l.completionDate, today); return g>=0 && g<=13; }).length;
+  return n/14;
+}
+function readinessData(profileId){
+  const today = todayStr(), exam = S.shared.examDate, daysToExam = daysBetweenDates(today, exam), buffer = readinessBuffer();
+  const lecDeadline = tgAddDays(exam, -buffer), daysToLecDeadline = daysBetweenDates(today, lecDeadline);
+  const other = otherProfileId(profileId);
+  const rows = PAPERS.map(p=>{
+    const c = paperComponents(profileId, p.id), co = paperComponents(other, p.id);
+    const left = Math.max(0, c.lecTotal - c.done);
+    const pace = c.usesLectureTracker ? tgLecturePace14(profileId, p.id) : null;
+    let finish = null, state = 'none';
+    if(c.lecTotal > 0 && left === 0){ state = 'done'; }
+    else if(c.lecTotal > 0 && pace > 0){
+      const days = Math.ceil(left/pace); finish = {days, date: targetDateFromToday(days), diff: days - daysToLecDeadline, afterExam: days > daysToExam};
+      state = finish.afterExam ? 'late' : (finish.diff <= 0 ? 'ok' : 'tight');
+    } else if(c.lecTotal > 0) state = c.usesLectureTracker ? 'nopace' : 'untracked';
+    const needPerDay = left > 0 && daysToLecDeadline > 0 ? left/daysToLecDeadline : (left>0 ? left : 0);
+    return {p, c, co, left, pace, finish, state, needPerDay};
+  }).filter(r=>r.c.lecTotal>0 || r.c.total>0);
+  const trackedRows = rows.filter(r=>r.c.usesLectureTracker && r.c.lecTotal>0); // chapter-tracked papers have no dates, so no pace: they stay out of the forecast
+  const untrackedLeft = rows.filter(r=>!r.c.usesLectureTracker).reduce((a,r)=>a+r.left,0);
+  const totalLeft = trackedRows.reduce((a,r)=>a+r.left,0);
+  const trackedPace = trackedRows.reduce((a,r)=>a+(r.pace||0),0);
+  const needAll = totalLeft > 0 && daysToLecDeadline > 0 ? totalLeft/daysToLecDeadline : 0;
+  let allFinish = null;
+  if(totalLeft > 0 && trackedPace > 0){ const days = Math.ceil(totalLeft/trackedPace); allFinish = {days, date: targetDateFromToday(days), diff: days - daysToLecDeadline, afterExam: days > daysToExam}; }
+  return {today, exam, daysToExam, buffer, lecDeadline, daysToLecDeadline, rows, totalLeft, untrackedLeft, trackedPace, needAll, allFinish};
+}
+function targetsReadinessHtml(profileId){
+  const R = readinessData(profileId), ro = profileId !== S.local.myProfile, prof = profileById(profileId), other = profileById(otherProfileId(profileId));
+  const chip = {ok:['On course','var(--good)'], tight:['Tight','var(--amber)'], late:['After exam','var(--bad)'], nopace:['No pace yet','var(--text-faint)'], done:['Lectures done','var(--good)'], untracked:['Not date-tracked','var(--text-faint)'], none:['—','var(--text-faint)']};
+  let head;
+  if(R.daysToExam < 0) head = `The exam date (${fmtShortDate(R.exam)}) has passed. Update it in Settings.`;
+  else if(R.totalLeft === 0) head = `All lectures are done. ${R.daysToExam} days to the exam — it's revision time.`;
+  else if(R.allFinish){
+    const f = R.allFinish;
+    head = f.afterExam ? `At the current pace the remaining lectures would run past the exam.`
+      : (f.diff <= 0 ? `At ${tgFmt(R.trackedPace)} lectures/day all remaining lectures finish around <b>${fmtShortDate(f.date)}</b> — ${-f.diff} ${tgPlural(-f.diff,'day')} before the ${R.buffer}-day revision window opens.`
+      : `At ${tgFmt(R.trackedPace)} lectures/day all remaining lectures finish around <b>${fmtShortDate(f.date)}</b> — ${f.diff} ${tgPlural(f.diff,'day')} into the ${R.buffer}-day revision window.`);
+  } else head = `No lecture progress in the last 14 days, so there is no pace to project from yet.`;
+  const gauge = (pct, color) => `<div style="height:7px;border-radius:4px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:${Math.max(0,Math.min(100,pct))}%;background:${color};border-radius:4px"></div></div>`;
+  return `
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:11px;color:var(--text-faint)">${ro ? prof.nick+"'s" : 'Your'} readiness for CA Final · ${fmtShortDate(R.exam)}</div>
+    <div class="mt-ptiles" style="margin:10px 0">
+      ${tgTile(R.daysToExam>=0 ? R.daysToExam : '—', 'days to exam')}${tgTile(R.totalLeft, 'dated lectures left')}${tgTile(R.needAll>0 ? tgFmt(R.needAll) : '—', 'need/day for '+R.buffer+'d buffer', R.needAll>R.trackedPace && R.needAll>0 ? 'var(--bad)' : '')}
+    </div>
+    <div style="font-size:12.5px;line-height:1.55">${head}</div>
+    ${ro ? '' : `<div class="mt-lbl" style="margin-top:12px">Revision window kept before the exam</div>
+    <div class="mt-chips">${[30,45,60,75].map(n=>`<button type="button" class="mt-chip${n===R.buffer?' active':''}" onclick="setReadinessBuffer(${n})">${n} days</button>`).join('')}</div>`}
+    <div class="mt-note">Lectures should be finished by ${fmtShortDate(R.lecDeadline)} to leave that window.${R.untrackedLeft>0 ? ' The forecast covers papers whose lectures are tracked by date; the others are tracked by chapter.' : ''}</div>
+  </div>
+  ${R.rows.map(r=>{
+    const c = r.c, st = chip[r.state];
+    const bar = c.lecTotal>0 ? Math.round(c.done/c.lecTotal*100) : c.lecPct;
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="font-weight:800;font-size:13px">${r.p.code} · ${r.p.nick}</div>
+        <span class="mt-badge" style="--mt-color:${st[1]};--mt-tint:var(--surface2)">${st[0]}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin:9px 0 4px"><span>Lectures <b style="color:var(--text)">${c.done}/${c.lecTotal}</b></span><span style="color:var(--${other.color})">${other.nick} ${r.co.lecTotal>0 ? Math.round(r.co.done/r.co.lecTotal*100) : r.co.lecPct}%</span></div>
+      ${gauge(bar, 'var(--'+prof.color+')')}
+      <div style="display:flex;gap:10px;font-size:10.5px;color:var(--text-faint);margin-top:8px;flex-wrap:wrap"><span>Rev 1 <b style="color:var(--text-muted)">${c.rev1Pct}%</b></span><span>Rev 2 <b style="color:var(--text-muted)">${c.rev2Pct}%</b></span><span>Practice <b style="color:var(--text-muted)">${c.practicePct}%</b></span><span>Mock avg <b style="color:var(--text-muted)">${c.mockAvg}%</b></span><span style="margin-left:auto">Prep <b style="color:var(--text)">${c.prepScore}%</b></span></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">${
+        r.state==='done' ? 'All lectures are done.' :
+        r.finish ? `${tgFmt(r.pace)}/day recently → finish ~${fmtShortDate(r.finish.date)}${r.finish.afterExam ? ' (after the exam)' : ''}. To finish by ${fmtShortDate(R.lecDeadline)} you need ${tgFmt(r.needPerDay)}/day.` :
+        r.state==='nopace' ? `No lectures completed in the last 14 days. To finish by ${fmtShortDate(R.lecDeadline)} you need ${tgFmt(r.needPerDay)}/day.` :
+        r.state==='untracked' ? 'This paper is tracked by chapter, not by dated lectures, so there is no pace to project.' : ''}</div>
+    </div>`;
+  }).join('')}
+  <div class="mt-note" style="text-align:center">Pace = lectures finished in the last 14 days ÷ 14. Revision and practice have no dates, so they show progress only.</div>`;
+}
+
 // Summary strip at the top of the Targets page (this is the Targets page, not Home).
 function targetsOverviewHtml(profileId){
   const all = milestoneTargetsFor(profileId);
@@ -8682,11 +9353,12 @@ function renderTargetsPopup(){
   // create / edit are always about my own targets; everything else follows the Mangu | Chinnu switch
   const profileId = (view==='create' || view==='edit') ? me : targetsProfileId();
   const ro = profileId !== me, otherNick = profileById(profileId).nick;
-  const titles = {dashboard: ro ? otherNick+"'s targets" : 'Targets', create:'New target', edit:'Edit target', detail: ro ? otherNick+"'s target" : 'Target', history: ro ? otherNick+"'s completed" : 'Completed'};
+  const titles = {dashboard: ro ? otherNick+"'s targets" : 'Targets', create:'New target', edit:'Edit target', detail: ro ? otherNick+"'s target" : 'Target', history: ro ? otherNick+"'s completed" : 'Completed', readiness:'Exam readiness'};
   const body = view==='create' ? targetFormHtml(profileId, null, S.targetsDraft)
     : view==='edit' ? (targetById(profileId, S.targetEditId) ? targetFormHtml(profileId, targetById(profileId, S.targetEditId)) : emptyState('🎯','This target no longer exists.'))
     : view==='detail' ? targetDetailHtml(profileId, S.targetDetailId)
     : view==='history' ? targetHistoryHtml(profileId)
+    : view==='readiness' ? targetsReadinessHtml(profileId)
     : targetsDashboardHtml(profileId);
   const _prevScroll = document.getElementById('targets-scroll'), _viewKey = view+'|'+profileId+'|'+(S.targetDetailId||'');
   const _keepTop = (_prevScroll && S._tgViewKey === _viewKey) ? _prevScroll.scrollTop : 0; // a redraw of the same page (partner's data arrived) keeps your place
@@ -9206,7 +9878,9 @@ function startBackgroundPoll(){
           // away and back, even though the underlying data was already refreshed here.
           if(S.view==='home' || S.view==='timer') renderApp();
           // v134: the Targets page (when open on a list / detail, never on a form being typed into) shows the other person's targets too
-          if(S.targetsPopupOpen && ['dashboard','detail','history'].includes(S.targetsView||'dashboard')) renderTargetsPopup();
+          if(S.targetsPopupOpen && ['dashboard','detail','history','readiness'].includes(S.targetsView||'dashboard')) renderTargetsPopup();
+          // v136: her Diary, when you are looking at it (read-only, so a redraw can never eat anything you typed)
+          if(S.diaryPopupOpen && S.viewingProfile !== S.local.myProfile && !S.diaryCloseDayActive) renderDiaryPage();
           // Persist what was just merged — this was missing before, and mattered a lot more
           // than it looks like it should: mergeChatFromRemote()/mergeTimerStateFromRemote()
           // only mutate S.shared in memory, so a successful merge here (e.g. picking up the
@@ -9359,7 +10033,11 @@ function chatStatusInfo(otherId){
 // longer deletes the partner's (it remembers a dead endpoint on its own device instead -- see sendPush()).
 const SINGLE_OWNER_SHARED_KEYS = ['logs','targets','chapters','lectures','mockScores','tasks',
   'profileInfo','dailyTargetOverride','prefs','celebratedMilestones','habits','habitLog',
-  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','dailyQuote','pushSubscriptions','pushPrefs'];
+  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','dailyQuote','pushSubscriptions','pushPrefs',
+  'diaryMood','diaryReflections','dailyChallenges','dcState'];
+// v136: the Diary's reflections (and the mistakes log inside them) and the daily-challenge records are each person's own too, but were
+// never registered here, so a partner's save made from a stale copy could roll back a diary entry you had just written, and her diary
+// view on your phone only updated when you reopened the app. Same protection as the other per-person data now.
 // v124: 'dailyQuote' added -- each profile writes only its own motivation, and without this the partner's phone could re-upload a stale
 // copy of it, wiping today's message and triggering a second generation.
 // milestoneTargets was missing from this list entirely — the rebuilt Targets page (see its
@@ -9398,7 +10076,9 @@ function refreshOtherProfileDataFromRemote(freshRemote){
     const lecSig = Object.entries((S.shared.lectures||{})[other]||{}).map(([p,ls])=>p+'='+(ls||[]).filter(l=>l.status==='done').length+'/'+(ls||[]).length).join(',');
     // v134: her targets are readable on my Targets page / Home, so a change to them counts too
     const tgSig = ((S.shared.milestoneTargets||{})[other]||[]).map(t=>[t.id,t.title,t.deadline,t.targetValue,t.unit,t.completedAt,t.manualProgress,t.paperId,t.type].join('~')).join('|');
-    return L.length+':'+h.toFixed(4)+':'+c+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], ((S.shared.dailyQuote||{})[other]||{}).text, lecSig, ((S.shared.prefs||{})[other]||{}).homeLecturePaper, tgSig]);
+    // v136: her Diary (closed days, mistakes log) is readable on my phone too
+    const dgSig = JSON.stringify(((S.shared.diaryReflections||{})[other])||{}).length+':'+JSON.stringify(((S.shared.diary||{})[other])||{}).length;
+    return L.length+':'+h.toFixed(4)+':'+c+'|'+dgSig+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], ((S.shared.dailyQuote||{})[other]||{}).text, lecSig, ((S.shared.prefs||{})[other]||{}).homeLecturePaper, tgSig]);
   };
   const before = slice();
   SINGLE_OWNER_SHARED_KEYS.forEach(key=>{

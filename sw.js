@@ -199,7 +199,13 @@
 //   Nothing was added to Home. Index.html only.
 // v135: Targets follow the Mangu | Chinnu switch at the top of the app, like Diary / Timer / Planner: view the other profile, then Features -> Targets shows THEIR
 //   targets (read-only). The extra switch inside the Targets page from v134 is removed. Index.html only.
-const CACHE_VERSION = 'olympus-v135';
+// v136: TARGETS + DIARY. Targets: new target types (study hours, mock-score average); "Today's plan" (what to do today per target, plus a Sunday checkpoint);
+//   cards with a 14-day sparkline; finish forecasts with a likely range and a risk level; exact day-by-day history for lecture / hours / mock targets;
+//   You-vs-partner comparison when you both have the same target on the same paper; an Exam readiness page (every paper against the exam date, with a
+//   revision-window setting). Diary: 5-week heatmap with closed-day streak, a Mistakes & learnings log with a revisit list (send to the Planner / mark fixed),
+//   and auto-drafted "went well / went wrong" suggestions from the day's data. The Diary's reflections and the daily-challenge records are now protected from a
+//   partner's simultaneous save like the other per-person data, and her Diary refreshes on your phone by itself. Index.html only.
+const CACHE_VERSION = 'olympus-v136';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
