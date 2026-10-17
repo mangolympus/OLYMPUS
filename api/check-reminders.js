@@ -173,6 +173,13 @@ function buildReminderReasons(data, profileId, todayIST) {
   // Unlike the four reasons above (whose in-app-banner toggles live client-side only and
   // never reach this job), habit reminders are a pushPrefs entry, which DOES sync to Drive —
   // so this is the one reason here that can actually honour an off switch.
+  // v139: today's diary is reminded here (9 PM, while there's still time to write it) now that the midnight diary cron's slot is the
+  // morning job (check-morning.js). Same strictness as the app: only a CLOSED day counts as filled; honours the diaryReminder switch.
+  const diaryPrefOff = data.pushPrefs && data.pushPrefs[profileId] && data.pushPrefs[profileId].diaryReminder === false;
+  const todayRefl = data.diaryReflections && data.diaryReflections[profileId] && data.diaryReflections[profileId][todayIST];
+  if (!diaryPrefOff && !(todayRefl && todayRefl.closedAt) && hoursOnDate(data, profileId, todayIST) > 0) {
+    reasons.push({ title: "Today's diary isn't filled yet", body: 'Close Day from the Diary tab before you sleep.' });
+  }
   const habitPrefOff = data.pushPrefs && data.pushPrefs[profileId] && data.pushPrefs[profileId].habitReminder === false;
   if (!habitPrefOff) reasons.push(...habitsIncompleteReasons(data, profileId, todayIST));
   return reasons;
@@ -331,7 +338,9 @@ export default async function handler(req, res) {
         data: { url: './' },
       });
       try {
-        await webpush.sendNotification(subscription, payload);
+        // v139: urgency 'high' + a TTL -- with the default (normal) Android's Doze mode can hold a push back for a long time, which was the
+        // "reminder came late" symptom; the TTL makes a stale one expire instead of arriving hours later.
+        await webpush.sendNotification(subscription, payload, { urgency: 'high', TTL: 14400 });
         remindedToday.push(profileId);
         dirty = true;
         result.sent.push({ profileId, reasons: reasons.map((r) => r.title) });
