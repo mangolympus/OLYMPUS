@@ -214,7 +214,15 @@
 //   Strict Countdown) shows a "Close yesterday's diary first" popup with a button that opens yesterday's page, and the Timer page shows a notice above the Start
 //   button. Closing the day unlocks it straight away. Running sessions, pause / resume / stop and manual logging are untouched; an account with no history is never
 //   blocked. Index.html only.
-const CACHE_VERSION = 'olympus-v138';
+// v139: notifications + celebrations + statistics.
+//   * Reminders arrived late because the app only evaluated them when Home happened to redraw, and the server pushed just once a day (9 PM) at normal urgency (Android Doze delays those).
+//     The open app now re-checks every minute / on return to the foreground; server reminder pushes are high-urgency with a TTL; new api/check-morning.js (Vercel's own daily cron, ~8 AM IST, replaces the midnight
+//     diary cron) sends the Monday weekly review and "close yesterday's diary to unlock your timer"; today's diary joins the 9 PM reminder. No external scheduler. Reminder pushes carry a tag (replace, not stack) and stay until tapped;
+//     tapping the weekly review opens Statistics (OPEN_GO message / ?go=stats).
+//   * Celebration glitches: daily target + minimum hours celebrated twice at once; boot celebrated the PARTNER's finished targets on your screen; celebrations fired under the splash
+//     screen or in a background tab; a reopened target never celebrated again; stale shared stamps could repeat a celebration. One queue, owner-only, device-local stamps now.
+//   * Statistics overview rebuilt in plain language (week vs last week, what needs attention, per-paper status, time use, mocks); the old detailed page is folded underneath.
+const CACHE_VERSION = 'olympus-v139';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
@@ -383,6 +391,11 @@ self.addEventListener('push', (event) => {
       data,
       vibrate: [120, 60, 120],
     };
+    // v139: reminder pushes (weekly review, nudges, diary...) carry their own tag so a re-send replaces rather than stacks, and stay on screen until tapped.
+    if (!isChat) {
+      if (payload.tag || data.tag) options.tag = payload.tag || data.tag;
+      if (data.kind === 'reminder' || data.kind === 'weekly') { options.requireInteraction = true; options.renotify = !!options.tag; }
+    }
     if (isChat) {
       let count = 1;
       try {
@@ -435,6 +448,7 @@ self.addEventListener('notificationclick', (event) => {
         if (client.url.includes(self.registration.scope) && 'focus' in client) {
           // A chat notification lands in the chat itself, not on whatever screen was open.
           if (isChat) client.postMessage({ type: 'OPEN_CHAT' });
+          else if (nData.go) client.postMessage({ type: 'OPEN_GO', go: nData.go });
           return client.focus();
         }
       }

@@ -2201,10 +2201,32 @@ function showMilestoneToast(text){
   document.body.appendChild(t);
   setTimeout(()=>t.remove(), 3100);
 }
+// v139: celebrations go through ONE queue. Before, every call fired confetti + a toast straight away, so (a) two that happened together
+// (the daily target and the minimum-hours line are usually the same number) drew two toasts on top of each other, (b) one fired while the
+// splash / sign-in screen was still covering the app (z-index 1000) played to nobody, and (c) one fired while the tab was in the
+// background ran its 3 s animation unseen. Now: they wait for a visible, uncovered app, play one at a time, and an identical line
+// is never queued twice.
+const _celebQ = [];
+let _celebBusy = false, _celebLastText = '', _celebLastAt = 0;
 function celebrateMilestone(text){
+  text = String(text||'').trim(); if(!text) return;
+  if(_celebQ.includes(text)) return;
+  if(text===_celebLastText && Date.now()-_celebLastAt < 8000) return;
+  _celebQ.push(text);
+  pumpCelebrations();
+}
+function pumpCelebrations(){
+  if(_celebBusy || !_celebQ.length) return;
+  const covered = !!document.querySelector('.splash-overlay, .login-screen');
+  if(document.hidden || covered){ setTimeout(pumpCelebrations, 700); return; }
+  _celebBusy = true;
+  const text = _celebQ.shift();
+  _celebLastText = text; _celebLastAt = Date.now();
   fireConfetti();
   showMilestoneToast(text);
+  setTimeout(()=>{ _celebBusy = false; pumpCelebrations(); }, 3300);
 }
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pumpCelebrations(); });
 function emptyState(icon, text){
   return `<div class="placeholder-note"><div class="big">${icon}</div>${text}</div>`;
 }
@@ -3163,7 +3185,7 @@ function freshDtLectures(profileId){
 }
 function buildDefaultLocal(){
   return { myProfile:null, palette:null, dark:true, skipIntro:false,
-    notifPrefs:{lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true},
+    notifPrefs:{lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true, weekly:true},
     celebratedMilestones:{}, allowedEmails:[], dismissedNotifs:{},
     bgTheme:'snow', lastArchiveSweepDate:null, lastTaskRolloverDate:null, pushedNotifDate:null, pushedNotifKeys:{} };
 }
@@ -3513,6 +3535,7 @@ async function loadShared(){
 // the timer heartbeat uses this (see startBackgroundPoll) — every other caller wants the
 // normal save-then-sync behaviour and can keep calling saveShared() with no arguments.
 async function saveShared(data, opts){
+  try{ scheduleTargetCheck(); }catch(e){}
   try{
     await storageSet('olympusData', JSON.stringify(data || S.shared), true);
     S.lastSavedAt = new Date();
@@ -3550,10 +3573,11 @@ async function loadLocal(){
     const res = await storageGet('olympusLocal', false);
     if(res && res.value){
       const parsed = JSON.parse(res.value);
-      if(!parsed.notifPrefs) parsed.notifPrefs = {lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true};
+      if(!parsed.notifPrefs) parsed.notifPrefs = {lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true, weekly:true};
       if(parsed.notifPrefs.countdownNag===undefined) parsed.notifPrefs.countdownNag = true;
       if(parsed.notifPrefs.targets===undefined) parsed.notifPrefs.targets = true;
       if(parsed.notifPrefs.diary===undefined) parsed.notifPrefs.diary = true;
+      if(parsed.notifPrefs.weekly===undefined) parsed.notifPrefs.weekly = true;
       // dark was saved (default false) back when it was pure dead code — applyTheme() ignored
       // it and always forced dark mode regardless. Now that it's real, a stored false from
       // that era would wrongly read as "chose Day mode" on the very first load after this
@@ -7723,6 +7747,9 @@ function targetStatusData(profileId, target){
 // the same dedupe store checkMilestones() already uses elsewhere, under a 'target:' key.
 function checkTargetCompletion(profileId, target, statusData){
   if(target.completedAt) return;
+  // v139: only the owner's own phone decides that a target is finished. The boot pass used to run this for BOTH people, so Chinnu's
+  // finished target popped confetti on Umang's screen (and stamped her target from his phone, racing her own device).
+  if(profileId !== S.local.myProfile) return;
   if(statusData.currentValue < statusData.goal) return;
   target.completedAt = todayStr();
   if(!S.shared.celebratedMilestones) S.shared.celebratedMilestones = {};
@@ -7731,10 +7758,36 @@ function checkTargetCompletion(profileId, target, statusData){
   const key = 'target:'+target.id;
   if(!seen[key]){
     seen[key] = true;
+    // A target that was already met the moment it was created (e.g. 100% of a paper you had finished) was never worked towards:
+    // no party for it, just mark it done.
+    if(Date.now() - (target.createdAt||0) < 120000) return;
     const early = daysBetweenDates(todayStr(), target.deadline);
     const when = early>0 ? `${early} day${early>1?'s':''} early` : (early<0 ? `${-early} day${-early>1?'s':''} late` : 'right on schedule');
     celebrateMilestone(`${target.title} — completed ${when}!`);
+    notifyPartnerTargetDone(profileId, target);
   }
+}
+// v139: the other person hears about it too (their "target hit" switch in Settings -> Push controls this).
+function notifyPartnerTargetDone(profileId, target){
+  try{
+    if(profileId==='umang' && umangHasBlocked()) return;
+    const other = otherProfileId(profileId);
+    if(!pushPrefEnabled(other, 'targetHit')) return;
+    const prof = profileById(profileId);
+    sendPush(other, `🏁 ${prof.nick} completed a target`, String(target.title||'').slice(0,100), {url:'./', kind:'target', ts:Date.now()}, {urgency:'normal', ttl:86400});
+  }catch(e){}
+}
+// A target that becomes active again (goal raised, or reopened) must be able to celebrate again when it is finished the second time.
+function forgetTargetCelebration(profileId, targetId){
+  const seen = S.shared.celebratedMilestones && S.shared.celebratedMilestones[profileId];
+  if(seen) delete seen['target:'+targetId];
+}
+// v139: targets are re-checked a moment after ANY save, not only when Home/Targets happens to redraw -- so finishing the last lecture or
+// logging the last hour celebrates right then. Debounced; refreshAllTargets() is idempotent and only saves if something changed.
+let _tgCheckTimer = null;
+function scheduleTargetCheck(){
+  if(_tgCheckTimer || !(S.local && S.local.myProfile) || !S.appSession) return;
+  _tgCheckTimer = setTimeout(()=>{ _tgCheckTimer = null; try{ refreshAllTargets(S.local.myProfile); }catch(e){ console.warn('[Targets] check failed', e); } }, 1200);
 }
 // Pass over every target once per render, refreshing snapshots and catching newly-completed
 // ones. Cheap (O(targets × chapters)) and idempotent, so calling it liberally is fine.
@@ -8460,7 +8513,7 @@ function submitEditTarget(profileId, targetId){
   // so pace starts over from today rather than mixing two different measures.
   if(measureChanged) t.progressLog = [];
   // A finished target whose goal was raised past what's done becomes active again; otherwise it just stays finished.
-  if(t.completedAt && targetCurrentValue(profileId, t) < t.targetValue) t.completedAt = null;
+  if(t.completedAt && targetCurrentValue(profileId, t) < t.targetValue){ t.completedAt = null; forgetTargetCelebration(profileId, t.id); }
   try{ ensureTargetSnapshot(profileId, t); }catch(err){ console.warn('[Targets] snapshot error on edit:', err); }
   try{ checkTargetCompletion(profileId, t, targetStatusData(profileId, t)); }catch(err){ console.warn('[Targets] completion check error on edit:', err); }
   saveShared();
@@ -8512,12 +8565,14 @@ function quickCreateTargetForDate(profileId, dateStr){
 function completeTargetNow(profileId, targetId){
   const t = targetById(profileId, targetId); if(!t || t.completedAt) return;
   t.completedAt = todayStr(); t.updatedAt = Date.now();
+  const _seen = ((S.shared.celebratedMilestones = S.shared.celebratedMilestones||{})[profileId] = S.shared.celebratedMilestones[profileId]||{});
+  if(!_seen['target:'+t.id] && profileId===S.local.myProfile){ _seen['target:'+t.id] = true; celebrateMilestone(`${t.title} — marked complete!`); notifyPartnerTargetDone(profileId, t); }
   saveShared(); renderTargetsPopup(); showToast('Target marked complete.');
 }
 function reopenTarget(profileId, targetId){
   const t = targetById(profileId, targetId); if(!t) return;
   if(targetCurrentValue(profileId, t) >= t.targetValue){ showToast('The goal is already met. Raise the goal under Edit to keep it open.'); return; }
-  t.completedAt = null; t.updatedAt = Date.now();
+  t.completedAt = null; t.updatedAt = Date.now(); forgetTargetCelebration(profileId, t.id);
   saveShared(); renderTargetsPopup(); showToast('Target reopened.');
 }
 function extendTargetDeadline(profileId, targetId, days){
@@ -10204,6 +10259,7 @@ function openChatFromNotification(){
 function applyPendingOpenFromUrl(){
   try{
     const params = new URLSearchParams(location.search);
+    if(params.get('go') === 'stats'){ history.replaceState(null, '', location.pathname); openWeeklyReview(); return; }
     if(params.get('open') !== 'chat') return;
     history.replaceState(null, '', location.pathname);
     openChatFromNotification();
@@ -11593,6 +11649,7 @@ const NOTIF_ICONS = {
   book:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>',
   flag:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 011-1h13l-3 5 3 5H6"/></svg>',
   megaphone:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   diary:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
 };
 function computeNotifications(profileId){
@@ -11600,7 +11657,7 @@ function computeNotifications(profileId){
   const out = [];
   if(prefs.lectures){
     const overdue = autoTasksFor(profileId).length;
-    if(overdue>0) out.push({type:'warn', ic:'book', title:`${overdue} lecture${overdue>1?'s':''} past target date`, text:'Check the Planner tab to mark them done or reschedule.'});
+    if(overdue>0) out.push({id:'lectures-overdue', type:'warn', ic:'book', title:`${overdue} lecture${overdue>1?'s':''} past target date`, text:'Check the Planner tab to mark them done or reschedule.'});
   }
   if(prefs.revision){
     let awaitingR1=0, awaitingR2=0;
@@ -11610,8 +11667,8 @@ function computeNotifications(profileId){
         if(c.rev1 && !c.rev2) awaitingR2++;
       });
     });
-    if(awaitingR1>0) out.push({type:'info', ic:'clock', title:`${awaitingR1} chapter${awaitingR1>1?'s':''} awaiting 1st revision`, text:'Lecture done, revision not started yet.'});
-    if(awaitingR2>0) out.push({type:'info', ic:'clock', title:`${awaitingR2} chapter${awaitingR2>1?'s':''} awaiting 2nd revision`, text:'First revision done — keep the cycle going.'});
+    if(awaitingR1>0) out.push({id:'rev1', type:'info', ic:'clock', title:`${awaitingR1} chapter${awaitingR1>1?'s':''} awaiting 1st revision`, text:'Lecture done, revision not started yet.'});
+    if(awaitingR2>0) out.push({id:'rev2', type:'info', ic:'clock', title:`${awaitingR2} chapter${awaitingR2>1?'s':''} awaiting 2nd revision`, text:'First revision done — keep the cycle going.'});
   }
   if(prefs.dailyTarget){
     const target = effectiveTodayTarget(profileId);
@@ -11620,11 +11677,14 @@ function computeNotifications(profileId){
     // Evening OR the 12 AM–5 AM tail end of the study day (still "today" under the 5 AM
     // boundary) — otherwise this nudge would go silent for exactly the hours when the
     // study day is actually about to close out.
-    if((hour>=18 || hour<5) && done < target) out.push({type:'warn', ic:'clock', title:`${(target-done).toFixed(1)}h left on today's target`, text:'Log a session before the day closes out.'});
+    // v139: the key is now fixed per reminder (id), not built from the title -- the title carries the hours left, so every log made a "new"
+    // reminder and re-notified. Also a gentler afternoon nudge when nothing at all is logged by 1 PM, instead of silence until 6 PM.
+    if((hour>=18 || hour<5) && done < target) out.push({id:'daily-target-evening', tag:'olympus-nudge-'+todayStr()+'-evening', type:'warn', ic:'clock', title:`${(target-done).toFixed(1)}h left on today's target`, text:'Log a session before the day closes out.'});
+    else if(hour>=13 && hour<18 && done===0) out.push({id:'daily-target-afternoon', tag:'olympus-nudge-'+todayStr()+'-afternoon', type:'info', ic:'clock', title:'Nothing logged yet today', text:`Target is ${target}h. One focused session gets the day moving.`});
   }
   if(prefs.examCountdown){
     const d = daysUntilExam();
-    if(d<=30 && d>=0) out.push({type:'warn', ic:'flag', title:`${d} days to the exam`, text:'Final stretch — prioritise revision and mocks.'});
+    if(d<=30 && d>=0) out.push({id:'exam-countdown', type:'warn', ic:'flag', title:`${d} days to the exam`, text:'Final stretch — prioritise revision and mocks.'});
   }
   if(prefs.targets){
     out.push(...computeTargetNotifications(profileId));
@@ -11643,19 +11703,41 @@ function computeNotifications(profileId){
     const todayUnfilled = (hour>=18 || hour<5) && diaryDayStatus(profileId, today).diaryState!=='closed';
     const yestUnfilled = diaryDayStatus(profileId, yesterday).diaryState!=='closed';
     if(todayUnfilled && yestUnfilled){
-      out.push({type:'warn', ic:'diary', title:"Diary not filled for today or yesterday", text:'Close Day for both from the Diary tab — it only takes a minute.'});
+      out.push({id:'diary-both', type:'warn', ic:'diary', title:"Diary not filled for today or yesterday", text:'Close Day for both from the Diary tab — it only takes a minute.'});
     } else if(todayUnfilled){
-      out.push({type:'warn', ic:'diary', title:"Today's diary isn't filled yet", text:'Close Day from the Diary tab before you sleep.'});
+      out.push({id:'diary-today', type:'warn', ic:'diary', title:"Today's diary isn't filled yet", text:'Close Day from the Diary tab before you sleep.'});
     } else if(yestUnfilled){
-      out.push({type:'warn', ic:'diary', title:"Yesterday's diary was never filled", text:'Close Day for it from the Diary tab whenever you get a moment.'});
+      out.push({id:'diary-yesterday', type:'warn', ic:'diary', title:"Yesterday's diary was never filled", text:'Close Day for it from the Diary tab whenever you get a moment.'});
     }
   }
+  if(prefs.weekly!==false){
+    const wn = weeklyReviewNotification(profileId);
+    if(wn) out.push(wn);
+  }
   return out;
+}
+// v139: every Monday (study day) a card + a device notification: "last week in numbers -- go and look at the statistics". Built from the same
+// numbers as the Statistics page. It stays until dismissed or until Tuesday 5 AM; one per Monday (the id carries the date).
+function weeklyReviewData(profileId){
+  const wk = statsWeek(profileId, 1), pw = statsWeek(profileId, 2);
+  const diff = Number((wk.total - pw.total).toFixed(1));
+  return {wk, pw, diff, line:`${statsFmtH(wk.total)} last week (${diff>0?'+':''}${statsFmtH(diff)} vs the week before), studied ${wk.studied}/7 days, target met ${wk.hit} times.`};
+}
+function weeklyReviewNotification(profileId){
+  const today = todayStr();
+  if(new Date(today+'T00:00:00').getDay() !== 1) return null; // Monday only
+  const d = weeklyReviewData(profileId);
+  if(d.wk.total<=0 && d.pw.total<=0) return null;           // nothing to review yet
+  return {id:'weekly-review-'+today, type:'info', ic:'chart', title:'📊 Your week in numbers — time to review', text:d.line+' Open Statistics to see what needs attention.', act:'openWeeklyReview()', tag:'olympus-weekly-'+today};
+}
+function openWeeklyReview(){
+  try{ if(S.statsPopupOpen){ S.statsPaper=null; renderStatsPopup(); } else openStatsPopup(); }catch(e){}
 }
 // Stable per-notification key (profile + icon + type + slugified title) so a dismissal
 // can be persisted and matched back up on the next render, instead of just removing the
 // DOM node — which is why dismissals used to reappear after navigating away and back.
 function notifKey(profileId, n){
+  if(n.id) return `${profileId}:${n.ic}-${n.type}-${n.id}`;
   const slug = n.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
   return `${profileId}:${n.ic}-${n.type}-${slug}`;
 }
@@ -11669,7 +11751,7 @@ function renderNotifBanners(profileId){
   if(S.cloudStorageBroken){
     banners += `<div class="notif-banner warn"><span class="ic">${NOTIF_ICONS.clock}</span><div class="body"><b>Your last save didn't go through</b>There may be a connection issue — don't rely on sync right now. <span onclick="exportMyData()" style="text-decoration:underline;cursor:pointer;font-weight:700">Export a backup</span> to be safe.</div></div>`;
   }
-  banners += notifs.map(n=>`<div class="notif-banner ${n.type}" id="notif-${n.key}"><span class="ic">${NOTIF_ICONS[n.ic]}</span><div class="body"><b>${n.title}</b>${n.text}</div><button onclick="dismissNotif('${n.key}')" style="background:none;border:none;cursor:pointer;color:inherit;opacity:.6;font-size:14px;padding:0 2px;flex-shrink:0">✕</button></div>`).join('');
+  banners += notifs.map(n=>`<div class="notif-banner ${n.type}" id="notif-${n.key}"><span class="ic">${NOTIF_ICONS[n.ic]}</span><div class="body"${n.act?` onclick="${n.act}" style="cursor:pointer"`:''}><b>${n.title}</b>${n.text}</div><button onclick="dismissNotif('${n.key}')" style="background:none;border:none;cursor:pointer;color:inherit;opacity:.6;font-size:14px;padding:0 2px;flex-shrink:0">✕</button></div>`).join('');
   return banners;
 }
 // Feature 4 (In-App Reminders to Push Notifications): the first time a given reminder key
@@ -11680,6 +11762,7 @@ function renderNotifBanners(profileId){
 // never re-fires on every render just because renderNotifBanners() re-runs.
 function escalateNotifsToPush(notifs){
   if(!S.local) return;
+  if(!('Notification' in window) || Notification.permission!=='granted') return; // v139: don't use up today's one-time slot while it cannot be shown
   const today = todayStr();
   if(S.local.pushedNotifDate !== today){ S.local.pushedNotifDate = today; S.local.pushedNotifKeys = {}; }
   if(!S.local.pushedNotifKeys) S.local.pushedNotifKeys = {};
@@ -11688,9 +11771,30 @@ function escalateNotifsToPush(notifs){
     if(S.local.pushedNotifKeys[n.key]) return;
     S.local.pushedNotifKeys[n.key] = true;
     changed = true;
-    fireLocalPushNotification(n.title, n.text, {tag:'olympus-notif-'+n.key, requireInteraction:true});
+    fireLocalPushNotification(n.title, n.text, {tag:n.tag || ('olympus-notif-'+n.key), requireInteraction:true, data:{url:n.act?'./?go=stats':'./', go:n.act?'stats':undefined}});
   });
   if(changed) saveLocal();
+}
+// v139: THE reason reminders arrived late. They were only evaluated when the Home screen happened to draw, so a reminder that became due at
+// 6 PM waited until the app was next opened and Home redrawn (and nothing at all if the phone sat on another screen). Now the open app
+// re-checks every minute and whenever it returns to the foreground, and sends each due reminder as a device notification once per day.
+// (When the app is fully closed only server pushes can arrive -- see api/check-morning.js and check-reminders.js.)
+function runReminderCheck(){
+  try{
+    const me = S.local && S.local.myProfile;
+    if(!me || !S.appSession) return;
+    if(!('Notification' in window) || Notification.permission!=='granted') return;
+    const dismissed = S.local.dismissedNotifs || {};
+    const notifs = computeNotifications(me).map(n=>({...n, key:notifKey(me, n)})).filter(n=>!dismissed[n.key]);
+    escalateNotifsToPush(notifs);
+  }catch(e){ console.warn('Reminder check failed (non-fatal):', e); }
+}
+let _reminderTicker = null;
+function startReminderTicker(){
+  if(_reminderTicker) return;
+  _reminderTicker = setInterval(runReminderCheck, 60000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) runReminderCheck(); });
+  setTimeout(runReminderCheck, 4000);
 }
 // Umang-only to publish (see viewSettings()'s "App Announcement" section), but visible to
 // both profiles on Home — unlike renderNotifBanners() above, this isn't gated on isMe, and
@@ -13558,8 +13662,8 @@ function addLogEntry(profileId, entry){
     ...(entry.category?{category:entry.category}:{}), ...(entry.itemLabel?{itemLabel:entry.itemLabel}:{})});
   saveShared();
   checkAchievementBadges(profileId);
-  checkDailyTargetForPush(profileId);
-  checkMinHoursCelebration(profileId);
+  const _hitTarget = checkDailyTargetForPush(profileId);
+  checkMinHoursCelebration(profileId, _hitTarget);
 }
 function addLog(profileId){
   const date = document.getElementById('lg-date')?.value || todayStr();
@@ -16102,7 +16206,264 @@ function statsCompBars(comp){
 // right place → what the outcome data (mocks) says → how it compares. Each block answers a
 // question the one above it raises.
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// v139 — STATISTICS, IN PLAIN LANGUAGE
+// The old Overview opened with a dozen KPIs and charts (prep score, momentum, balance, radar...) and left the reading to you. This layer
+// answers, in order: how is the week going, what needs attention, where is the time going, and which paper to open next. Everything
+// is derived from the same logs / chapters / lectures / mocks as before -- nothing new is stored -- and the full detailed page is
+// still there, folded under "Full detailed statistics". Neutral wording on purpose (no "you"), so it reads right for either person.
+// ═══════════════════════════════════════════════════════════
+const STATS_DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+function statsWeekStart(weeksBack){
+  const t = new Date(todayStr()+'T00:00:00');
+  const dow = (t.getDay()+6)%7; // Monday = 0
+  t.setDate(t.getDate() - dow - 7*(weeksBack||0));
+  return t;
+}
+// One Monday-to-Sunday study week. weeksBack 0 = this week so far (today's running session included), 1 = last week, ...
+function statsWeek(pid, weeksBack){
+  weeksBack = weeksBack||0;
+  const start = statsWeekStart(weeksBack), today = todayStr();
+  const target = Number(S.shared.targets && S.shared.targets[pid]) || 4;
+  const days = []; let total = 0, studied = 0, hit = 0, elapsed = 0;
+  for(let i=0;i<7;i++){
+    const d = new Date(start); d.setDate(d.getDate()+i);
+    const ds = localDateStr(d);
+    const future = ds > today;
+    const h = future ? 0 : Number((ds===today ? liveHoursOnDate(pid, ds) : hoursOnDate(pid, ds)).toFixed(2));
+    if(!future){ elapsed++; total += h; if(h>0) studied++; if(h >= target) hit++; }
+    days.push({date:ds, dow:STATS_DOW[i], hours:h, future, isToday:ds===today, hitTarget:!future && h>=target});
+  }
+  return {days, total:Number(total.toFixed(1)), studied, hit, elapsed, target, start:localDateStr(start),
+    firstN:(n)=>Number(days.slice(0,n).reduce((s,x)=>s+x.hours,0).toFixed(1))};
+}
+function statsFmtH(h){ h = Number(h)||0; return (Math.round(h*10)/10).toString().replace(/\.0$/,'')+'h'; }
+function statsAgoText(n){ return n===null ? 'never studied' : (n===0 ? 'studied today' : (n===1 ? 'studied yesterday' : `last studied ${n} days ago`)); }
+// Per-paper standing in one word, with the reason to show beside it.
+function statsPaperStatus(r, avgPrep){
+  const ago = r.lastStudied.daysAgo;
+  if(r.prep >= 100) return {id:'done', label:'Complete', color:'var(--good)', rank:5};
+  if(r.prep===0 && r.hours===0 && ago===null) return {id:'new', label:'Not started', color:'var(--text-faint)', rank:1};
+  if(ago===null || ago>=7) return {id:'stale', label:'Neglected', color:'var(--bad)', rank:0};
+  if(r.prep < avgPrep-10) return {id:'behind', label:'Behind', color:'var(--warn)', rank:2};
+  if(r.prep >= 70) return {id:'strong', label:'Strong', color:'var(--good)', rank:4};
+  return {id:'ok', label:'On track', color:'var(--accent, var(--umang))', rank:3};
+}
+// The "what needs attention" list: plain sentences, most important first, each tied to a number you can see elsewhere on the page.
+function statsInsights(pid){
+  const out = [];
+  const add = (sev, title, text, extra)=> out.push(Object.assign({sev, title, text}, extra||{}));
+  const wk = statsWeek(pid,0), lw = statsWeek(pid,1);
+  const like = lw.firstN(wk.elapsed), diff = Number((wk.total-like).toFixed(1));
+  const today = todayStr();
+  const hour = new Date().getHours();
+  const todayH = liveHoursOnDate(pid, today);
+  const target = wk.target;
+  // 1. Pace against the same point of last week
+  if(wk.elapsed>=2 && like>0){
+    if(diff <= -2) add(3, `${statsFmtH(-diff)} behind last week`, `${statsFmtH(wk.total)} so far, against ${statsFmtH(like)} by this day last week.`);
+    else if(diff >= 2) add(0, `${statsFmtH(diff)} ahead of last week`, `${statsFmtH(wk.total)} so far, against ${statsFmtH(like)} by this day last week. Keep it up.`);
+  }
+  // 2. Today
+  if(todayH===0 && hour>=13 && hour<24) add(2, 'Nothing logged yet today', `Target is ${statsFmtH(target)}. Even one focused session keeps the week on track.`);
+  else if(todayH>0 && todayH<target && hour>=18) add(2, `${statsFmtH(target-todayH)} left on today's target`, `${statsFmtH(todayH)} done of ${statsFmtH(target)}.`);
+  // 3. Papers not touched lately
+  const bal = statsBalance(pid);
+  const everStudied = bal.filter(r=>r.lastStudied.daysAgo!==null);
+  const stale = everStudied.filter(r=>r.prep<100 && r.lastStudied.daysAgo>=7).sort((a,b)=>b.lastStudied.daysAgo-a.lastStudied.daysAgo).slice(0,2);
+  stale.forEach(r=>add(3, `${r.nick} not studied for ${r.lastStudied.daysAgo} days`, `It sits at ${r.prep}% progress. Give it a session soon so it doesn't fade.`, {paper:r.id}));
+  const notStarted = everStudied.length ? bal.filter(r=>r.lastStudied.daysAgo===null && r.prep<100) : [];
+  if(notStarted.length) add(2, notStarted.length===1 ? `${notStarted[0].nick} hasn't been started` : `${notStarted.length} papers not started yet: ${notStarted.map(r=>r.nick).join(', ')}`, 'No study time is logged against them. Pick the next one and schedule a first lecture.', notStarted.length===1 ? {paper:notStarted[0].id} : undefined);
+  // 4. Lectures past their date
+  let overdue = 0; try{ overdue = autoTasksFor(pid).length; }catch(e){}
+  if(overdue>0) add(2, `${overdue} lecture${overdue>1?'s':''} past the target date`, 'Mark them done or move them in the Planner so the plan matches reality.');
+  // 5. Revision backlog
+  let r1 = 0, r2 = 0, r1Paper = {};
+  PAPERS.forEach(p=>chaptersFor(pid,p.id).forEach(c=>{ if(c.lecDone && !c.rev1){ r1++; r1Paper[p.nick]=(r1Paper[p.nick]||0)+1; } if(c.rev1 && !c.rev2) r2++; }));
+  if(r1>=3){
+    const topP = Object.keys(r1Paper).sort((a,b)=>r1Paper[b]-r1Paper[a])[0];
+    add(2, `${r1} chapters waiting for first revision`, `Lectures are done but revision hasn't started${topP?` — most in ${topP}`:''}. Revising soon after a lecture sticks far better.`);
+  }
+  // 6. Can the lectures finish in time?
+  try{
+    const rd = readinessData(pid);
+    if(rd.totalLeft>0 && rd.daysToLecDeadline>0 && rd.allFinish){
+      const per = rd.trackedPace, need = rd.needAll;
+      if(rd.allFinish.afterExam) add(3, 'Lectures will not finish before the exam at this pace', `${rd.totalLeft} left. You need about ${need.toFixed(1)} a day, the last two weeks averaged ${per.toFixed(1)}.`);
+      else if(rd.allFinish.diff>0) add(2, `Lectures finish ${rd.allFinish.diff} days after the revision buffer starts`, `${rd.totalLeft} left. You need about ${need.toFixed(1)} a day, the last two weeks averaged ${per.toFixed(1)}.`);
+      else add(0, 'Lectures are on pace to finish in time', `${rd.totalLeft} left at about ${per.toFixed(1)} a day.`);
+    }
+  }catch(e){}
+  // 7. Mocks
+  const mocks = statsAllMockSeries(pid);
+  if(!mocks.length) add(1, 'No mock scores yet', 'One mock shows which paper needs the most work. Add a score from the paper page.');
+  else {
+    const weak = PAPERS.map(p=>{ const sc = mockScoresFor(pid,p.id); return sc.length ? {p, avg:Math.round(sc.reduce((s,x)=>s+safeChartNum(x.score),0)/sc.length), n:sc.length} : null; }).filter(Boolean).sort((a,b)=>a.avg-b.avg)[0];
+    if(weak && weak.avg<50) add(2, `${weak.p.nick} is the weakest in mocks`, `Average ${weak.avg}% over ${weak.n} mock${weak.n>1?'s':''}. Worth a focused revision round.`, {paper:weak.p.id});
+    if(mocks.length>=4){
+      const last3 = mocks.slice(-3).reduce((s,m)=>s+m.hours,0)/3, prev = mocks.slice(-6,-3); 
+      if(prev.length){ const d = Math.round(last3 - prev.reduce((s,m)=>s+m.hours,0)/prev.length);
+        if(d>=5) add(0, `Mock scores rising (+${d} pts)`, 'The last three mocks beat the three before.');
+        else if(d<=-5) add(2, `Mock scores falling (${d} pts)`, 'The last three mocks are below the three before. Check which paper dragged them down.'); }
+    }
+  }
+  // 8. Time spent on lectures versus revision / practice (last 30 days)
+  const mix = statsHoursByCategory(pid, 30);
+  const tagged = mix.total - mix.untagged;
+  if(tagged>=8){
+    const lecShare = Math.round(mix.rows.find(r=>r.id==='lectures').hours/tagged*100);
+    const revPr = Math.round((mix.rows.filter(r=>['rev1','rev2','practice'].includes(r.id)).reduce((s,r)=>s+r.hours,0))/tagged*100);
+    if(lecShare>=65 && revPr<=15) add(2, `${lecShare}% of recent study is lectures`, `Only ${revPr}% went to revision and practice. Add some revision sessions before the pile-up grows.`);
+  }
+  // 9. Streak and consistency
+  const st = liveStreak(pid);
+  if(st>=3) add(0, `${st}-day study streak`, 'Every day counts, so protect it today.');
+  else if(wk.elapsed>=3 && wk.studied<=wk.elapsed-2) add(2, `Studied ${wk.studied} of ${wk.elapsed} days this week`, 'Short sessions on the off days keep the habit alive.');
+  // 10. Patterns: best weekday and time of day (information only)
+  const byDow = Array(7).fill(0), cnt = Array(7).fill(0);
+  for(let w=1; w<=8; w++){ const wd = statsWeek(pid,w); wd.days.forEach((d,i)=>{ byDow[i]+=d.hours; cnt[i]++; }); }
+  const avgDow = byDow.map((h,i)=>cnt[i]? h/cnt[i] : 0);
+  if(avgDow.some(x=>x>0)){
+    const bi = avgDow.indexOf(Math.max(...avgDow)), wi = avgDow.indexOf(Math.min(...avgDow));
+    if(bi!==wi && avgDow[bi]-avgDow[wi]>=1) add(-1, `Strongest day: ${STATS_DOW[bi]}, weakest: ${STATS_DOW[wi]}`, `Over the last 8 weeks ${STATS_DOW[bi]} averages ${statsFmtH(avgDow[bi])} and ${STATS_DOW[wi]} ${statsFmtH(avgDow[wi])}. Plan the heavy chapters for ${STATS_DOW[bi]}.`);
+  }
+  const blocks = {morning:0, afternoon:0, evening:0, night:0}; let bt = 0;
+  statsLogsInRange(pid, 30).forEach(l=>{ if(!l.startTime) return; const d = new Date(l.startTime); if(!Number.isFinite(d.getTime())) return; const h = d.getHours(), hh = safeChartNum(l.hours);
+    const k = (h>=5&&h<12)?'morning':(h>=12&&h<17)?'afternoon':(h>=17&&h<22)?'evening':'night'; blocks[k]+=hh; bt+=hh; });
+  if(bt>=8){ const k = Object.keys(blocks).sort((a,b)=>blocks[b]-blocks[a])[0]; const pct = Math.round(blocks[k]/bt*100);
+    if(pct>=40) add(-1, `Most study happens in the ${k}`, `${pct}% of timed sessions in the last 30 days started in the ${k}.`); }
+  out.sort((a,b)=>b.sev-a.sev);
+  return out;
+}
+function setStatsRange(n){ S.statsRange = n; renderStatsPopup(); }
+function statsRangeLabel(n){ return n===7 ? 'last 7 days' : (n===30 ? 'last 30 days' : 'all time'); }
+// ── the new Overview ────────────────────────────────────────────────────────────────────────────────────────────
+function statsWeekChartHtml(wk, accent){
+  const maxH = Math.max(wk.target*1.4, ...wk.days.map(d=>d.hours), 1);
+  const lineBottom = Math.min(96, wk.target/maxH*100);
+  const cols = wk.days.map(d=>{
+    const hpct = d.hours/maxH*100;
+    const col = d.future ? 'var(--surface2)' : (d.hitTarget ? 'var(--good)' : (d.hours>0 ? accent : 'var(--surface2)'));
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0">
+      <div class="mono" style="font-size:9.5px;font-weight:800;color:${d.future?'var(--text-faint)':'var(--text-muted)'};margin-bottom:3px">${d.future?'':(d.hours>0?statsFmtH(d.hours):'0')}</div>
+      <div style="width:70%;max-width:30px;height:${d.future?3:Math.max(3,hpct).toFixed(1)}%;background:${col};border-radius:5px 5px 2px 2px;opacity:${d.future?.5:1}"></div>
+    </div>`;
+  }).join('');
+  const labels = wk.days.map(d=>`<div style="flex:1;text-align:center;font-size:10px;font-weight:${d.isToday?800:600};color:${d.isToday?accent:'var(--text-faint)'}">${d.dow}</div>`).join('');
+  return `<div style="position:relative;height:120px;padding-top:4px">
+      <div style="position:absolute;left:0;right:0;bottom:calc(${lineBottom.toFixed(1)}% * .86 + 0px);border-top:1px dashed var(--text-faint);opacity:.55;pointer-events:none"></div>
+      <div style="display:flex;gap:6px;height:100%;align-items:flex-end;position:relative">${cols}</div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:5px">${labels}</div>
+    <div style="font-size:10px;color:var(--text-faint);margin-top:7px;display:flex;gap:12px;flex-wrap:wrap"><span><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--good);margin-right:4px"></span>target (${statsFmtH(wk.target)}) met</span><span><span style="display:inline-block;width:14px;border-top:1px dashed var(--text-faint);margin-right:4px;vertical-align:middle"></span>daily target</span></div>`;
+}
 function statsOverview(vp, prof){
+  const accent = `var(--${prof.color})`;
+  const wk = statsWeek(vp,0), lw = statsWeek(vp,1);
+  const like = lw.firstN(wk.elapsed), diff = Number((wk.total-like).toFixed(1));
+  const overall = overallPrep(vp);
+  const daysLeft = daysUntilExam();
+  const range = (S.statsRange===30 || S.statsRange===0) ? S.statsRange : 7;
+  const bal = statsBalance(vp).map(r=>({...r, hours: statsPaperHours(vp, r.id, range||null)}));
+  const totalR = bal.reduce((s,r)=>s+r.hours,0);
+  bal.forEach(r=>{ r.share = totalR>0 ? Math.round(r.hours/totalR*100) : 0; });
+  const rows = bal.map(r=>({r, st:statsPaperStatus(r, overall.prepScore)})).sort((a,b)=>a.st.rank-b.st.rank || a.r.prep-b.r.prep);
+  const mix = statsHoursByCategory(vp, range||null);
+  const insights = statsInsights(vp);
+  const shown = insights.slice(0,6);
+  const sevMeta = {3:{c:'var(--bad)',l:'Fix first'}, 2:{c:'var(--warn)',l:'Watch'}, 1:{c:'var(--text-faint)',l:'Tip'}, 0:{c:'var(--good)',l:'Good'}, '-1':{c:'var(--text-faint)',l:'Pattern'}};
+  let verdict, vcol;
+  if(wk.elapsed>=2 && like>0 && diff<=-2){ verdict = 'The week is running behind last week.'; vcol='var(--warn)'; }
+  else if(wk.elapsed>=2 && like>0 && diff>=2){ verdict = 'A stronger week than last week.'; vcol='var(--good)'; }
+  else if(wk.studied===0 && wk.elapsed>=1){ verdict = 'No study logged yet this week.'; vcol='var(--warn)'; }
+  else { verdict = 'About level with last week.'; vcol='var(--text-muted)'; }
+  const tile = (big, label, sub, col)=>`<div style="background:var(--surface2);border-radius:12px;padding:10px 11px;min-width:0"><div class="mono" style="font-size:19px;font-weight:800;color:${col||'var(--text)'}">${big}</div><div style="font-size:10.5px;font-weight:700;color:var(--text-muted);margin-top:1px">${label}</div>${sub?`<div style="font-size:9.5px;color:var(--text-faint);margin-top:2px">${sub}</div>`:''}</div>`;
+  const chip = (n,l)=>`<button class="btn btn-sm ${range===n?'btn-accent':''}" style="padding:4px 11px;font-size:11px" onclick="setStatsRange(${n})">${l}</button>`;
+  const mixTagged = mix.total - mix.untagged;
+  const mixLine = (()=>{
+    if(mixTagged < 3) return 'Not enough timed sessions with an activity type yet.';
+    const g = id=>mix.rows.find(r=>r.id===id).hours;
+    const rev = g('rev1')+g('rev2'), pr = g('practice'), lec = g('lectures')+g('chapters');
+    return `${Math.round(lec/mixTagged*100)}% learning new material (lectures and chapters), ${Math.round(rev/mixTagged*100)}% revising, ${Math.round(pr/mixTagged*100)}% practising.`;
+  })();
+  const allMocks = statsAllMockSeries(vp);
+  const mockAvg = allMocks.length ? Math.round(allMocks.reduce((s,m)=>s+m.hours,0)/allMocks.length) : null;
+  const lastMock = allMocks.length ? allMocks[allMocks.length-1].hours : null;
+  return `
+  <div class="card" id="stats-report" style="margin-bottom:14px;background:linear-gradient(135deg, color-mix(in srgb, ${accent} 10%, var(--surface)), var(--surface))">
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">This week · Mon to today</div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-top:3px;flex-wrap:wrap">
+      <div class="mono" style="font-size:34px;font-weight:800;color:${accent}">${statsFmtH(wk.total)}</div>
+      ${like>0||wk.elapsed>=2 ? statsDeltaBadge(diff>0.05?'up':(diff<-0.05?'down':'flat'), `${diff>0?'+':''}${statsFmtH(diff)} vs same point last week (${statsFmtH(like)})`) : ''}
+    </div>
+    <div style="font-size:12.5px;font-weight:700;color:${vcol};margin:4px 0 12px">${verdict}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      ${tile(`${wk.studied}/${wk.elapsed}`, 'Days studied', wk.studied===wk.elapsed?'every day so far':'days with any study', wk.studied===wk.elapsed?'var(--good)':'')}
+      ${tile(`${wk.hit}/${wk.elapsed}`, 'Target met', `target ${statsFmtH(wk.target)} a day`, wk.hit>=Math.ceil(wk.elapsed/2)?'var(--good)':'var(--warn)')}
+      ${tile(`${liveStreak(vp)}d`, 'Streak', 'days in a row')}
+      ${tile(`${overall.prepScore}%`, 'Overall progress', 'avg of all 6 papers')}
+      ${tile(daysLeft>0?`${daysLeft}`:'—', 'Days to exam', daysLeft>0?'':'date not set')}
+      ${tile(statsFmtH(lw.total), 'Last full week', `${lw.studied}/7 days · ${lw.hit} on target`)}
+    </div>
+  </div>
+
+  <div class="section-title">What needs attention</div>
+  <div class="card" style="margin-bottom:14px;padding:6px 14px">
+    ${shown.length ? shown.map((n,i)=>{ const m = sevMeta[String(n.sev)] || sevMeta['0'];
+      return `<div ${n.paper?`onclick="setStatsPaper('${n.paper}')" style="cursor:pointer;`:`style="`}display:flex;gap:11px;padding:11px 0;${i<shown.length-1?'border-bottom:1px solid var(--border)':''}">
+        <div style="flex:0 0 auto;width:4px;border-radius:2px;background:${m.c}"></div>
+        <div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:7px"><b style="font-size:12.5px">${escChat(n.title)}</b><span style="font-size:9px;font-weight:800;color:${m.c};text-transform:uppercase;letter-spacing:.05em">${m.l}</span></div>
+        <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;line-height:1.45">${escChat(n.text)}${n.paper?' <span style="color:var(--text-faint)">Tap to open the paper ›</span>':''}</div></div>
+      </div>`; }).join('') : `<div style="font-size:12px;color:var(--text-faint);padding:12px 0">Nothing needs attention right now. Log some study and this list fills in.</div>`}
+  </div>
+
+  <div class="section-title">This week, day by day</div>
+  <div class="card" style="margin-bottom:14px">${statsWeekChartHtml(wk, accent)}</div>
+
+  <div class="section-title">Papers: where to focus</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+      <div style="font-size:11px;color:var(--text-faint)">Most urgent first. Hours shown for the ${statsRangeLabel(range)}.</div>
+      <div style="display:flex;gap:5px">${chip(7,'7d')}${chip(30,'30d')}${chip(0,'All')}</div>
+    </div>
+    ${rows.map(({r,st})=>{
+      const col = st.id==='done'||st.id==='strong' ? 'var(--good)' : (st.id==='stale' ? 'var(--bad)' : (st.id==='behind' ? 'var(--warn)' : accent));
+      return `<div style="padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="setStatsPaper('${r.id}')">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="font-size:12.5px;font-weight:800;width:48px;color:${accent}">${r.nick}</div>
+          <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div class="chart-animate hbar-grow-right" style="--target-w:${r.prep}%;height:100%;width:${r.prep}%;background:${col};border-radius:4px"></div></div>
+          <div class="mono" style="width:36px;text-align:right;font-size:12px;font-weight:800">${r.prep}%</div>
+          <div style="font-size:9.5px;font-weight:800;color:${st.color};background:color-mix(in srgb, ${st.color} 13%, transparent);padding:3px 8px;border-radius:20px;white-space:nowrap">${st.label}</div>
+        </div>
+        <div style="font-size:10.5px;color:var(--text-faint);margin-top:5px;padding-left:57px">${statsFmtH(r.hours)} studied${totalR>0?` (${r.share}% of time)`:''} · ${statsAgoText(r.lastStudied.daysAgo)}${r.comp.lecTotal?` · ${r.comp.done}/${r.comp.lecTotal} lectures`:''}</div>
+      </div>`;
+    }).join('')}
+    <div style="font-size:10px;color:var(--text-faint);margin-top:9px;line-height:1.5">Progress = the average of lectures done, practice done, revision 1, revision 2 and the mock average for that paper. “Neglected” means no study for 7+ days; “Behind” means more than 10 points under your overall progress.</div>
+  </div>
+
+  <div class="section-title">How study time is spent</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;color:var(--text-faint);margin-bottom:10px">${totalR>0?`${statsFmtH(totalR)} in the ${statsRangeLabel(range)}.`:`Nothing logged in the ${statsRangeLabel(range)}.`} ${mixLine}</div>
+    ${statsStackedBar(mix.rows, mix.total)}
+  </div>
+
+  <div class="section-title">Mock tests</div>
+  <div class="card" style="margin-bottom:14px">
+    ${allMocks.length ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:${allMocks.length>=2?12:0}px">
+        ${tile(`${mockAvg}%`, 'Average score', `${allMocks.length} mock${allMocks.length>1?'s':''} taken`, mockAvg>=50?'var(--good)':(mockAvg>=40?'var(--warn)':'var(--bad)'))}
+        ${tile(`${lastMock}%`, 'Latest score', '')}
+        ${tile(`${Math.max(...allMocks.map(m=>m.hours))}%`, 'Best score', '')}
+      </div>${allMocks.length>=2 ? trendChartSVG(allMocks, 110, 'var(--green)', '%') : ''}`
+      : `<div style="font-size:12px;color:var(--text-faint)">No mock scores yet. Open a paper above and add one to see how you are really doing.</div>`}
+  </div>
+
+  <details class="stats-more" style="margin-bottom:14px">
+    <summary style="cursor:pointer;font-weight:800;font-size:13px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;list-style:none;display:flex;align-items:center;justify-content:space-between">Full detailed statistics <span style="color:var(--text-faint);font-size:11px;font-weight:600">headline numbers, trends, head to head ▾</span></summary>
+    <div style="margin-top:12px">${statsOverviewDetail(vp, prof)}</div>
+  </details>`;
+}
+
+function statsOverviewDetail(vp, prof){
   const overall   = overallPrep(vp);
   const proj      = statsProjection(vp);
   const mom       = statsMomentum(vp);
@@ -16778,7 +17139,8 @@ function settingsSectionNotifications(){
     ${pushPrefToggleRow('targetHit', '🎯 Partner hit their daily target')}
     ${pushPrefToggleRow('newMessage', '💬 New chat message')}
     ${pushPrefToggleRow('habitReminder', '✅ Habit reminders (evening + time-linked)')}
-    ${pushPrefToggleRow('diaryReminder', '📔 Diary reminder (~midnight, if not filled)')}
+    ${pushPrefToggleRow('diaryReminder', '📔 Diary reminder (morning if yesterday is open, 9 PM for today)')}
+    ${pushPrefToggleRow('weeklyReview', '📊 Monday weekly review (statistics, ~8 AM)')}
     ` : ''}
   </div>
   <div class="card settings-group" style="margin-top:12px">
@@ -16788,6 +17150,7 @@ function settingsSectionNotifications(){
     ${notifToggleRow('dailyTarget', "🎯 Today's target reminder")}
     ${notifToggleRow('targets', '📅 Target deadline alerts')}
     ${notifToggleRow('diary', '📔 Diary not filled (today/yesterday)')}
+    ${notifToggleRow('weekly', '📊 Monday: review last week’s statistics')}
     ${notifToggleRow('examCountdown', '⏳ Countdown — exam milestone banners')}
     ${notifToggleRow('countdownNag', '⏳ Countdown — paused 5+ min nag')}
   </div>`;
@@ -18385,6 +18748,7 @@ function bootStartBackgroundWork(){
   startBackgroundPoll();
   flushDriveIfDirty();          // v128: anything left over from a previous session that Drive never confirmed
   reconcilePushSubscription();  // v128: repair a dropped / renewed push address
+  startReminderTicker();        // v139: reminders no longer wait for Home to redraw
   maybeSweepArchive(); // fire-and-forget; gated to once/day/device internally, never blocks load
   // v131: these two big files used to start downloading the instant the app opened, in competition with the main data and with any save. They now
   // start a few seconds later (and come from the local copy unless they changed -- see readDriveFile), and share ONE redraw.
@@ -18393,7 +18757,7 @@ function bootStartBackgroundWork(){
     ensureMcqBankLoaded(); // fire-and-forget; loads the question bank file (and runs its one-time migration off S.shared) without waiting for someone to open Practice/Mock Tests
   }, 3000);
   maybeRolloverOverdueTasks(); // same convention — rolls overdue incomplete tasks onto today
-  PROFILES.forEach(p=> refreshAllTargets(p.id)); // snapshots progress + fires completion celebrations on every load
+  refreshAllTargets(S.local.myProfile); // snapshots progress + fires completion celebrations on every load (own targets only -- see checkTargetCompletion)
   ensureDailyQuote(); // fire-and-forget; gated to once/day (shared, not per-device) internally
   applyPendingTimerActionFromUrl();
 }
@@ -18829,6 +19193,8 @@ if('serviceWorker' in navigator){
       applyTimerNotificationAction(d.action);
     } else if(d.type==='OPEN_CHAT'){
       openChatFromNotification(); // tapped a chat notification
+    } else if(d.type==='OPEN_GO'){
+      if(d.go==='stats') openWeeklyReview(); // tapped the Monday review notification
     } else if(d.type==='PUSH_RECEIVED'){
       const kind = d.payload && d.payload.data && d.payload.data.kind;
       // v128: a chat push used to call pollChatUpdates(), which does nothing unless the chat is the open screen -- so a message that
@@ -19114,52 +19480,75 @@ function nudgePartner(){
   const other = otherProfileId(me);
   if(!pushPrefEnabled(other, 'nudge')) return; // they've turned nudges off — fail silently, same as the other push types below
   const prof = profileById(me);
-  sendPush(other, `👋 ${prof.nick} is nudging you!`, 'Tap to open Olympus.', {url:'./'});
+  sendPush(other, `👋 ${prof.nick} is nudging you!`, 'Tap to open Olympus.', {url:'./'}, {urgency:'high', ttl:3600});
 }
 function notifyPartnerSessionStarted(me){
   if(me==='umang' && umangHasBlocked()) return; // his activity stays hidden from her, pushes included
   const other = otherProfileId(me);
   if(!pushPrefEnabled(other, 'sessionStarted')) return;
   const prof = profileById(me);
-  sendPush(other, `⏱ ${prof.nick} started studying`, 'Their timer is live now.', {url:'./'});
+  sendPush(other, `⏱ ${prof.nick} started studying`, 'Their timer is live now.', {url:'./'}, {urgency:'high', ttl:900});
 }
 // Called from addLogEntry() — the single write-point for both timer-completed sessions and
 // manual Planner log entries, so this catches a target crossed either way. Dedupes per
 // profile per study day via pushState.targetHitDate (todayStr()-keyed, so it naturally
 // resets at the 5 AM boundary rather than needing its own reset logic) — otherwise every
 // subsequent log entry the same day would re-fire the push once the target's already met.
+// v139: "already celebrated today" is now ALSO remembered on this device (S.local.celebDay). pushState lives in the shared file and is
+// deliberately not owner-protected (the reminders cron writes into it), so a stale copy uploaded by the other phone could blank the
+// stamp and the same celebration -- and the partner's push -- fired a second time. Returns true when it celebrated.
+function celebStamped(kind, profileId){
+  const k = kind+':'+profileId;
+  return !!(S.local && S.local.celebDay && S.local.celebDay[k] === todayStr());
+}
+function celebStamp(kind, profileId){
+  if(!S.local) return;
+  const t = todayStr();
+  if(!S.local.celebDay || S.local.celebDayDate !== t){ S.local.celebDay = {}; S.local.celebDayDate = t; }
+  S.local.celebDay[kind+':'+profileId] = t;
+  saveLocal();
+}
 function checkDailyTargetForPush(profileId){
-  if(profileId==='umang' && umangHasBlocked()) return;
+  if(profileId==='umang' && umangHasBlocked()) return false;
   const target = effectiveTodayTarget(profileId);
-  if(hoursOnDate(profileId, todayStr()) < target) return;
+  if(hoursOnDate(profileId, todayStr()) < target) return false;
+  if(celebStamped('target', profileId)) return false;
   if(!S.shared.pushState) S.shared.pushState = {targetHitDate:{}, minHoursHitDate:{}};
   if(!S.shared.pushState.targetHitDate) S.shared.pushState.targetHitDate = {};
-  if(S.shared.pushState.targetHitDate[profileId] === todayStr()) return;
+  if(S.shared.pushState.targetHitDate[profileId] === todayStr()){ celebStamp('target', profileId); return false; }
   S.shared.pushState.targetHitDate[profileId] = todayStr();
+  celebStamp('target', profileId);
   saveShared();
   // Local celebration (confetti + toast) only for the profile that actually hit it, on
   // their own device — the partner still gets the push below, not a confetti burst on a
   // screen they're not looking at.
   if(profileId===S.local.myProfile) celebrateMilestone(`Daily target hit — ${target}h logged today!`);
   const other = otherProfileId(profileId);
-  if(!pushPrefEnabled(other, 'targetHit')) return;
+  if(!pushPrefEnabled(other, 'targetHit')) return true;
   const prof = profileById(profileId);
-  sendPush(other, `🎯 ${prof.nick} hit today's target!`, `${target}h logged today.`, {url:'./'});
+  sendPush(other, `🎯 ${prof.nick} hit today's target!`, `${target}h logged today.`, {url:'./'}, {urgency:'normal', ttl:21600});
+  return true;
 }
 // Separate from the Daily Target above: S.shared.targets is the Settings floor/minimum,
 // while effectiveTodayTarget() can be raised above it just for today (dailyTargetOverride)
 // — so these two celebrations only coincide on a day with no override active. Own dedup
 // key (minHoursHitDate) for the same reason; same todayStr()-keyed reset.
-function checkMinHoursCelebration(profileId){
+// v139: when the minimum and today's target are the same number (every day without a raised target) both used to celebrate at the same
+// instant, drawing two toasts on top of each other. `justCelebratedTarget` = the daily-target line already played for this log, so
+// the minimum is recorded as done without a second celebration.
+function checkMinHoursCelebration(profileId, justCelebratedTarget){
   if(profileId==='umang' && umangHasBlocked()) return;
   if(profileId!==S.local.myProfile) return; // local-only celebration, nothing to send the partner
   const minHours = Number((S.shared.targets && S.shared.targets[profileId]) || 4);
   if(hoursOnDate(profileId, todayStr()) < minHours) return;
+  if(celebStamped('min', profileId)) return;
   if(!S.shared.pushState) S.shared.pushState = {targetHitDate:{}, minHoursHitDate:{}};
   if(!S.shared.pushState.minHoursHitDate) S.shared.pushState.minHoursHitDate = {};
-  if(S.shared.pushState.minHoursHitDate[profileId] === todayStr()) return;
+  if(S.shared.pushState.minHoursHitDate[profileId] === todayStr()){ celebStamp('min', profileId); return; }
   S.shared.pushState.minHoursHitDate[profileId] = todayStr();
+  celebStamp('min', profileId);
   saveShared();
+  if(justCelebratedTarget && effectiveTodayTarget(profileId) <= minHours) return; // same milestone, already celebrated
   celebrateMilestone(`Minimum study hours reached — ${minHours}h logged today!`);
 }
 // v128: the push is ALWAYS sent now (unless the recipient turned "new message" off). The old rule skipped it whenever the
