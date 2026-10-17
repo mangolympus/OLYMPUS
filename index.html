@@ -902,6 +902,9 @@ body.targets-mode #targets-root{display:flex}
     transition:transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
   }
 .money-view .rec-item:active{transform:scale(.98); background:var(--input-bg);}
+.money-view .rec-item{-webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; touch-action:pan-y}
+.money-view .rec-item.pressing{transform:scale(.97); background:var(--input-bg); box-shadow:0 0 0 2px color-mix(in srgb, var(--umang) 55%, transparent) inset; transition:transform .25s ease, box-shadow .25s ease}
+.money-view .press-hint{font-size:11px; color:var(--muted); text-align:center; margin:2px 0 10px}
 .money-view .rec-avatar{
     width:38px;height:38px;border-radius:10px;background:var(--blue-100);color:var(--navy-700);
     display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none;
@@ -4257,6 +4260,7 @@ function moneyPageHtml(){
 
       </div>
 
+    <div class="press-hint">Tip: press and hold an entry to edit or delete it</div>
     <div id="money-transactions-list"></div>
   </main>
 
@@ -4359,6 +4363,7 @@ function moneyPageHtml(){
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--muted);" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="money-rec-search" placeholder="Search by party name or invoice no.">
       </div>
+      <div class="press-hint">Tip: press and hold an invoice to edit, export or delete it</div>
       <div id="money-records-list"></div>
     </div>
   </main>
@@ -4725,6 +4730,15 @@ function moneyPageHtml(){
   </div>
 </div>
 
+<div class="modal-bg" id="money-press-modal-bg">
+  <div class="modal">
+    <h3 id="money-press-title">Entry</h3>
+    <div class="modal-sub" id="money-press-sub"></div>
+    <div class="btn-row" id="money-press-actions" style="grid-template-columns:1fr 1fr;"></div>
+    <button class="btn btn-ghost" id="money-press-close" type="button" style="margin-top:10px;">Cancel</button>
+  </div>
+</div>
+
 <!-- Hidden PDF render template -->
 <div id="money-pdf-root" style="position:fixed; left:-99999px; top:0; width:816px; background:#fff;"></div>
 
@@ -5023,6 +5037,7 @@ function moneyPageHtml(){
   }
 
   function openTxnModal(type){
+    _txnSaveCool = 0; // a freshly opened form is a new entry -- never blocked by the cool-down of the previous save
     activeTxnType = type;
     editingTxnId = null;
     const isIn = type === 'inflow';
@@ -5040,6 +5055,7 @@ function moneyPageHtml(){
   }
 
   function openTxnEditModal(id){
+    _txnSaveCool = 0;
     let t = transactions.find(x=>x.id===id);
     if(!t) return;
     if(t.transferId){
@@ -5123,13 +5139,23 @@ function moneyPageHtml(){
     wrap.style.display = '';
   }
 
+  // v140: a second tap on Save while the first is still finishing (or while the sheet is sliding away) saved the entry twice -- or, after an
+  // edit, as a brand-new duplicate because the edit id had already been cleared. One save at a time, plus a short cool-down.
+  let _txnSaving = false, _txnSaveCool = 0;
   async function saveTransactionEntry(){
+    if(_txnSaving || Date.now() < _txnSaveCool) return;
+    _txnSaving = true;
+    try{ await _saveTransactionEntry(); } finally { _txnSaving = false; _txnSaveCool = Date.now() + 300; }
+  }
+  async function _saveTransactionEntry(){
     const date = $('money-txn-date').value || todayStr();
-    const amount = parseFloat($('money-txn-amount').value);
+    let amount = parseFloat($('money-txn-amount').value);
+    if(isFinite(amount)) amount = Math.round(amount*100)/100; // v140: money is stored to the paisa, so balances can't drift by fractions
     const source = selectedTxnSource;
     const category = $('money-txn-category').value;
     const remarks = $('money-txn-remarks').value.trim();
-    if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
+    if(!amount || !isFinite(amount) || amount<=0){ toast('Enter a valid amount'); return; }
+    if(amount > 1e11){ toast('That amount looks too large — check it'); return; }
     if(!activeTxnType){ toast('Something went wrong — try again'); return; }
 
     const isEdit = !!editingTxnId;
@@ -5269,7 +5295,7 @@ function moneyPageHtml(){
       // Only the first screenful animates in; hundreds of simultaneous CSS animations off-screen were pure paint cost.
       const anim = i < 16 ? ` animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${delay}ms;` : '';
       return `
-      <div class="rec-item" data-id="${t.id}" style="cursor:pointer;${anim}">
+      <div class="rec-item" data-id="${escapeHtml(t.id)}" style="cursor:pointer;${anim}">
         <div class="rec-avatar" style="background:${isIn?'var(--good-bg)':'var(--danger-bg)'}; color:${isIn?'var(--good)':'var(--danger)'};">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${isIn? '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>' : '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'}</svg>
         </div>
@@ -5281,7 +5307,95 @@ function moneyPageHtml(){
       </div>`;
     }).join('');
     // one delegated listener instead of one per row
-    list.onclick = (e)=>{ const el = e.target.closest && e.target.closest('.rec-item'); if(el && list.contains(el)) openTxnViewModal(el.getAttribute('data-id')); };
+    list.onclick = (e)=>{ if(Date.now() < _pressSwallowUntil) return; const el = e.target.closest && e.target.closest('.rec-item'); if(el && list.contains(el)) openTxnViewModal(el.getAttribute('data-id')); };
+  }
+
+  // ── v140: press and hold an entry -> Edit / Delete ───────────────────────────────────────────────────────────────────────────────
+  // Hold ~0.45 s on a transaction or an invoice row (a little buzz on phones that support it). Moving the finger more than 10 px, or
+  // letting go early, is an ordinary scroll / tap and does nothing special; a tap still opens the detail sheet as before.
+  let _pressSwallowUntil = 0;
+  function wirePress(list, onPress){
+    if(!list || list._pressWired) return;
+    list._pressWired = true;
+    let timer = null, startX = 0, startY = 0, el = null;
+    const clear = ()=>{ if(timer){ clearTimeout(timer); timer = null; } if(el){ el.classList.remove('pressing'); el = null; } };
+    list.addEventListener('pointerdown', (e)=>{
+      if(e.pointerType==='mouse' && e.button!==0) return;
+      const row = e.target.closest && e.target.closest('.rec-item');
+      if(!row || !list.contains(row)) return;
+      clear();
+      el = row; startX = e.clientX; startY = e.clientY;
+      timer = setTimeout(()=>{
+        timer = null;
+        const id = row.getAttribute('data-id');
+        _pressSwallowUntil = Date.now() + 700;
+        try{ if(navigator.vibrate) navigator.vibrate(18); }catch(err){}
+        row.classList.remove('pressing'); el = null;
+        onPress(id);
+      }, 450);
+      setTimeout(()=>{ if(el===row && timer) row.classList.add('pressing'); }, 140);
+    });
+    list.addEventListener('pointermove', (e)=>{ if(timer && (Math.abs(e.clientX-startX)>10 || Math.abs(e.clientY-startY)>10)) clear(); });
+    ['pointerup','pointercancel','pointerleave','scroll'].forEach(ev=> list.addEventListener(ev, clear, true));
+    list.addEventListener('contextmenu', (e)=>{ if(e.target.closest && e.target.closest('.rec-item')) e.preventDefault(); }); // the phone's own long-press menu / text-selection must not fight this one
+  }
+  function openPressSheet(title, sub, actions){
+    $('money-press-title').textContent = title;
+    $('money-press-sub').textContent = sub;
+    const box = $('money-press-actions');
+    box.style.gridTemplateColumns = '1fr ' + (actions.length>2 ? '1fr 1fr' : '1fr');
+    box.innerHTML = '';
+    actions.forEach(a=>{
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn ' + (a.danger ? 'btn-danger' : 'btn-ghost'); b.textContent = a.label;
+      if(a.danger) b.style.background = 'var(--danger-bg)';
+      b.addEventListener('click', ()=>{ closePressSheet(); a.run(); });
+      box.appendChild(b);
+    });
+    openModalAnimated($('money-press-modal-bg'));
+  }
+  function closePressSheet(){ closeModalAnimated($('money-press-modal-bg')); }
+  function pressTxn(id){
+    const t = transactions.find(x=>x.id===id); if(!t) return;
+    const isIn = t.type==='inflow';
+    openPressSheet(t.category + (t.transferId ? ' (transfer)' : ''), `${rowDateLabel(t.date)} · ${t.source} · ${isIn?'+':'-'}${fmt(t.amount)}${t.remarks? ' · '+t.remarks : ''}`, [
+      {label:'Edit', run:()=> openTxnEditModal(id)},
+      {label:'Delete', danger:true, run:()=> deleteTxnById(id)},
+    ]);
+  }
+  function pressInvoice(id){
+    const inv = invoices.find(i=>i.id===id); if(!inv) return;
+    openPressSheet(inv.billTo.name, `${inv.dateDisplay} · ${inv.invoiceNo} · ${fmt(inv.total)}`, [
+      {label:'Edit', run:()=> openInvoiceEditForm(id)},
+      {label:'Export PDF', run:()=> exportInvoicePdf(inv)},
+      {label:'Delete', danger:true, run:()=> deleteInvoiceById(id)},
+    ]);
+  }
+  async function deleteTxnById(id){
+    const t = transactions.find(x=>x.id===id);
+    if(!t){ closeTxnViewModal(); return; }
+    const isTransfer = !!t.transferId;
+    const confirmMsg = isTransfer
+      ? 'This is one side of a transfer between your accounts. Deleting it will remove both linked entries. Continue?'
+      : 'Delete this transaction?';
+    if(!confirm(confirmMsg)) return;
+    if(isTransfer) transactions = transactions.filter(x=>x.transferId!==t.transferId);
+    else transactions = transactions.filter(x=>x.id!==id);
+    await persistTransactions();
+    closeTxnViewModal();
+    renderTransactionsList($('money-txn-search').value);
+    computeBalances();
+    renderExpenseDashboard();
+    toast(isTransfer ? 'Transfer deleted (both entries removed)' : 'Transaction deleted');
+  }
+  async function deleteInvoiceById(id){
+    if(!invoices.some(i=>i.id===id)){ closeModal(); return; }
+    if(!confirm('Delete this invoice record?')) return;
+    invoices = invoices.filter(i=>i.id!==id);
+    await persistInvoices();
+    closeModal();
+    renderRecords($('money-rec-search').value); renderDashboard();
+    toast('Invoice deleted');
   }
 
   function openTxnViewModal(id){
@@ -5307,7 +5421,11 @@ function moneyPageHtml(){
   function previewInvoiceNo(dateStr){
     const label = fyLabel(dateStr);
     const startNum = (settings.startNumbers && settings.startNumbers[label]) || 1;
-    const seq = startNum + invoices.filter(inv=>inv.fyLabel===label).length;
+    // v140: next = one past the HIGHEST number already used in this financial year (not "start + how many exist"): after deleting an
+    // invoice from the middle, counting reused a number that was still in use and produced two invoices with the same number.
+    let maxSeq = startNum - 1;
+    invoices.forEach(inv=>{ if(inv.fyLabel!==label) return; const m = /_(\d+)$/.exec(String(inv.invoiceNo||'')); if(m) maxSeq = Math.max(maxSeq, parseInt(m[1],10)); else maxSeq += 0; });
+    const seq = maxSeq + 1;
     return { no: 'Inv_' + label + '_' + String(seq).padStart(2,'0'), fyLabel: label };
   }
 
@@ -5438,7 +5556,7 @@ function moneyPageHtml(){
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <input type="number" class="it-amt amt" placeholder="Amount" min="0" step="0.01" value="${it.amount}">
+        <input type="number" class="it-amt amt" placeholder="Amount" min="0" step="0.01" value="${escapeHtml(it.amount)}">
       </div>
     `).join('');
     c.querySelectorAll('.item-row').forEach(row=>{
@@ -5790,7 +5908,13 @@ function moneyPageHtml(){
   }
 
   /* ---------- Save flow ---------- */
+  let _invSaving = false;
   async function handleSaveExport(){
+    if(_invSaving) return; // v140: double-tap = two invoices (the second one got the next number)
+    _invSaving = true;
+    try{ await _handleSaveExport(); } finally { _invSaving = false; }
+  }
+  async function _handleSaveExport(){
     const name = $('money-bill-name').value.trim();
     const address = $('money-bill-address').value.trim();
     const phone = $('money-bill-phone').value.trim();
@@ -5887,7 +6011,7 @@ function moneyPageHtml(){
       const initials = inv.billTo.name.trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
       const delay = Math.min(i,12)*25;
       return `
-      <div class="rec-item" data-id="${inv.id}" style="cursor:pointer; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${delay}ms;">
+      <div class="rec-item" data-id="${escapeHtml(inv.id)}" style="cursor:pointer; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${delay}ms;">
         <div class="rec-avatar">${escapeHtml(initials)}</div>
         <div class="rec-mid">
           <div class="rec-name">${escapeHtml(inv.billTo.name)}</div>
@@ -5897,7 +6021,7 @@ function moneyPageHtml(){
       </div>`;
     }).join('');
     list.querySelectorAll('.rec-item').forEach(el=>{
-      el.addEventListener('click', ()=> openModal(el.getAttribute('data-id')));
+      el.addEventListener('click', ()=>{ if(Date.now() < _pressSwallowUntil) return; openModal(el.getAttribute('data-id')); });
     });
   }
 
@@ -6013,10 +6137,33 @@ function moneyPageHtml(){
     return { start, end };
   }
 
-  function getPreviousRange(start, end){
-    const lengthMs = end.getTime() - start.getTime();
-    const prevEnd = new Date(start.getTime() - 1);
-    const prevStart = new Date(prevEnd.getTime() - lengthMs);
+  // v140: the previous period is the previous CALENDAR period (last week / last month / the 3 months before / last year). It used to be
+  // "the same number of milliseconds earlier", which for a month (28-31 days), 3 months or a leap year starts or ends a day or two off,
+  // pulling in the wrong days. `aligned` shortens it to the same number of days that have elapsed so far in the current period
+  // (day 12 of this month vs the first 12 days of last month) so a part-finished period isn't compared with a whole one.
+  function getPreviousRange(start, end, period, elapsedMs){
+    let prevStart, prevEnd;
+    if(period==='week'){
+      prevStart = new Date(start.getFullYear(), start.getMonth(), start.getDate()-7, 0,0,0,0);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate()-1, 23,59,59,999);
+    } else if(period==='month'){
+      prevStart = new Date(start.getFullYear(), start.getMonth()-1, 1, 0,0,0,0);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), 0, 23,59,59,999);
+    } else if(period==='last3'){
+      prevStart = new Date(start.getFullYear(), start.getMonth()-3, 1, 0,0,0,0);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), 0, 23,59,59,999);
+    } else if(period==='year'){
+      prevStart = new Date(start.getFullYear()-1, 0, 1, 0,0,0,0);
+      prevEnd = new Date(start.getFullYear()-1, 11, 31, 23,59,59,999);
+    } else {
+      const lengthMs = end.getTime() - start.getTime();
+      prevEnd = new Date(start.getTime() - 1);
+      prevStart = new Date(prevEnd.getTime() - lengthMs);
+    }
+    if(elapsedMs != null && isFinite(elapsedMs)){
+      const alignedEnd = new Date(prevStart.getTime() + Math.max(0, elapsedMs));
+      if(alignedEnd < prevEnd) prevEnd = alignedEnd;
+    }
     return { start: prevStart, end: prevEnd };
   }
 
@@ -6059,7 +6206,9 @@ function moneyPageHtml(){
 
     const now = new Date();
     const range = getPeriodRange(dashPeriod, now);
-    const prevRange = getPreviousRange(range.start, range.end);
+    const prevRange = getPreviousRange(range.start, range.end, dashPeriod);
+    const elapsedNow = Math.min(now.getTime(), range.end.getTime()) - range.start.getTime();
+    const prevAligned = getPreviousRange(range.start, range.end, dashPeriod, elapsedNow); // like-for-like, for the "% vs previous" line only
     const catMatch = t => dashCategory==='all' || t.category===dashCategory;
 
     // account balances (opening balance + all logged movements, including transfers) — always all-time
@@ -6079,7 +6228,7 @@ function moneyPageHtml(){
     const periodInflow = transactions.filter(t=> isRealIncome(t) && dateInRange(t.date, range));
 
     const spent = allRealExpenses.reduce((s,t)=> catMatch(t) ? s + expenseContributionInRange(t, range) : s, 0);
-    const prevSpent = allRealExpenses.reduce((s,t)=> catMatch(t) ? s + expenseContributionInRange(t, prevRange) : s, 0);
+    const prevSpent = dashPeriod==='all' ? 0 : allRealExpenses.reduce((s,t)=> catMatch(t) ? s + expenseContributionInRange(t, prevAligned) : s, 0);
     const inflowTotal = periodInflow.reduce((s,t)=>s+t.amount,0);
     const totalExpenseInRange = allRealExpenses.reduce((s,t)=> s + expenseContributionInRange(t, range), 0);
     const netTotal = inflowTotal - totalExpenseInRange;
@@ -6089,7 +6238,7 @@ function moneyPageHtml(){
     let changeText = 'No prior data to compare';
     if(prevSpent>0){
       const pct = Math.round(((spent-prevSpent)/prevSpent)*100);
-      changeText = (pct>=0?'+':'') + pct + '% vs previous period';
+      changeText = (pct>=0?'+':'') + pct + '% vs same point of the previous period';
     } else if(spent>0){
       changeText = 'New spending vs previous period';
     }
@@ -6784,25 +6933,11 @@ async function init(){
     $('money-txn-view-close').addEventListener('click', closeTxnViewModal);
     $('money-txn-view-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='money-txn-view-modal-bg') closeTxnViewModal(); });
     $('money-txn-view-edit').addEventListener('click', ()=>{ openTxnEditModal(activeTxnViewId); });
-    $('money-txn-view-delete').addEventListener('click', async ()=>{
-      const t = transactions.find(x=>x.id===activeTxnViewId);
-      const isTransfer = t && t.transferId;
-      const confirmMsg = isTransfer
-        ? 'This is one side of a transfer between your accounts. Deleting it will remove both linked entries. Continue?'
-        : 'Delete this transaction?';
-      if(!confirm(confirmMsg)) return;
-      if(isTransfer){
-        transactions = transactions.filter(x=>x.transferId!==t.transferId);
-      } else {
-        transactions = transactions.filter(x=>x.id!==activeTxnViewId);
-      }
-      await persistTransactions();
-      closeTxnViewModal();
-      renderTransactionsList($('money-txn-search').value);
-      computeBalances();
-      renderExpenseDashboard();
-      toast(isTransfer ? 'Transfer deleted (both entries removed)' : 'Transaction deleted');
-    });
+    $('money-txn-view-delete').addEventListener('click', ()=> deleteTxnById(activeTxnViewId));
+    $('money-press-close').addEventListener('click', closePressSheet);
+    $('money-press-modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='money-press-modal-bg') closePressSheet(); });
+    wirePress($('money-transactions-list'), pressTxn);
+    wirePress($('money-records-list'), pressInvoice);
 
     $('money-btn-save-settings').addEventListener('click', saveSettingsToStorage);
     $('money-btn-export-backup').addEventListener('click', exportBackupToFile);
@@ -6832,14 +6967,7 @@ async function init(){
       const inv = invoices.find(i=>i.id===currentModalId);
       if(inv) exportInvoicePdf(inv);
     });
-    $('money-modal-delete').addEventListener('click', async ()=>{
-      if(!confirm('Delete this invoice record?')) return;
-      invoices = invoices.filter(i=>i.id!==currentModalId);
-      await persistInvoices();
-      closeModal();
-      renderRecords(); renderDashboard();
-      toast('Invoice deleted');
-    });
+    $('money-modal-delete').addEventListener('click', ()=> deleteInvoiceById(currentModalId));
     $('money-inv-edit-cancel').addEventListener('click', ()=>{
       resetForm();
       toast('Edit cancelled');
@@ -6862,10 +6990,10 @@ async function init(){
     await loadSettings();
     await loadInvoices();
     await loadTransactions();
-    renderRecords();
+    renderRecords($('money-rec-search') ? $('money-rec-search').value : '');
     renderDashboard();
     renderExpenseDashboard();
-    renderTransactionsList();
+    renderTransactionsList($('money-txn-search') ? $('money-txn-search').value : '');
     computeBalances();
   };
   window.moneySwitchTab = function(name){ switchTab(name); };
@@ -9324,8 +9452,23 @@ function openFullscreenTimer(){
   renderFullscreenTimer();
   startTimerTick(); // idempotent — ensures #fs-time-display actually gets fed even if nothing else already started it
   requestNativeFullscreen(document.documentElement);
+  fsAcquireWakeLock(); // v140
 }
+// v140: keep the screen awake while the full-screen clock is on show (it is meant to be glanced at from the desk; the phone used to dim
+// and lock after 30 s, which also froze the page). Released when the overlay closes; re-requested when the page comes back to the
+// foreground because the browser drops the lock whenever the page is hidden.
+let _fsWakeLock = null;
+async function fsAcquireWakeLock(){
+  try{
+    if(!S.fullscreenTimerOpen || document.hidden || _fsWakeLock || !(navigator.wakeLock && navigator.wakeLock.request)) return;
+    _fsWakeLock = await navigator.wakeLock.request('screen');
+    _fsWakeLock.addEventListener('release', ()=>{ _fsWakeLock = null; });
+  }catch(e){ _fsWakeLock = null; }
+}
+function fsReleaseWakeLock(){ try{ if(_fsWakeLock) _fsWakeLock.release(); }catch(e){} _fsWakeLock = null; }
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && S.fullscreenTimerOpen) fsAcquireWakeLock(); });
 function closeFullscreenTimer(){
+  fsReleaseWakeLock();
   if(_fsTimerHistoryActive){
     window.removeEventListener('popstate', onFullscreenTimerBackButton);
     _fsTimerHistoryActive = false;
@@ -10063,15 +10206,26 @@ function verifyMoneyOnDrive(attempt){
   }, delays[attempt]);
 }
 
+function chatClearedAtMax(a, b){
+  const ta = a ? new Date(a).getTime() : 0, tb = b ? new Date(b).getTime() : 0;
+  if(!(ta > 0) && !(tb > 0)) return null;
+  return (tb > ta || !(ta > 0)) ? b : a;
+}
 function mergeChatFromRemote(remoteShared){
   _chatMergeListChanged = false;
   if(!remoteShared || !remoteShared.chat) return false;
   let changed = false;
   const remote = remoteShared.chat;
   const local = S.shared.chat;
+  // v140: "Clear chat" is a shared fact. Without it the merge below (a union by id) put every cleared message straight back
+  // from Drive / the partner's phone within seconds. The newest clearedAt wins; nothing created at or before it survives.
+  const clearedAt = chatClearedAtMax(local.clearedAt, remote.clearedAt);
+  if(clearedAt && clearedAt !== local.clearedAt){ local.clearedAt = clearedAt; changed = true; }
+  const clearedMs = clearedAt ? new Date(clearedAt).getTime() : 0;
   const byId = {};
-  (local.messages||[]).forEach(m=> byId[m.id]=m);
+  (local.messages||[]).forEach(m=>{ if(!(clearedMs && new Date(m.createdAt).getTime() <= clearedMs)) byId[m.id]=m; });
   (remote.messages||[]).forEach(m=>{
+    if(clearedMs && new Date(m.createdAt).getTime() <= clearedMs) return;
     const existing = byId[m.id];
     if(!existing){ byId[m.id]=m; changed=true; }
     else{
@@ -10297,9 +10451,14 @@ function unionRecentLocalChat(target, localShared){
   const have = {};
   (target.chat.messages||[]).forEach(m=>{ have[m.id] = m; });
   let changed = false;
+  // v140: honour "Clear chat" -- the newest clearedAt wins and nothing created before it is folded back in.
+  const clr = chatClearedAtMax(target.chat.clearedAt, localShared.chat.clearedAt);
+  if(clr && clr !== target.chat.clearedAt){ target.chat.clearedAt = clr; changed = true; }
+  const clrMs = clr ? new Date(clr).getTime() : 0;
   (localShared.chat.messages||[]).forEach(m=>{
     const t = new Date(m.updatedAt||m.createdAt).getTime();
     if(!(t >= horizon)) return;
+    if(clrMs && new Date(m.createdAt).getTime() <= clrMs) return;
     const ex = have[m.id];
     if(!ex || t > new Date(ex.updatedAt||ex.createdAt).getTime()){ have[m.id] = m; changed = true; }
   });
@@ -10438,13 +10597,9 @@ function onChatVisibilityChange(){
   postSwViewState(); // tell sw.js whether the chat is on screen, so it knows whether to show a notification
   if(document.hidden){
     if(_chatPollTimer){ clearInterval(_chatPollTimer); _chatPollTimer=null; }
-    // Stop the heartbeat too. lastActive is the cross-device "they're looking at Chat right
-    // now" signal, and notifyPartnerNewMessage() SKIPS the push entirely when the recipient's
-    // lastActive is under 90s old. Leaving the heartbeat running while the tab is hidden meant
-    // a phone with Chat open but screen locked kept advertising itself as actively watching,
-    // so the sender's device suppressed the push and the recipient was never notified at all —
-    // exactly the case push exists for. Pausing here lets lastActive go stale within ~90s of
-    // backgrounding, which is what the recipient actually is.
+    // Stop the heartbeat too. lastActive drives the other person's "Online" dot and "last seen" text -- a phone with Chat open
+    // but the screen locked must not keep advertising itself as online. (Push delivery no longer depends on it: the push is always
+    // sent and sw.js alone decides whether to show it, based on whether Chat is actually on screen.)
     stopChatHeartbeat();
   } else if(S.view==='chat'){
     if(!_chatPollTimer){ pollChatUpdates(); _chatPollTimer = setInterval(pollChatTick, 3000); }
@@ -10622,7 +10777,9 @@ function chatSheetHtml(){
 // are always older, but sorted explicitly by createdAt rather than assumed, since a future
 // sweep could in principle run mid-session while messages are already rendered.
 function chatAllMessagesIncludingArchive(){
-  const archived = (S.sharedArchive && S.sharedArchive.chat) || [];
+  let archived = (S.sharedArchive && S.sharedArchive.chat) || [];
+  const clr = S.shared.chat && S.shared.chat.clearedAt; // v140: a copy of the archive loaded before the other phone cleared the chat
+  if(clr){ const cm = new Date(clr).getTime(); archived = archived.filter(m=> new Date(m.createdAt).getTime() > cm); }
   if(!archived.length) return S.shared.chat.messages || [];
   return archived.concat(S.shared.chat.messages||[]).sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||''));
 }
@@ -10708,7 +10865,7 @@ function renderChatRow(msg, showAvatar, posClass){
   }
   const iStarred = !msg.deleted && msg.starredBy && msg.starredBy[me];
   const reactions = (!msg.deleted && msg.reactions && Object.keys(msg.reactions).length)
-    ? `<div class="chat-reactions">${Object.entries(msg.reactions).map(([emo,ppl])=>
+    ? `<div class="chat-reactions">${Object.entries(msg.reactions).filter(([emo,ppl])=> emo.length<=12 && !/['"<>&\\]/.test(emo) && Array.isArray(ppl) && ppl.length).map(([emo,ppl])=>
         `<button class="chat-reaction-pill ${ppl.includes(me)?'mine':''}" onclick="reactToMessage('${msg.id}','${emo}')" aria-label="${ppl.length} reacted ${emo}">${emo} ${ppl.length}</button>`
       ).join('')}</div>` : '';
   const ticks = (isOut && !msg.deleted) ? chatTicksHtml(msg) : '';
@@ -10789,7 +10946,7 @@ function chatComposerAreaHtml(){
     ${bars}${tray}
     <div class="chat-composer">
       <button class="chat-compose-icon-btn" onclick="toggleChatTray('sticker')" aria-label="Stickers" aria-pressed="${S._chatTray==='sticker'}">${CHAT_ICONS.sticker}</button>
-      <textarea id="chat-composer-input" class="chat-composer-input" rows="1" placeholder="Message…" aria-label="Message input"
+      <textarea id="chat-composer-input" class="chat-composer-input" rows="1" maxlength="4000" placeholder="Message…" aria-label="Message input"
         oninput="chatComposerInput(this)"
         onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChatMessage(); }">${escChat(S._chatDraft||'')}</textarea>
       <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()" aria-label="Send message">${CHAT_ICONS.send}</button>
@@ -11315,15 +11472,17 @@ function maybeRolloverOverdueTasks(){
   if(rolloverOverdueTasks()) driveSyncSaveNow();
 }
 
+const CHAT_MAX_LEN = 4000; // one pasted essay would otherwise be re-uploaded with the whole shared file on every save
 function sendChatMessage(){
   const me = S.local.myProfile; if(!me) return;
   const text = (S._chatDraft||'').trim();
   if(!text) return;
+  if(text.length > CHAT_MAX_LEN){ showToast('That message is too long — keep it under ' + CHAT_MAX_LEN + ' characters.'); return; }
   const now = nowISO();
   let isNewMessage = false;
   if(S._chatEditing){
     const msg = findMsg(S._chatEditing);
-    if(msg && msg.from===me && text){ msg.text=text; msg.edited=true; msg.editedAt=now; msg.updatedAt=now; }
+    if(msg && msg.from===me && !msg.deleted && text && text !== (msg.text||'')){ msg.text=text; msg.edited=true; msg.editedAt=now; msg.updatedAt=now; } // v140: unchanged text isn't an edit; a message deleted on another phone isn't revived
     S._chatEditing = null;
   } else {
     S.shared.chat.messages.push({id:uid(), from:me, type:'text', text, replyTo:S._chatReplyTo||null,
@@ -11336,7 +11495,7 @@ function sendChatMessage(){
   // seconds after the message already arrived on the other person's screen.
   if(S.shared.chat.typingUntil) S.shared.chat.typingUntil[me] = null;
   saveShared();
-  if(isNewMessage) notifyPartnerNewMessage(me, text);
+  if(isNewMessage) notifyPartnerNewMessage(me, text, S.shared.chat.messages[S.shared.chat.messages.length-1].id);
   const btn = document.getElementById('chat-send-btn');
   if(btn){ btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
   renderChatPage();
@@ -11349,7 +11508,7 @@ function sendSticker(char){
     forwarded:false, edited:false, editedAt:null, deleted:false, pinned:false, starredBy:{}, reactions:{}, createdAt:now, updatedAt:now});
   S._chatReplyTo = null; S._chatTray = null;
   if(S.shared.chat.typingUntil) S.shared.chat.typingUntil[me] = null;
-  saveShared(); notifyPartnerNewMessage(me, 'Sticker ' + char); renderChatPage(); scrollChatToBottom();
+  saveShared(); notifyPartnerNewMessage(me, 'Sticker ' + char, S.shared.chat.messages[S.shared.chat.messages.length-1].id); renderChatPage(); scrollChatToBottom();
 }
 // pollDraftAddOption/pollDraftRemoveOption/pollDraftUpdate/submitPoll/votePoll removed along
 // with the poll feature — nothing can create a poll or change a vote any more. renderPollBubble()
@@ -11392,7 +11551,7 @@ function forwardMessage(id){
     replyTo:null, forwarded:true, edited:false, editedAt:null, deleted:false, pinned:false,
     starredBy:{}, reactions:{}, createdAt:now, updatedAt:now,
   });
-  saveShared(); notifyPartnerNewMessage(me, chatPlainPreview(msg)); renderChatPage(); scrollChatToBottom();
+  saveShared(); notifyPartnerNewMessage(me, chatPlainPreview(msg), S.shared.chat.messages[S.shared.chat.messages.length-1].id); renderChatPage(); scrollChatToBottom();
 }
 function pinChatMessage(id){
   const msg = findMsg(id); if(!msg) return;
@@ -11462,11 +11621,12 @@ function deleteSelectedMessages(){
 function starSelectedMessages(){
   const me = S.local.myProfile;
   // Skip archive messages — same reason as deleteSelectedMessages above.
-  [...S._chatSelected].forEach(id=>{
-    if(!isLiveMsg(id)) return;
-    const m = findMsg(id); if(!m) return;
+  // v140: it was star-only; if every selected message is already starred, a second tap now un-stars them (like the sheet's Star/Unstar).
+  const targets = [...S._chatSelected].filter(id=>{ const m=findMsg(id); return m && !m.deleted && isLiveMsg(id); }).map(findMsg);
+  const allStarred = targets.length>0 && targets.every(m=> m.starredBy && m.starredBy[me]);
+  targets.forEach(m=>{
     if(!m.starredBy) m.starredBy={};
-    m.starredBy[me] = true; m.updatedAt = nowISO();
+    m.starredBy[me] = !allStarred; m.updatedAt = nowISO();
   });
   cancelSelectMode(); saveShared(); renderChatPage();
 }
@@ -11478,6 +11638,7 @@ async function clearChatHistory(){
   S._chatHeaderMenuOpen = false;
   if(!confirm('Clear the entire chat history for both of you? This cannot be undone.')){ renderChatPage(); return; }
   S.shared.chat.messages = [];
+  S.shared.chat.clearedAt = nowISO(); // v140: shared -- stops the partner's phone and Drive from bringing the messages back
   // Re-render immediately so the chat visually clears before the async archive operation
   // completes — without this, messages stay on screen for the full duration of the archive
   // fetch (potentially several seconds on a slow network), which looks like the clear didn't work.
@@ -11861,6 +12022,10 @@ function timerStart(paperId, category, itemId, itemLabel, countdownTargetMs){
   // v138: yesterday's diary has to be closed before today's timer can start (every way of starting a session comes through here)
   const _gate = diaryYesterdayGate();
   if(_gate.blocked){ showDiaryGate(_gate.date); return false; }
+  // v140: never overwrite a session that is already running/on a break (a second tap on a Plan row, a stale picker, or the other
+  // phone having started one) -- the old one would have vanished without being logged.
+  const _cur = myLiveStatus();
+  if(_cur && _cur.startTime && _cur.status!=='idle'){ showToast('A session is already running — stop it first.'); renderApp(); return false; }
   paperId = paperId||null; category = category||null; itemId = itemId||null; itemLabel = itemLabel||null;
   countdownTargetMs = countdownTargetMs||0;
   const now = Date.now();
@@ -11911,6 +12076,20 @@ function timerResume(){
 // Countdown, the hours logged are the TARGET duration, not whatever slightly-over amount had
 // actually elapsed before this tick caught it, and the countBreakTime preference doesn't
 // apply — the target itself is the commitment being logged, regardless of break time within it.
+const TIMER_LONG_SESSION_H = 6;
+function timerAskRealHours(hours, ts){
+  const fmt = h=>{ const m = Math.round(h*60); return Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m'; };
+  const since = fmtMsgTime(new Date(ts.startTime).toISOString());
+  const ans = prompt('This session has been running since '+since+' — '+fmt(hours)+' of study.\n\nForgot to stop it? Enter the hours you actually studied (e.g. 2.5 or 1:30), or leave it to log all '+fmt(hours)+'.\n\nCancel keeps the timer running.', (Math.round(hours*100)/100).toString());
+  if(ans === null) return null;
+  const t = String(ans).trim();
+  if(t === '') return hours;
+  let v = NaN;
+  const hm = t.match(/^(\d+):([0-5]?\d)$/);
+  if(hm) v = (+hm[1]) + (+hm[2])/60; else v = parseFloat(t);
+  if(!isFinite(v) || v < 0 || v > hours + 0.01){ showToast('Enter a number of hours between 0 and '+(Math.round(hours*100)/100)+'.'); return null; }
+  return v;
+}
 function timerStop(){
   const me = S.local.myProfile; if(!me) return;
   const ts = myLiveStatus();
@@ -11920,7 +12099,14 @@ function timerStop(){
   const breakSecs = computeBreakSeconds(ts);
   const totalSecs = wasStrictCountdown ? ts.countdownTargetMs/1000 : (Date.now()-ts.startTime)/1000;
   const studySecs = wasStrictCountdown ? totalSecs : (prefs.countBreakTime ? totalSecs : Math.max(0, totalSecs-breakSecs));
-  const hours = studySecs/3600;
+  let hours = studySecs/3600;
+  // v140: a timer left running overnight used to log all of it (9, 14, 20 hours...) with no question asked. Past 6 h of study
+  // the person now says how long they really studied; Cancel keeps the timer running untouched.
+  if(!wasStrictCountdown && hours > TIMER_LONG_SESSION_H){
+    const fixed = timerAskRealHours(hours, ts);
+    if(fixed === null) return;
+    hours = fixed;
+  }
   stopTimerTick();
   clearTimerNotification();
   // The fullscreen overlay's clock is only ever updated by the tick loop above, which just
@@ -11938,9 +12124,14 @@ function timerStop(){
     // shape (see todaysSessionsSection/fmtMsgTime), unrelated to this rewrite.
     _timerStopping = true; // v123: while the log is being written, the session must not ALSO be counted as the live one
     try{
+      // v140: a Strict Countdown that finished while the app was closed is completed when it is next opened -- its end time is when
+      // the countdown actually ran out, not when the app woke up (the sessions list and "last session ended at" read this).
+      const endMs = wasStrictCountdown ? Math.min(Date.now(), startTime + countdownTargetMs + (ts.accumulatedBreakMs||0) + (ts.status==='break' && ts.lastBreakStart ? Date.now()-ts.lastBreakStart : 0)) : Date.now();
       addLogEntry(me, {date:todayStr(new Date(startTime)), paperId, chapterId:(category && category!=='lectures')?itemId:null, category, itemLabel, hours,
-        startTime:new Date(startTime).toISOString(), endTime:nowISO(), source: wasStrictCountdown?'strict-countdown':'timer'});
+        startTime:new Date(startTime).toISOString(), endTime:new Date(endMs).toISOString(), source: wasStrictCountdown?'strict-countdown':'timer'});
     } finally { _timerStopping = false; }
+  } else {
+    showToast('Under a minute — not logged.'); // v140: it used to vanish silently
   }
   S.shared.timerState[me] = stoppedTimerState();
   driveSyncSaveTimerChange();
@@ -11990,7 +12181,7 @@ function timerDiscard(){
 // long-press fail-safe all live here.
 // ═══════════════════════════════════════════════════════════
 const STRICT_COUNTDOWN_DURATIONS = [
-  {label:'1h', ms:60*60*1000}, {label:'1.5h', ms:90*60*1000},
+  {label:'30m', ms:30*60*1000}, {label:'1h', ms:60*60*1000}, {label:'1.5h', ms:90*60*1000},
   {label:'2h', ms:120*60*1000}, {label:'3h', ms:180*60*1000},
 ];
 function toggleStrictCountdownPicker(){
@@ -12391,7 +12582,7 @@ function timerCardHtml(){
       </div>
       ${isStrict
         ? `<div style="text-align:center;margin-top:8px;font-size:10.5px;color:var(--text-faint)">Strict Countdown — no early stop. Hold the clock for 5s if this was started by accident.</div>`
-        : `<div style="text-align:center;margin-top:8px"><span onclick="timerDiscard()" style="font-size:11px;color:var(--text-faint);text-decoration:underline;cursor:pointer">Discard session</span></div>`}
+        : `<div style="text-align:center;margin-top:8px"><button type="button" onclick="timerDiscard()" style="font-size:11.5px;color:var(--text-faint);text-decoration:underline;cursor:pointer;background:none;border:none;padding:10px 16px;min-height:40px">Discard session</button></div>`}
     `;
   } else { // break
     controls = `
@@ -19557,13 +19748,13 @@ function checkMinHoursCelebration(profileId, justCelebratedTarget){
 // in the middle of a conversation, every reply was swallowed (exactly when replies happen). Whether to actually show it is now
 // decided on the RECIPIENT'S device by sw.js, which knows for certain whether she has the chat open on screen
 // (see postSwViewState()). Stickers and forwards notify too -- they used to be silent.
-function notifyPartnerNewMessage(me, text){
+function notifyPartnerNewMessage(me, text, mid){
   if(me==='umang' && umangHasBlocked()) return;
   const other = otherProfileId(me);
   if(!pushPrefEnabled(other, 'newMessage')) return;
   const prof = profileById(me);
   const preview = String(text||'').replace(/\s+/g,' ').trim().slice(0,120) || 'Sent a message';
-  sendPush(other, `💬 ${prof.nick}`, preview, {url:'./?open=chat', kind:'chat', from:me, ts:Date.now()}, {urgency:'high', ttl:86400});
+  sendPush(other, `💬 ${prof.nick}`, preview, {url:'./?open=chat', kind:'chat', from:me, ts:Date.now(), mid:mid||null}, {urgency:'high', ttl:86400});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

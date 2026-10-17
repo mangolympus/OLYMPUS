@@ -222,7 +222,10 @@
 //   * Celebration glitches: daily target + minimum hours celebrated twice at once; boot celebrated the PARTNER's finished targets on your screen; celebrations fired under the splash
 //     screen or in a background tab; a reopened target never celebrated again; stale shared stamps could repeat a celebration. One queue, owner-only, device-local stamps now.
 //   * Statistics overview rebuilt in plain language (week vs last week, what needs attention, per-paper status, time use, mocks); the old detailed page is folded underneath.
-const CACHE_VERSION = 'olympus-v139';
+// v140: chat notifications are now one per message (tag olympus-chat-<message id>) instead of a single replace-in-place notification, so several
+// messages in a row leave several notifications on the phone (newest 12 kept, badge = how many are showing). Chat code in index.html also gained
+// press-and-hold edit/delete on Money rows, a durable "Clear chat", and timer fixes (forgotten-timer prompt, wake lock, no overwriting a running session).
+const CACHE_VERSION = 'olympus-v140';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
@@ -276,8 +279,15 @@ self.addEventListener('activate', (event) => {
 // safely means "not watching" and the notification is shown.
 const CHAT_TAG = 'olympus-chat';
 const viewStates = new Map(); // client id -> { inChat, ts }
+// v140: every chat message is its OWN notification (tag olympus-chat-<message id>). Before, all chat pushes shared one tag and replaced each other
+// ("2 new messages · latest"), so a burst of messages left a single notification on the phone. The app badge now counts the chat notifications
+// that are actually showing.
+const CHAT_KEEP = 12; // at most this many chat notifications stay in the shade; older ones are closed so a long burst can't flood it
+async function chatNotifications() {
+  try { return (await self.registration.getNotifications()).filter((n) => n.data && n.data.kind === 'chat'); } catch (e) { return []; }
+}
 async function clearChatNotifications() {
-  try { (await self.registration.getNotifications({ tag: CHAT_TAG })).forEach((n) => n.close()); } catch (e) { /* ignore */ }
+  (await chatNotifications()).forEach((n) => { try { n.close(); } catch (e) { /* ignore */ } });
   try { if (self.navigator && self.navigator.clearAppBadge) await self.navigator.clearAppBadge(); } catch (e) { /* ignore */ }
 }
 self.addEventListener('message', (event) => {
@@ -397,17 +407,17 @@ self.addEventListener('push', (event) => {
       if (data.kind === 'reminder' || data.kind === 'weekly') { options.requireInteraction = true; options.renotify = !!options.tag; }
     }
     if (isChat) {
-      let count = 1;
-      try {
-        const existing = await self.registration.getNotifications({ tag: CHAT_TAG });
-        if (existing.length) count = ((existing[0].data && existing[0].data.count) || existing.length) + 1;
-      } catch (e) { /* ignore */ }
-      options.tag = CHAT_TAG;      // one notification for the whole conversation...
-      options.renotify = true;     // ...that still buzzes/rings for every new message
+      const mid = data.mid || data.ts || now;
+      options.tag = CHAT_TAG + '-' + mid;   // one notification per message (a repeat delivery of the SAME message still just replaces itself)
+      options.renotify = false;
       options.timestamp = data.ts || now;
-      options.data = Object.assign({}, data, { count });
-      if (count > 1) options.body = count + ' new messages · ' + options.body;
-      try { if (self.navigator && self.navigator.setAppBadge) await self.navigator.setAppBadge(count); } catch (e) { /* ignore */ }
+      options.data = Object.assign({}, data);
+      const existing = (await chatNotifications()).filter((n) => n.tag !== options.tag);
+      // keep the newest CHAT_KEEP-1 old ones + this one; close the rest
+      existing.sort((a, b) => ((a.timestamp || (a.data && a.data.ts) || 0) - (b.timestamp || (b.data && b.data.ts) || 0)));
+      existing.slice(0, Math.max(0, existing.length - (CHAT_KEEP - 1))).forEach((n) => { try { n.close(); } catch (e) { /* ignore */ } });
+      const visible = Math.min(CHAT_KEEP, existing.length + 1);
+      try { if (self.navigator && self.navigator.setAppBadge) await self.navigator.setAppBadge(visible); } catch (e) { /* ignore */ }
     }
     await self.registration.showNotification(payload.title || 'Olympus', options);
   })());
