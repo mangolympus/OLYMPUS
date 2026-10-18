@@ -225,7 +225,9 @@
 // v140: chat notifications are now one per message (tag olympus-chat-<message id>) instead of a single replace-in-place notification, so several
 // messages in a row leave several notifications on the phone (newest 12 kept, badge = how many are showing). Chat code in index.html also gained
 // press-and-hold edit/delete on Money rows, a durable "Clear chat", and timer fixes (forgotten-timer prompt, wake lock, no overwriting a running session).
-const CACHE_VERSION = 'olympus-v140';
+// v141: Money entries (transactions and invoices) no longer react to a plain tap -- press and hold is the only way to edit/delete -- and the on-page tips are gone.
+// v143: Snow background fixed (canvas was 0x0 on screen) and kept BEHIND all content; bigger/brighter flakes, fill the screen at once, also fall in Day mode, no freeze under reduce-motion.
+const CACHE_VERSION = 'olympus-v143';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

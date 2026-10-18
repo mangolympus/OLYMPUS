@@ -84,8 +84,10 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;
    don't trigger a full-document repaint each frame. contain:strict (layout + style + paint)
    is safe here because nothing inside ever needs to influence or be influenced by outside
    layout — it's a purely decorative element that's already isolated by position:fixed. */
-#bg-canvas{position:fixed;inset:0;pointer-events:none;z-index:-1;display:none;
+#bg-canvas{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:-1;display:none;
   will-change:transform;contain:strict}
+/* v142 ROOT CAUSE of 'snow not working' (the canvas stays BEHIND all content, as in the original design -- flakes never overlap a card or button): a <canvas> is a replaced element, so inset:0 does not stretch it, and contain:strict (size containment) makes its
+   intrinsic size 0x0 -- the flakes were being drawn into a canvas that occupied no space on screen. The explicit width/height above give it the full viewport. */
 
 /* VIEW SWITCH TRANSITION */
 @keyframes viewFadeSlide{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
@@ -901,10 +903,8 @@ body.targets-mode #targets-root{display:flex}
     display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--card); margin-bottom:8px;
     transition:transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
   }
-.money-view .rec-item:active{transform:scale(.98); background:var(--input-bg);}
 .money-view .rec-item{-webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; touch-action:pan-y}
 .money-view .rec-item.pressing{transform:scale(.97); background:var(--input-bg); box-shadow:0 0 0 2px color-mix(in srgb, var(--umang) 55%, transparent) inset; transition:transform .25s ease, box-shadow .25s ease}
-.money-view .press-hint{font-size:11px; color:var(--muted); text-align:center; margin:2px 0 10px}
 .money-view .rec-avatar{
     width:38px;height:38px;border-radius:10px;background:var(--blue-100);color:var(--navy-700);
     display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none;
@@ -2274,8 +2274,15 @@ const BG_THEMES = {
   snow: {
     label:'Snow', emoji:'❄️',
     bgCss:'linear-gradient(180deg, rgba(20,32,58,.22), rgba(8,10,18,0) 60%)',
-    particleCount:60, colors:['#EAF3FF','#FFFFFF','#CFE3FF'],
-    sizeRange:[1,3.4], speedRange:[13,44], glow:2.6, blend:'source-over', trail:0, drift:'down', wobble:true,
+    particleCount:80, colors:['#EAF3FF','#FFFFFF','#CFE3FF'],
+    sizeRange:[1.4,4], speedRange:[16,48], glow:3.3, alphaRange:[0.4,0.95], blend:'source-over', trail:0, drift:'down', wobble:true,
+  },
+  // Same snow for Day mode (white flakes vanish on a light page): soft blue flakes instead.
+  snowday: {
+    label:'Snow (day)', emoji:'❄️',
+    bgCss:'',
+    particleCount:70, colors:['#5E8FD0','#7FA6DC','#4A78BA'],
+    sizeRange:[1.4,4], speedRange:[16,48], glow:3.0, alphaRange:[0.25,0.6], blend:'source-over', trail:0, drift:'down', wobble:true,
   },
   dark: {
     label:'Dark', emoji:'🌌',
@@ -2303,18 +2310,22 @@ function makeGlowSprite(hex){
   cx.fillRect(0,0,size,size);
   return c;
 }
-function makeBgParticle(theme, cw, ch){
+function makeBgParticle(theme, cw, ch, initial){
   const [minS,maxS] = theme.sizeRange;
   const [minV,maxV] = theme.speedRange;
   const size = minS + Math.random()*(maxS-minS);
   const speed = minV + Math.random()*(maxV-minV);
   const color = theme.colors[Math.floor(Math.random()*theme.colors.length)];
   let y;
-  if(theme.drift==='up') y = ch + Math.random()*ch*0.3;
-  else if(theme.drift==='down') y = -Math.random()*ch*0.3;
+  // v142: the first fill is spread over the whole screen -- flakes used to all start ABOVE the top edge, so the screen looked empty for several seconds.
+  if(initial) y = Math.random()*ch;
+  else if(theme.drift==='up') y = ch + Math.random()*ch*0.3;
+  else if(theme.drift==='down') y = -Math.random()*ch*0.1;
   else y = Math.random()*ch;
-  return {x:Math.random()*cw, y, size, speed, color, baseAlpha:0.35+Math.random()*0.55, phase:Math.random()*Math.PI*2};
+  const [minA,maxA] = theme.alphaRange || [0.35,0.9];
+  return {x:Math.random()*cw, y, size, speed, color, baseAlpha:minA+Math.random()*(maxA-minA), phase:Math.random()*Math.PI*2};
 }
+let _bgSlow = 1;
 let _bgCanvas=null, _bgCtx=null, _bgParticles=[], _bgSprites={}, _bgThemeKey='off', _bgRafId=null, _bgLastTs=0, _bgDpr=1;
 function teardownBgCanvas(){
   if(_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId=null; }
@@ -2532,7 +2543,7 @@ function startBgLoop(){
   const isRage = _bgThemeKey==='rage';
   const step = (ts)=>{
     _bgRafId = requestAnimationFrame(step);
-    const dt = Math.min(0.05, (ts-_bgLastTs)/1000);
+    const dt = Math.min(0.05, (ts-_bgLastTs)/1000) * _bgSlow;
     _bgLastTs = ts;
     if(isRage) updateAndDrawRage(dt); else updateAndDrawBg(themeCfg, dt);
   };
@@ -2555,13 +2566,14 @@ function startBgLoop(){
 const BG_THEME_LOCKED = 'snow';
 function applyBgTheme(){
   const isDark = ((S.local && S.local.dark) !== false);
-  _bgThemeKey = isDark ? (BG_THEME_LOCKED || (S.local && S.local.bgTheme) || 'off') : 'off';
+  _bgThemeKey = isDark ? (BG_THEME_LOCKED || (S.local && S.local.bgTheme) || 'off') : (BG_THEME_LOCKED === 'snow' ? 'snowday' : 'off'); // v142: Day mode gets blue snow instead of nothing
   teardownBgCanvas();
   if(!_bgCanvas) _bgCanvas = document.getElementById('bg-canvas');
   if(!_bgCanvas) return;
   const themeCfg = BG_THEMES[_bgThemeKey];
   if(!themeCfg){ _bgCanvas.style.display = 'none'; _bgCanvas.style.background = ''; return; }
   _bgCanvas.style.display = 'block';
+  _bgCanvas.style.zIndex = '';
   _bgCanvas.style.background = themeCfg.bgCss;
   if(!_bgCtx) _bgCtx = _bgCanvas.getContext('2d');
   resizeBgCanvas();
@@ -2571,9 +2583,12 @@ function applyBgTheme(){
     _bgSprites = {};
     themeCfg.colors.forEach(c=>{ _bgSprites[c] = makeGlowSprite(c); });
     const cw = window.innerWidth, ch = window.innerHeight;
-    _bgParticles = Array.from({length:themeCfg.particleCount}, ()=> makeBgParticle(themeCfg, cw, ch));
+    _bgParticles = Array.from({length:themeCfg.particleCount}, ()=> makeBgParticle(themeCfg, cw, ch, true));
   }
-  if(prefersReducedMotion()){
+  // v142: the phone's "reduce motion"/battery-saver setting used to freeze the snow into a still picture, which is exactly how it looks when the
+  // effect "isn't working". Snow is the app's deliberate ambient theme, so it keeps falling -- at half speed -- instead of freezing.
+  _bgSlow = prefersReducedMotion() ? 0.5 : 1;
+  if(prefersReducedMotion() && !BG_THEME_LOCKED){
     if(_bgThemeKey==='rage') drawRageStaticFrame(); else drawBgStaticFrame(themeCfg, window.innerWidth, window.innerHeight);
     return;
   }
@@ -2589,7 +2604,7 @@ function setBgTheme(key){
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){
     if(_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId=null; }
-  } else if(_bgThemeKey!=='off' && !prefersReducedMotion()){
+  } else if(_bgThemeKey!=='off' && (!prefersReducedMotion() || BG_THEME_LOCKED)){
     startBgLoop();
   }
 });
@@ -4260,7 +4275,6 @@ function moneyPageHtml(){
 
       </div>
 
-    <div class="press-hint">Tip: press and hold an entry to edit or delete it</div>
     <div id="money-transactions-list"></div>
   </main>
 
@@ -4363,7 +4377,6 @@ function moneyPageHtml(){
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--muted);" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="money-rec-search" placeholder="Search by party name or invoice no.">
       </div>
-      <div class="press-hint">Tip: press and hold an invoice to edit, export or delete it</div>
       <div id="money-records-list"></div>
     </div>
   </main>
@@ -5306,13 +5319,12 @@ function moneyPageHtml(){
         <div class="rec-amt txn-amt ${isIn?'in':'out'}">${isIn?'+':'-'}${fmt(t.amount)}</div>
       </div>`;
     }).join('');
-    // one delegated listener instead of one per row
-    list.onclick = (e)=>{ if(Date.now() < _pressSwallowUntil) return; const el = e.target.closest && e.target.closest('.rec-item'); if(el && list.contains(el)) openTxnViewModal(el.getAttribute('data-id')); };
+    list.onclick = null; // v140: a plain tap does nothing -- entries are edited / deleted only by pressing and holding them
   }
 
   // ── v140: press and hold an entry -> Edit / Delete ───────────────────────────────────────────────────────────────────────────────
   // Hold ~0.45 s on a transaction or an invoice row (a little buzz on phones that support it). Moving the finger more than 10 px, or
-  // letting go early, is an ordinary scroll / tap and does nothing special; a tap still opens the detail sheet as before.
+  // letting go early, is an ordinary scroll / tap and does nothing at all -- a plain tap never opens or changes an entry.
   let _pressSwallowUntil = 0;
   function wirePress(list, onPress){
     if(!list || list._pressWired) return;
@@ -6011,7 +6023,7 @@ function moneyPageHtml(){
       const initials = inv.billTo.name.trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
       const delay = Math.min(i,12)*25;
       return `
-      <div class="rec-item" data-id="${escapeHtml(inv.id)}" style="cursor:pointer; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${delay}ms;">
+      <div class="rec-item" data-id="${escapeHtml(inv.id)}" style="animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${delay}ms;">
         <div class="rec-avatar">${escapeHtml(initials)}</div>
         <div class="rec-mid">
           <div class="rec-name">${escapeHtml(inv.billTo.name)}</div>
@@ -6020,9 +6032,6 @@ function moneyPageHtml(){
         <div class="rec-amt">${fmt(inv.total)}</div>
       </div>`;
     }).join('');
-    list.querySelectorAll('.rec-item').forEach(el=>{
-      el.addEventListener('click', ()=>{ if(Date.now() < _pressSwallowUntil) return; openModal(el.getAttribute('data-id')); });
-    });
   }
 
   function openModal(id){
@@ -19492,12 +19501,12 @@ function bgThemeSettingsRow(){
     const theme = BG_THEMES[BG_THEME_LOCKED];
     return `<div style="padding:12px 14px">
       <div class="settings-row-lbl" style="margin-bottom:4px">Motion background</div>
-      <div class="settings-row-sub">Fixed to ${theme.emoji} ${theme.label} at Night — off in Day mode, no other options while this is on.</div>
+      <div class="settings-row-sub">Fixed to ${theme.emoji} ${theme.label} — white flakes at Night, blue flakes in Day mode. It keeps falling (slowly) even if your phone is set to reduce motion.</div>
     </div>`;
   }
   const current = (S.local && S.local.bgTheme) || 'off';
   const options = [{key:'off',label:'Off',emoji:'⭘'}].concat(
-    Object.keys(BG_THEMES).map(key=>({key, label:BG_THEMES[key].label, emoji:BG_THEMES[key].emoji})));
+    Object.keys(BG_THEMES).filter(k=>k!=='snowday').map(key=>({key, label:BG_THEMES[key].label, emoji:BG_THEMES[key].emoji})));
   return `<div style="padding:12px 14px">
     <div class="settings-row-lbl" style="margin-bottom:4px">Motion background</div>
     <div class="settings-row-sub" style="padding:0 0 10px">A subtle animated backdrop behind your data, shown at Night only. Purely decorative — never changes your Umang/Chetna accent colors.</div>
