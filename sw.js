@@ -227,7 +227,13 @@
 // press-and-hold edit/delete on Money rows, a durable "Clear chat", and timer fixes (forgotten-timer prompt, wake lock, no overwriting a running session).
 // v141: Money entries (transactions and invoices) no longer react to a plain tap -- press and hold is the only way to edit/delete -- and the on-page tips are gone.
 // v143: Snow background fixed (canvas was 0x0 on screen) and kept BEHIND all content; bigger/brighter flakes, fill the screen at once, also fall in Day mode, no freeze under reduce-motion.
-const CACHE_VERSION = 'olympus-v143';
+// v144: Money for both profiles, each strictly private. Everyone's Money now lives in their own Drive file (olympus-money-umang.json / olympus-money-chetna.json) that api/sync.js
+// only serves to its owner, and is no longer part of the shared file (Chinnu's copy of Umang's Money is purged from her phone). Chinnu's Money has SBI + Cash only. The Money
+// Dashboard shows money going out only (Inflow / Net cards, money-in line and the Sales tab are gone). Needs the new api/sync.js deployed with this index.html.
+// v145: Money audit. Backup import repaired (settings import always failed after already adding entries in memory; broken entries are skipped; Chinnu's import skips HDFC),
+// invoice save no longer breaks when the PDF tools cannot load offline (no duplicate invoice on a second tap), "Avg. daily spend" counts whole study days, Chinnu's own saved Money is no
+// longer discarded on reopening, the private Money file retries after a failed write.
+const CACHE_VERSION = 'olympus-v145';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
