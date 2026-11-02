@@ -57,6 +57,16 @@
 //  * POST may send { file, payloadGz: <base64 of gzip(JSON)> } instead of { file, payload }: the whole shared file used to be uploaded as plain text on
 //    every save, which on a mobile uplink is most of the time a save takes. Both forms are accepted.
 //
+// *** v144: PRIVATE MONEY FILES ***
+// Each person's Money (transactions, invoices, balances) lives in its OWN file, olympus-money-<profile>.json, and this endpoint
+// only ever serves / accepts that file to the profile it belongs to -- a token for the other profile gets 403, whatever it asks for.
+// Money is no longer part of the shared olympus-data.json that both phones download:
+//   * GET of the main file strips the `money` key for everyone except Umang (his copy is only there so his phone can move the OLD
+//     in-file Money into his own file once -- after that the key is gone from the file);
+//   * POST of the main file from Chetna can neither write nor remove it: whatever Money the file currently holds is carried over untouched.
+// File names are compared case-insensitively on purpose -- Drive's `name =` search ignores case, so `OLYMPUS-MONEY-UMANG.JSON` would
+// otherwise reach the very same file.
+//
 // Auth: every request needs `Authorization: Bearer <token>` from a prior /api/auth call.
 // GET  /api/sync?file=<name>  → 200 { data: <JSON, or null if the file doesn't exist yet>, modifiedTime }
 // POST /api/sync              → body { file?: <name>, payload: <JSON to save> }; 200 { ok: true }
@@ -278,6 +288,20 @@ function isValidFileName(name) {
   return typeof name === 'string' && /^[A-Za-z0-9._-]{1,100}$/.test(name);
 }
 
+// v144: who may touch which file. Any file whose name mentions "money" is private to the profile named in it (exact, lower-case name);
+// everyone else gets 403. Returns { allowed, isMain } -- isMain = the shared data file, in any capitalisation.
+function fileAccess(fileName, profile) {
+  const lower = String(fileName).toLowerCase();
+  if (lower.includes('money')) {
+    return { allowed: fileName === `olympus-money-${profile}.json`, isMain: false };
+  }
+  return { allowed: true, isMain: lower === DEFAULT_FILE_NAME };
+}
+// Instance-local hint (valid for 5 minutes): the main file was seen holding no Money, so Chetna's saves can skip the extra read below.
+let _mainNoMoneyAt = 0;
+const MAIN_NO_MONEY_TTL_MS = 5 * 60 * 1000;
+function mainKnownMoneyFree() { return _mainNoMoneyAt > 0 && Date.now() - _mainNoMoneyAt < MAIN_NO_MONEY_TTL_MS; }
+
 export default async function handler(req, res) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -299,6 +323,11 @@ export default async function handler(req, res) {
     const fileName = req.query && req.query.file ? req.query.file : DEFAULT_FILE_NAME;
     if (!isValidFileName(fileName)) {
       res.status(400).json({ error: 'Invalid file name' });
+      return;
+    }
+    const access = fileAccess(fileName, profile);
+    if (!access.allowed) {
+      res.status(403).json({ error: 'Not allowed' });
       return;
     }
     const since = req.query && typeof req.query.since === 'string' && req.query.since.length < 64 ? req.query.since : null;
@@ -345,6 +374,8 @@ export default async function handler(req, res) {
         res.status(500).json({ error: 'Shared data file is corrupted' });
         return;
       }
+      if (access.isMain && profile !== 'umang' && data && typeof data === 'object') delete data.money; // v144: never leaves the server for Chetna
+      if (access.isMain && data && typeof data === 'object') _mainNoMoneyAt = data.money ? 0 : Date.now();
       res.status(200).json({ data, modifiedTime: result.modifiedTime });
     } catch (err) {
       console.error('sync GET failed:', err);
@@ -362,6 +393,11 @@ export default async function handler(req, res) {
       res.status(400).json({ error: 'Invalid file name' });
       return;
     }
+    const access = fileAccess(fileName, profile);
+    if (!access.allowed) {
+      res.status(403).json({ error: 'Not allowed' });
+      return;
+    }
     if (typeof body.payloadGz === 'string' && payload === undefined) {
       try {
         jsonString = gunzipSync(Buffer.from(body.payloadGz, 'base64')).toString('utf8');
@@ -376,6 +412,23 @@ export default async function handler(req, res) {
       return;
     }
     try {
+      if (access.isMain) {
+        if (profile === 'umang') {
+          _mainNoMoneyAt = payload.money ? 0 : Date.now(); // his phone dropping the key = the old in-file Money has been moved out
+        } else {
+          // Chetna's phone must not write or erase Money in the shared file: put back exactly what the file holds now (or nothing).
+          delete payload.money;
+          if (!mainKnownMoneyFree()) {
+            const existing = await withDriveToken(async (accessToken) => {
+              const f = await resolveFile(accessToken, fileName);
+              if (!f) return null;
+              try { return JSON.parse(await readFileContent(accessToken, f.id)); } catch (e) { return null; }
+            });
+            if (existing && existing.money) { payload.money = existing.money; _mainNoMoneyAt = 0; } else _mainNoMoneyAt = Date.now();
+          }
+          jsonString = JSON.stringify(payload);
+        }
+      }
       if (jsonString === null) jsonString = JSON.stringify(payload);
       const saved = await withDriveToken(async (accessToken) => {
         let file = await resolveFile(accessToken, fileName);
