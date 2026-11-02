@@ -805,6 +805,9 @@ body.targets-mode #targets-root{display:flex}
 .money-view .money-source-btn-row{display:flex; gap:8px;}
 .money-view .money-source-btn{flex:1; padding:11px 8px; border-radius:10px; border:1px solid var(--border); background:var(--input-bg); color:var(--muted); font-weight:700; font-size:13.5px; cursor:pointer; transition:background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);}
 .money-view .money-source-btn.active{background:var(--umang); border-color:var(--umang); color:#fff;}
+/* v144: Chetna's Money has SBI and Cash only -- HDFC is Umang's account */
+body.money-no-hdfc [data-money-src="HDFC"]{display:none !important;}
+body.money-no-hdfc .money-view .stat-grid[data-bal]{grid-template-columns:repeat(2,1fr) !important;}
 /* top:60px = Olympus's own <header> height: 13px+13px padding + 33px .icon-btn (its tallest
    content) + 1px border-bottom (see header{} and .icon-btn{} above). Fixed px on both sides,
    not measured at runtime — this used to read header.offsetHeight via JS into a CSS custom
@@ -3317,7 +3320,7 @@ function migrateShared(data){
     data.money = {
       __nativeSchema: true,
       settings: Object.assign(
-        { name:'Umang Jain', tagline:'', email:'', phone:'', upiId:'', theme:'navy', startNumbers:{}, openingBalances:{HDFC:0,SBI:0,Cash:0} },
+        moneyDefaultSettings(S.local && S.local.myProfile),
         parseOr(old['settings'], {})
       ),
       invoices: parseOr(old['invoices-list'], []),
@@ -3543,9 +3546,10 @@ function migrateShared(data){
 async function loadShared(){
   try{
     const res = await storageGet('olympusData', true);
-    if(res && res.value) return migrateShared(JSON.parse(res.value));
+    if(res && res.value){ const d = migrateShared(JSON.parse(res.value)); moneyOwnerGuard(d); return d; }
   }catch(e){ console.warn('loadShared failed, starting fresh:', e); }
   const fresh = buildDefaultShared();
+  moneyOwnerGuard(fresh); // a brand-new phone: this is where its Money starts, so it is stamped as this person's
   await saveShared(fresh);
   return fresh;
 }
@@ -4034,12 +4038,11 @@ const NAV_ITEMS = [
   {id:'chat', label:'Chat'},
   {id:'settings', label:'Settings'},
 ];
-// Money is a personal-finance page for Umang only — never shown, mounted, or reachable
-// from Chetna's profile. Computed rather than a static array so it can key off whoever
-// is actually logged in right now.
+// v144: Money is a page in BOTH profiles, but each person's Money is private to them (their own file on Drive that the server only
+// hands to its owner -- see moneyVault below). Computed rather than a static array so it can key off whoever is logged in.
 function navItems(){
   const items = NAV_ITEMS.slice();
-  if(S.local.myProfile === 'umang') items.push({id:'money', label:'Money'});
+  if(S.local.myProfile === 'umang' || S.local.myProfile === 'chetna') items.push({id:'money', label:'Money'});
   return items;
 }
 function renderNav(){
@@ -4076,7 +4079,8 @@ function confirmLeaveTest(){
 }
 function switchView(v){
   if(!confirmLeaveTest()) return;
-  if(v==='money' && S.local.myProfile!=='umang') return; // never reachable from Chetna's profile
+  if(v==='money' && !S.local.myProfile) return;
+  if(v==='money') moneyVaultSync({minAgeMs:5000}); // v144: look at this person's private Money file whenever the page is opened
   const enteringChat = v==='chat' && S.view!=='chat';
   if(enteringChat) S._chatReturnView = (S.view==='workspace' ? 'timer' : S.view) || 'home';
   S.view=v;
@@ -4195,7 +4199,7 @@ function openWorkspace(paperId, tab){
 // Chetna never sees the nav button, switchView() above refuses v==='money' for her profile.
 // ═══════════════════════════════════════════════════════════
 function renderMoneyPage(){
-  if(S.local.myProfile !== 'umang'){ switchView('home'); return; }
+  if(!S.local.myProfile){ switchView('home'); return; }
   const root = document.getElementById('money-root');
   if(!root) return;
   const freshlyOpened = !root.dataset.built;
@@ -4239,8 +4243,8 @@ function moneyPageHtml(){
         </button>
       </div>
 
-      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
-        <div class="stat-card" style="padding:10px 12px;">
+      <div class="stat-grid" data-bal="1" style="grid-template-columns:repeat(3,1fr);">
+        <div class="stat-card" data-money-src="HDFC" style="padding:10px 12px;">
           <div class="lbl">HDFC</div>
           <div class="val" id="money-bal-hdfc" style="font-size:15.5px;">₹0.00</div>
         </div>
@@ -4389,17 +4393,12 @@ function moneyPageHtml(){
       Transactions
     </button>
 
-    <div class="seg-control">
-      <button class="seg-btn active" data-dashsub="expenses" type="button">Expenses</button>
-      <button class="seg-btn" data-dashsub="sales" type="button">Sales</button>
-    </div>
-
     <div class="subpage active" id="money-dash-sub-expenses">
 
       <div class="card">
         <h2><span class="n">🏦</span>Account Balances</h2>
-        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:0;">
-          <div class="stat-card" style="padding:12px;">
+        <div class="stat-grid" data-bal="1" style="grid-template-columns:repeat(3,1fr); margin-bottom:0;">
+          <div class="stat-card" data-money-src="HDFC" style="padding:12px;">
             <div class="lbl">HDFC</div>
             <div class="val" id="money-exp-bal-hdfc" style="font-size:15px;">₹0</div>
           </div>
@@ -4442,16 +4441,6 @@ function moneyPageHtml(){
           <div class="sub" style="color:var(--muted);" id="money-exp-stat-spent-sub">—</div>
         </div>
         <div class="stat-card">
-          <div class="lbl">Inflow</div>
-          <div class="val" id="money-exp-stat-in" style="color:var(--good);">₹0</div>
-          <div class="sub" style="color:var(--muted);" id="money-exp-stat-in-sub">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="lbl">Net</div>
-          <div class="val" id="money-exp-stat-net">₹0</div>
-          <div class="sub" style="color:var(--muted);" id="money-exp-stat-net-sub">—</div>
-        </div>
-        <div class="stat-card">
           <div class="lbl">Avg. Daily Spend</div>
           <div class="val" id="money-exp-stat-avgday" style="font-size:16px;">₹0</div>
           <div class="sub" style="color:var(--muted);" id="money-exp-stat-avgday-sub">so far</div>
@@ -4465,8 +4454,8 @@ function moneyPageHtml(){
       </div>
 
       <div class="card">
-        <h2><span class="n">📈</span>30-Day Cash Flow</h2>
-        <div class="hint" id="money-exp-trend-cap" style="margin-top:0; margin-bottom:10px;">Money in vs money out, last 30 days. Tap a day for the breakdown.</div>
+        <h2><span class="n">📈</span>30-Day Spending</h2>
+        <div class="hint" id="money-exp-trend-cap" style="margin-top:0; margin-bottom:10px;">Money out, last 30 days. Tap a day for the breakdown.</div>
         <div class="chart-wrap" id="money-exp-trend-container"></div>
       </div>
 
@@ -4523,41 +4512,6 @@ function moneyPageHtml(){
         <div id="money-exp-top-categories"></div>
       </div>
     </div>
-
-    <div class="subpage" id="money-dash-sub-sales">
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="lbl">Total Revenue</div>
-          <div class="val" id="money-stat-revenue">₹0</div>
-          <div class="sub up" id="money-stat-revenue-sub">All time</div>
-        </div>
-        <div class="stat-card">
-          <div class="lbl">Invoices</div>
-          <div class="val" id="money-stat-count">0</div>
-          <div class="sub" style="color:var(--muted);" id="money-stat-count-sub">All time</div>
-        </div>
-        <div class="stat-card">
-          <div class="lbl">This Month</div>
-          <div class="val" id="money-stat-month">₹0</div>
-          <div class="sub" style="color:var(--muted);" id="money-stat-month-sub">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="lbl">Avg. Invoice</div>
-          <div class="val" id="money-stat-avg">₹0</div>
-          <div class="sub" style="color:var(--muted);">Per invoice</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2><span class="n">📈</span>Last 6 Months</h2>
-        <div class="chart-wrap" id="money-chart-container"></div>
-      </div>
-
-      <div class="card">
-        <h2><span class="n">★</span>Top Parties</h2>
-        <div id="money-top-parties"></div>
-      </div>
-    </div>
   </main>
 
   <!-- PAGE 4: SETTINGS -->
@@ -4612,7 +4566,7 @@ function moneyPageHtml(){
       <div class="hint" style="margin-top:0;margin-bottom:12px;">
         Enter each account's balance on the day you started using this tracker. It's added to your logged transactions so the balances shown on Transactions and the Dashboard match your real accounts.
       </div>
-      <div class="field">
+      <div class="field" data-money-src="HDFC">
         <label>HDFC</label>
         <input type="number" id="money-set-open-hdfc" placeholder="0" step="0.01">
       </div>
@@ -4702,7 +4656,7 @@ function moneyPageHtml(){
     <div class="field">
       <label>Source</label>
       <div class="money-source-btn-row" id="money-txn-source-row">
-        <button type="button" class="money-source-btn" data-source="HDFC">HDFC</button>
+        <button type="button" class="money-source-btn" data-source="HDFC" data-money-src="HDFC">HDFC</button>
         <button type="button" class="money-source-btn" data-source="SBI">SBI</button>
         <button type="button" class="money-source-btn" data-source="Cash">Cash</button>
       </div>
@@ -4847,7 +4801,10 @@ function moneyPageHtml(){
   let selectedTxnSource = 'HDFC'; // tracked here now instead of a <select>'s own .value — see setTxnSource()
   const OUTFLOW_CATEGORIES = ['Travel','Food','Shopping','Recharge','Investment','Inter Bank Transactions','Others'];
   const INFLOW_CATEGORIES = ['Salary','Business','Investment','Reimbursement','Others'];
-  const ACCOUNT_SOURCES = ['HDFC','SBI','Cash'];
+  // v144: Umang has HDFC, SBI and Cash; Chetna's Money has SBI and Cash only (HDFC is hidden everywhere for her -- see body.money-no-hdfc)
+  const ALL_SOURCES = ['HDFC','SBI','Cash'];
+  const mySources = ()=> (S.local && S.local.myProfile === 'chetna') ? ['SBI','Cash'] : ALL_SOURCES;
+  const applyProfileSources = ()=> document.body.classList.toggle('money-no-hdfc', !!(S.local && S.local.myProfile === 'chetna'));
   let itemSeq = 0;
   let currentModalId = null;
   let editingInvoiceId = null;
@@ -4982,7 +4939,7 @@ function moneyPageHtml(){
     const label = fyLabel(todayStr());
     const startNum = Math.max(parseInt($('money-set-start-number').value, 10) || 1, 1);
     settings = {
-      name: $('money-set-name').value.trim() || 'Umang Jain',
+      name: $('money-set-name').value.trim() || moneyDefaultSettings(S.local && S.local.myProfile).name,
       tagline: $('money-set-tagline').value.trim(),
       email: $('money-set-email').value.trim(),
       phone: $('money-set-phone').value.trim(),
@@ -4998,7 +4955,7 @@ function moneyPageHtml(){
     applyTheme(settings.theme);
     moneyStore().settings = settings;
     moneyStore().settingsUpdatedAt = Date.now(); // v129: lets a merge tell which phone's settings are newer
-    saveShared();
+    window.moneyChanged();
     toast('Settings saved');
     updateInvNoPreview();
     computeBalances();
@@ -5032,7 +4989,7 @@ function moneyPageHtml(){
   async function persistInvoices(){
     stampChanges(invoices, _invSig);
     moneyStore().invoices = invoices;
-    saveShared();
+    window.moneyChanged();
     return true;
   }
 
@@ -5045,7 +5002,7 @@ function moneyPageHtml(){
   async function persistTransactions(){
     stampChanges(transactions, _txnSig);
     moneyStore().transactions = transactions;
-    saveShared();
+    window.moneyChanged();
     return true;
   }
 
@@ -5059,7 +5016,7 @@ function moneyPageHtml(){
     $('money-txn-date').value = todayStr();
     $('money-txn-amount').value = '';
     $('money-txn-remarks').value = '';
-    setTxnSource('HDFC');
+    setTxnSource(mySources()[0]);
     const cats = isIn ? INFLOW_CATEGORIES : OUTFLOW_CATEGORIES;
     $('money-txn-category').innerHTML = cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
     updateInvoiceLinkVisibility();
@@ -5147,8 +5104,8 @@ function moneyPageHtml(){
     const sourceVal = selectedTxnSource;
     const sel = $('money-txn-transfer-to');
     const current = sel.value;
-    sel.innerHTML = ACCOUNT_SOURCES.filter(s=>s!==sourceVal).map(s=>`<option value="${s}">${s}</option>`).join('');
-    if(ACCOUNT_SOURCES.includes(current) && current!==sourceVal) sel.value = current;
+    sel.innerHTML = mySources().filter(s=>s!==sourceVal).map(s=>`<option value="${s}">${s}</option>`).join('');
+    if(mySources().includes(current) && current!==sourceVal) sel.value = current;
     wrap.style.display = '';
   }
 
@@ -5850,7 +5807,7 @@ function moneyPageHtml(){
     _pdfLibsLoadingPromise = Promise.all([
       loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
       loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
-    ]).then(()=>{ _pdfLibsLoaded = true; });
+    ]).then(()=>{ _pdfLibsLoaded = true; }, (e)=>{ _pdfLibsLoadingPromise = null; throw e; }); // v145: a failed load (offline) is retried on the next export instead of failing until the app is reloaded
     return _pdfLibsLoadingPromise;
   }
 
@@ -5871,7 +5828,10 @@ function moneyPageHtml(){
 
   async function exportInvoicePdf(inv){
     // Load html2canvas + jsPDF on first use (see ensurePdfLibsLoaded above).
-    await ensurePdfLibsLoaded();
+    // v145: with no connection the two libraries cannot load. That used to throw out of the save flow AFTER the invoice was stored -- the form
+    // kept its contents (so a second tap saved a duplicate with the next number) and the list was not refreshed. The invoice is saved either way.
+    try{ await ensurePdfLibsLoaded(); }
+    catch(e){ toast('Invoice saved. PDF needs an internet connection — export it later by pressing and holding the invoice.'); return; }
     const root = $('money-pdf-root');
     root.innerHTML = buildPdfHtml(inv);
     await waitForInvoiceFonts();
@@ -6046,68 +6006,8 @@ function moneyPageHtml(){
 
   /* ---------- Dashboard ---------- */
   function monthKey(dateStr){ return dateStr.slice(0,7); }
-  function renderDashboard(){
-    const total = invoices.reduce((s,i)=>s+i.total,0);
-    const count = invoices.length;
-    const avg = count? total/count : 0;
-    const now = studyNow();
-    const curKey = monthKeyOf(now);
-    const thisMonth = invoices.filter(i=>monthKey(i.date)===curKey).reduce((s,i)=>s+i.total,0);
-
-    $('money-stat-revenue').textContent = fmt(total);
-    $('money-stat-count').textContent = String(count);
-    $('money-stat-month').textContent = fmt(thisMonth);
-    $('money-stat-avg').textContent = fmt(avg);
-    $('money-stat-revenue-sub').textContent = count? (count + ' invoice' + (count>1?'s':'')) : 'No data yet';
-    $('money-stat-count-sub').textContent = 'All time';
-    $('money-stat-month-sub').textContent = now.toLocaleDateString('en-IN',{month:'long', year:'numeric'});
-
-    // last 6 months bar chart
-    const months = [];
-    for(let k=5;k>=0;k--){
-      const d = new Date(now.getFullYear(), now.getMonth()-k, 1);
-      months.push({ key: monthKeyOf(d), label: d.toLocaleDateString('en-IN',{month:'short'}) });
-    }
-    const sums = months.map(m => invoices.filter(i=>monthKey(i.date)===m.key).reduce((s,i)=>s+i.total,0));
-    const max = Math.max(...sums, 1);
-    const W=300, H=140, barW=32, gap=18, offsetX=20;
-    let bars = '';
-    sums.forEach((v,idx)=>{
-      const h = Math.max((v/max)*100, v>0?4:0);
-      const x = offsetX + idx*(barW+gap);
-      const y = H - h - 24;
-      const barBottom = H - 24;
-      bars += `<g class="bar-grow" style="transform-origin:${x+barW/2}px ${barBottom}px; animation-delay:${idx*45}ms;" data-amt="${fmt(v)}" data-day="${escapeHtml(months[idx].label)}" data-x="${x+barW/2}" data-y="${y}">
-        <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="6" fill="url(#g1)" style="cursor:pointer;"></rect>
-      </g>`;
-      bars += `<text x="${x+barW/2}" y="${H-6}" text-anchor="middle" font-size="10.5" style="fill:var(--muted);" font-family="Inter,sans-serif">${months[idx].label}</text>`;
-      if(v>0) bars += `<text x="${x+barW/2}" y="${y-6}" text-anchor="middle" font-size="9.5" style="fill:var(--navy-900);" font-family="Inter,sans-serif" font-weight="700">${Math.round(v)>=1000? (Math.round(v/1000*10)/10)+'k' : Math.round(v)}</text>`;
-    });
-    const svgW = offsetX*2 + months.length*(barW+gap) - gap;
-    $('money-chart-container').innerHTML = `
-      <svg width="${svgW}" height="${H}" viewBox="0 0 ${svgW} ${H}">
-        <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" style="stop-color:var(--blue-500);"/><stop offset="100%" style="stop-color:var(--navy-800);"/>
-        </linearGradient></defs>
-        <line x1="0" y1="${H-24}" x2="${svgW}" y2="${H-24}" style="stroke:var(--border);" stroke-width="1.5"/>
-        ${bars}
-      </svg>`;
-    wireBarTooltips('money-chart-container');
-
-    // top parties
-    const byParty = {};
-    invoices.forEach(i=>{
-      const key = i.billTo.name;
-      byParty[key] = (byParty[key]||0) + i.total;
-    });
-    const top = Object.entries(byParty).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    $('money-top-parties').innerHTML = top.length? top.map(([name,val],i)=>`
-      <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13.5px; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${i*35}ms;">
-        <span style="font-weight:600; color:var(--ink);">${escapeHtml(name)}</span>
-        <span style="font-weight:700; color:var(--navy-800);">${fmt(val)}</span>
-      </div>
-    `).join('') : `<div class="hint" style="margin:0;">No invoices yet.</div>`;
-  }
+  // v144: the invoice/sales dashboard (revenue, invoices, last 6 months, top parties) was money coming IN -- the Dashboard now shows money going out only.
+  function renderDashboard(){}
 
   let dashPeriod = 'month';
   let dashCategory = 'all';
@@ -6216,7 +6116,11 @@ function moneyPageHtml(){
     const now = new Date();
     const range = getPeriodRange(dashPeriod, now);
     const prevRange = getPreviousRange(range.start, range.end, dashPeriod);
-    const elapsedNow = Math.min(now.getTime(), range.end.getTime()) - range.start.getTime();
+    // v145: elapsed time is counted in whole STUDY days (to the end of today's study day). It used the raw clock, so after midday the current day was
+    // counted twice (a half day rounds up, then +1) and "Avg. daily spend" came out too low; between midnight and 5 AM it ran a day ahead.
+    const todayEnd = new Date(todayStr(now) + 'T23:59:59.999');
+    const daysElapsed = dashPeriod==='all' ? 0 : Math.max(1, Math.floor((Math.min(todayEnd.getTime(), range.end.getTime()) - range.start.getTime()) / 86400000) + 1);
+    const elapsedNow = daysElapsed * 86400000;
     const prevAligned = getPreviousRange(range.start, range.end, dashPeriod, elapsedNow); // like-for-like, for the "% vs previous" line only
     const catMatch = t => dashCategory==='all' || t.category===dashCategory;
 
@@ -6234,13 +6138,9 @@ function moneyPageHtml(){
 
     // period-scoped data — each transaction counts in full on its own actual date
     const allRealExpenses = transactions.filter(isRealExpense);
-    const periodInflow = transactions.filter(t=> isRealIncome(t) && dateInRange(t.date, range));
 
     const spent = allRealExpenses.reduce((s,t)=> catMatch(t) ? s + expenseContributionInRange(t, range) : s, 0);
     const prevSpent = dashPeriod==='all' ? 0 : allRealExpenses.reduce((s,t)=> catMatch(t) ? s + expenseContributionInRange(t, prevAligned) : s, 0);
-    const inflowTotal = periodInflow.reduce((s,t)=>s+t.amount,0);
-    const totalExpenseInRange = allRealExpenses.reduce((s,t)=> s + expenseContributionInRange(t, range), 0);
-    const netTotal = inflowTotal - totalExpenseInRange;
 
     $('money-exp-stat-spent-lbl').textContent = dashCategory==='all' ? 'Spent' : dashCategory + ' Spend';
     $('money-exp-stat-spent').textContent = fmt(spent);
@@ -6254,14 +6154,6 @@ function moneyPageHtml(){
     $('money-exp-stat-spent-sub').textContent = changeText;
     $('money-exp-stat-spent-sub').style.color = prevSpent>0 && spent>prevSpent ? 'var(--danger)' : (prevSpent>0 && spent<prevSpent ? 'var(--good)' : 'var(--muted)');
 
-    $('money-exp-stat-in').textContent = fmt(inflowTotal);
-    $('money-exp-stat-in-sub').textContent = 'Over ' + PERIOD_LABELS[dashPeriod];
-    $('money-exp-stat-net').textContent = fmt(netTotal);
-    $('money-exp-stat-net').style.color = netTotal>=0 ? 'var(--good)' : 'var(--danger)';
-    $('money-exp-stat-net-sub').textContent = 'Over ' + PERIOD_LABELS[dashPeriod];
-
-    const cappedEnd = range.end > now ? now : range.end;
-    const daysElapsed = Math.max(1, Math.round((cappedEnd - range.start)/86400000) + 1);
     const avgDaily = dashPeriod==='all' ? 0 : spent / daysElapsed;
     $('money-exp-stat-avgday').textContent = dashPeriod==='all' ? '—' : fmt(avgDaily);
     $('money-exp-stat-avgday-sub').textContent = dashPeriod==='all' ? 'select a period' : daysElapsed + ' day' + (daysElapsed===1?'':'s') + ' so far';
@@ -6583,10 +6475,8 @@ function moneyPageHtml(){
       ${anyHigh?`<div class="hint" style="margin-top:8px; margin-bottom:0;"><span style="color:var(--danger); font-weight:800;">&#9679;</span> Flagged days are well above your typical daily spend.</div>`:''}`;
   }
 
-  // #2 — 30-Day Cash Flow Trend. Shared-scale money-in vs money-out overlay (both
-  // are ₹, so a single y-axis rather than a misleading twin-axis). Expenses honour
-  // the category filter; money-in is always the full inflow (inflow isn't split by
-  // the outflow categories in this data model), and the caption says so. Fixed-
+  // #2 — 30-Day Spending (v145: money out only; it used to overlay money in). Honours the
+  // category filter. Fixed-
   // width SVG on purpose so the reused showChartTooltip() positioning stays exact.
   function renderThirtyDayTrend(now){
     const host = $('money-exp-trend-container');
@@ -6599,15 +6489,13 @@ function moneyPageHtml(){
     const base = new Date(todayStr(now) + 'T00:00:00');
     const days=[]; for(let i=29;i>=0;i--){ days.push(new Date(base.getFullYear(), base.getMonth(), base.getDate()-i)); }
     const realExp = transactions.filter(isRealExpense);
-    const realInc = transactions.filter(isRealIncome);
     const outDaily = days.map(d => realExp.reduce((s,t)=> catMatch(t) ? s + dailyExpenseContribution(t,d) : s, 0));
-    const inDaily  = days.map(d => realInc.reduce((s,t)=> s + dailyExpenseContribution(t,d), 0));
-    const maxVal = Math.max(1, ...outDaily, ...inDaily);
+    const maxVal = Math.max(1, ...outDaily);
 
     const cap = $('money-exp-trend-cap');
     if(cap){ cap.innerHTML = dashCategory==='all'
-      ? 'Money in vs money out, last 30 days. Tap a day for the breakdown.'
-      : escapeHtml(dashCategory)+' spend vs all money in, last 30 days. Tap a day for the breakdown.'; }
+      ? 'Money out, last 30 days. Tap a day for the breakdown.'
+      : escapeHtml(dashCategory)+' spend, last 30 days. Tap a day for the breakdown.'; }
 
     const W=330, padL=30, padR=10, padT=14, padB=24;
     const plotL=padL, plotR=W-padR, plotW=plotR-plotL;
@@ -6616,13 +6504,12 @@ function moneyPageHtml(){
     const xAt = i => plotL + i*stepX;
     const yAt = v => plotB - (v/maxVal)*plotH;
     const outPts = outDaily.map((v,i)=>[xAt(i), yAt(v)]);
-    const inPts  = inDaily.map((v,i)=>[xAt(i), yAt(v)]);
     const lineD = pts => pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-    const outLine = lineD(outPts), inLine = lineD(inPts);
+    const outLine = lineD(outPts);
     const outArea = `${outLine} L ${outPts[outPts.length-1][0].toFixed(1)} ${plotB.toFixed(1)} L ${outPts[0][0].toFixed(1)} ${plotB.toFixed(1)} Z`;
     const gid = 'expTrendFill'+Math.round(Math.random()*1e6);
     const pathLen = pts => { let L=0; for(let i=1;i<pts.length;i++){ const dx=pts[i][0]-pts[i-1][0], dy=pts[i][1]-pts[i-1][1]; L+=Math.sqrt(dx*dx+dy*dy); } return L; };
-    const outLen = pathLen(outPts), inLen = pathLen(inPts);
+    const outLen = pathLen(outPts);
     const compact = v => v>=1000 ? (Math.round(v/100)/10)+'k' : Math.round(v);
 
     const grid = `
@@ -6633,12 +6520,11 @@ function moneyPageHtml(){
     const tickIdx = [0,7,14,21,29];
     const xLabels = tickIdx.map(i=>`<text x="${xAt(i).toFixed(1)}" y="${H-7}" font-size="8" fill="var(--muted)" text-anchor="${i===0?'start':i===29?'end':'middle'}">${days[i].toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</text>`).join('');
     const dotsOut = outPts.map((p,i)=> outDaily[i]>0 ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.3" fill="var(--danger)" class="chart-animate trend-dot" style="animation-delay:${(i*0.02).toFixed(2)}s"/>`:'').join('');
-    const dotsIn  = inPts.map((p,i)=> inDaily[i]>0 ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.3" fill="var(--umang)" class="chart-animate trend-dot" style="animation-delay:${(i*0.02).toFixed(2)}s"/>`:'').join('');
     const hitW = Math.max(stepX, 8);
     const hits = days.map((d,i)=>{
-      const inflow=inDaily[i], outflow=outDaily[i], net=inflow-outflow;
-      const amt = `In ${fmt(inflow)} \u00b7 Out ${fmt(outflow)}`;
-      const dayStr = `${d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} \u00b7 Net ${net>=0?'+':'\u2212'}${fmt(Math.abs(net))}`;
+      const outflow=outDaily[i];
+      const amt = `Spent ${fmt(outflow)}`;
+      const dayStr = d.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
       const hx = xAt(i);
       return `<g class="trend-tap" data-amt="${escapeHtml(amt)}" data-day="${escapeHtml(dayStr)}" data-x="${hx.toFixed(1)}" data-y="${plotT.toFixed(1)}">
         <rect x="${(hx-hitW/2).toFixed(1)}" y="${plotT}" width="${hitW.toFixed(1)}" height="${plotH.toFixed(1)}" fill="transparent" style="cursor:pointer"/>
@@ -6647,7 +6533,6 @@ function moneyPageHtml(){
 
     host.innerHTML = `
       <div style="display:flex; gap:14px; align-items:center; margin-bottom:8px; font-size:11px; font-weight:700;">
-        <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:11px;height:3px;border-radius:2px;background:var(--umang);display:inline-block;"></span><span style="color:var(--muted);">Money in</span></span>
         <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:11px;height:3px;border-radius:2px;background:var(--danger);display:inline-block;"></span><span style="color:var(--muted);">Money out</span></span>
       </div>
       <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
@@ -6659,9 +6544,7 @@ function moneyPageHtml(){
         ${xLabels}
         <path d="${outArea}" fill="url(#${gid})" class="chart-animate trend-area"/>
         <path d="${outLine}" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${outLen.toFixed(1)}" style="--dash-len:${outLen.toFixed(1)}" class="chart-animate trend-line"/>
-        <path d="${inLine}" fill="none" stroke="var(--umang)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${inLen.toFixed(1)}" style="--dash-len:${inLen.toFixed(1)}" class="chart-animate trend-line"/>
         ${dotsOut}
-        ${dotsIn}
         ${hits}
       </svg>`;
     wireTrendTooltips('money-exp-trend-container');
@@ -6770,14 +6653,6 @@ function moneyPageHtml(){
       </svg>`;
   }
 
-  function switchDashboardSub(name){
-    document.querySelectorAll('#money-page-dashboard .subpage').forEach(p=>p.classList.remove('active'));
-    $('money-dash-sub-'+name).classList.add('active');
-    document.querySelectorAll('#money-page-dashboard .seg-btn').forEach(b=>b.classList.toggle('active', b.getAttribute('data-dashsub')===name));
-    if(name==='expenses') renderExpenseDashboard();
-    else renderDashboard();
-  }
-
   /* ---------- Tab switching ---------- */
   function switchTab(name){
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -6826,66 +6701,84 @@ function moneyPageHtml(){
     $('money-import-file-input').click();
   }
 
+  // v145: a backup is checked before anything is added: entries missing their basics are skipped (they used to be accepted and then broke the list
+  // and the dashboard), entries from an account this profile does not have are skipped (Chinnu has SBI + Cash only), and settings are saved the same
+  // way as every other Money change (the old code called a storage helper that no longer exists, so importing settings always failed -- after the
+  // invoices and entries had already been added in memory but before anything was saved).
+  const _validYmd = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  function importableTxn(t, srcOk){
+    return !!(t && typeof t === 'object' && t.id && (t.type==='inflow' || t.type==='outflow') && typeof t.category === 'string' && t.category
+      && typeof t.amount === 'number' && isFinite(t.amount) && t.amount > 0 && _validYmd(t.date) && typeof t.source === 'string' && srcOk.includes(t.source)
+      && (!t.transferId || srcOk.includes(t.transferPeer)));
+  }
+  function importableInvoice(i){
+    return !!(i && typeof i === 'object' && i.id && i.billTo && typeof i.billTo.name === 'string' && typeof i.invoiceNo === 'string'
+      && typeof i.total === 'number' && isFinite(i.total) && _validYmd(i.date));
+  }
   async function handleImportFile(e){
     const file = e.target.files && e.target.files[0];
     if(!file) return;
     try{
       const text = await file.text();
       const data = JSON.parse(text);
-      if(!data || !Array.isArray(data.invoices)){ toast('Invalid backup file'); return; }
+      if(!data || typeof data !== 'object' || (!Array.isArray(data.invoices) && !Array.isArray(data.transactions))){ toast('Invalid backup file'); return; }
+      const srcOk = mySources();
 
-      const existingIds = new Set(invoices.map(i=>i.id));
-      let added = 0;
-      data.invoices.forEach(inv=>{
-        if(inv && inv.id && !existingIds.has(inv.id)){
-          invoices.push(inv);
-          existingIds.add(inv.id);
-          added++;
+      let settingsImported = false;
+      if(data.settings && typeof data.settings==='object'){
+        if(confirm('This backup also has sender details, payment info, theme and numbering settings. Import those too? This will overwrite your current settings.')){
+          const incoming = Object.assign({}, data.settings);
+          if(incoming.openingBalances && typeof incoming.openingBalances === 'object'){
+            const ob = {}; srcOk.forEach(k=>{ ob[k] = Number(incoming.openingBalances[k]) || 0; }); incoming.openingBalances = ob;
+          }
+          settings = Object.assign({}, settings, incoming);
+          if(!THEMES[settings.theme]) settings.theme = 'navy';
+          moneyStore().settings = settings;
+          moneyStore().settingsUpdatedAt = Date.now();
+          settingsImported = true;
         }
+      }
+
+      let added = 0, skipped = 0;
+      const existingIds = new Set(invoices.map(i=>i.id));
+      (Array.isArray(data.invoices) ? data.invoices : []).forEach(inv=>{
+        if(!importableInvoice(inv)){ skipped++; return; }
+        if(!existingIds.has(inv.id)){ invoices.push(inv); existingIds.add(inv.id); added++; }
       });
       invoices.sort((a,b)=> new Date(b.createdAt||b.date) - new Date(a.createdAt||a.date));
 
       let txnAdded = 0;
       if(Array.isArray(data.transactions)){
         const existingTxnIds = new Set(transactions.map(t=>t.id));
+        // a transfer is two linked entries: only import it when both sides are valid
+        const okIds = new Set(data.transactions.filter(t=>importableTxn(t, srcOk)).map(t=>t.id));
+        const legs = {}; data.transactions.forEach(t=>{ if(t && t.transferId && okIds.has(t.id)) legs[t.transferId] = (legs[t.transferId]||0) + 1; });
         data.transactions.forEach(t=>{
-          if(t && t.id && !existingTxnIds.has(t.id)){
-            transactions.push(t);
-            existingTxnIds.add(t.id);
-            txnAdded++;
-          }
+          if(!okIds.has(t.id) || (t.transferId && legs[t.transferId] !== 2)){ skipped++; return; }
+          if(!existingTxnIds.has(t.id)){ transactions.push(t); existingTxnIds.add(t.id); txnAdded++; }
         });
-        transactions.sort((a,b)=> new Date(b.createdAt||b.date) - new Date(a.createdAt||a.date));
-      }
-
-      let settingsImported = false;
-      if(data.settings && typeof data.settings==='object'){
-        if(confirm('This backup also has sender details, payment info, theme and numbering settings. Import those too? This will overwrite your current settings.')){
-          settings = Object.assign({}, settings, data.settings);
-          if(!THEMES[settings.theme]) settings.theme = 'navy';
-          await store.set('settings', JSON.stringify(settings), false);
-          settingsImported = true;
-        }
+        transactions.sort((a,b)=> String(b.createdAt||b.date).localeCompare(String(a.createdAt||a.date)));
       }
 
       await persistInvoices();
       if(txnAdded>0) await persistTransactions();
-      if(settingsImported){ await loadSettings(); }
+      if(settingsImported){ window.moneyChanged(); await loadSettings(); }
       renderRecords();
       renderDashboard();
       renderTransactionsList($('money-txn-search').value);
       computeBalances();
       renderExpenseDashboard();
       updateInvNoPreview();
-      toast(`Imported ${added} invoice${added===1?'':'s'}, ${txnAdded} transaction${txnAdded===1?'':'s'}${settingsImported? ' + settings' : ''}`);
+      toast(`Imported ${added} invoice${added===1?'':'s'}, ${txnAdded} transaction${txnAdded===1?'':'s'}${settingsImported? ' + settings' : ''}${skipped? ' · skipped '+skipped+' that did not fit' : ''}`);
     }catch(err){
+      console.warn('Money import failed', err);
       toast('Could not read backup file');
     }
   }
 
 async function init(){
     $('money-storage-status-dot').style.background = 'var(--good)';
-    $('money-storage-status-text').innerHTML = '<b style="color:var(--ink);">Synced via Olympus</b> — saved with your Olympus data and backed up to Google Drive.';
+    $('money-storage-status-text').innerHTML = '<b style="color:var(--ink);">Private to you</b> — saved on this device and in your own Money file on Google Drive. Nobody else can open it, not even in this app.';
 
     await loadSettings();
     await loadInvoices();
@@ -6913,10 +6806,6 @@ async function init(){
 
     document.querySelectorAll('#money-page-invoices .seg-btn').forEach(b=>{
       b.addEventListener('click', ()=> switchInvoiceSub(b.getAttribute('data-sub')));
-    });
-
-    document.querySelectorAll('#money-page-dashboard .seg-btn').forEach(b=>{
-      b.addEventListener('click', ()=> switchDashboardSub(b.getAttribute('data-dashsub')));
     });
 
     $('money-exp-filter-category').addEventListener('change', e=>{ dashCategory = e.target.value; renderExpenseDashboard(); });
@@ -6991,11 +6880,13 @@ async function init(){
   // in a single-page app rather than a whole standalone page.
   let _moneyInitialized = false;
   window.moneyInitOnce = async function(){
+    applyProfileSources();
     if(_moneyInitialized) { await moneyRefresh(); return; }
     _moneyInitialized = true;
     await init();
   };
   window.moneyRefresh = async function(){
+    applyProfileSources();
     await loadSettings();
     await loadInvoices();
     await loadTransactions();
@@ -9851,7 +9742,8 @@ function startBackgroundPoll(){
         // 'Last session ended at' line and today's hours all update together instead of the hours dipping until the next sync.
         // v129: Money is applied from the same read (Chinnu adopts Drive's copy; Umang merges, and re-uploads if Drive lost something of his)
         const _mr = migrateShared(remote);
-        reconcileMoneyFromRemote(_mr, {repair:true});
+        reconcileMoneyFromRemote(_mr);
+        if(S.view==='money') moneyVaultSync({minAgeMs:20000}); // v144: another phone of mine may have changed my Money
         if(refreshOtherProfileDataFromRemote(_mr)) changed = true;
         if(changed){
           renderNav();
@@ -9963,7 +9855,8 @@ async function refreshPartnerTimerNow(){
     if(remote) applyRemoteChat(remote, _t0);
     if(remote){
       const _mr = migrateShared(remote);
-      reconcileMoneyFromRemote(_mr, {repair:true}); // v129
+      reconcileMoneyFromRemote(_mr); // v129
+      moneyVaultSync({minAgeMs:30000}); // v144
       if(refreshOtherProfileDataFromRemote(_mr)){ saveShared(null, {skipDrivePush:true}); renderNav(); onPartnerTimerChanged(); }
     }
   }catch(e){ console.warn('Partner timer refresh failed', e); }
@@ -10072,18 +9965,15 @@ function refreshOtherProfileDataFromRemote(freshRemote){
   const timerChanged = mergeTimerStateFromRemote(freshRemote); // separate, timestamp-guarded merge — see its own comment above
   return timerChanged || before !== slice();
 }
-// ═══ v129: MONEY SYNC — Money is merged record by record, never replaced as a whole ═════════════════════════════════════
-// What was wrong: Money lives inside the one shared file that EVERY save uploads in full. Chinnu's phone (which never edits Money)
-// holds the copy of it from whenever she last loaded the file, and every chat message / timer tick she saves re-uploaded that old copy
-// -- the other keys are protected by refreshOtherProfileDataFromRemote() (SINGLE_OWNER_SHARED_KEYS), but `money` is not
-// per-profile so nothing refreshed it. Umang's next app open then adopted Drive's (old) copy wholesale, and the transactions he had
-// saved were gone from Drive AND, once adopted, from his own phone. Now:
-//   * the profile that doesn't own Money (Chinnu) always takes Drive's copy before she uploads, so she can never roll it back;
-//   * the owner's phone (and any second device of his) MERGES with Drive by record id: nothing he saved is dropped because an older
-//     copy happens to be newer on Drive, an edit keeps the version with the later `updatedAt`, and a delete leaves a tombstone in
-//     `money.deleted` so a stale copy cannot bring the record back;
-//   * opening the app folds this device's own Money back into whatever Drive returns, and a few seconds after every Money change
-//     the owner's phone looks at Drive again and uploads again if another phone's simultaneous save overwrote it.
+// ═══ MONEY SYNC ═════════════════════════════════════════════════════════════════════════════════════════════════════════
+// v129: Money is merged record by record (by id, later `updatedAt` wins, deletes leave a tombstone), never replaced as a whole.
+// v144: Money is PRIVATE to each person. It no longer lives in the shared file at all: Umang's Money is the Drive file
+// `olympus-money-umang.json` and Chinnu's is `olympus-money-chetna.json`, and the server (api/sync.js) refuses to read or write
+// either one for anyone but its owner (and strips any Money from the shared file it hands to Chinnu). This phone keeps its own
+// copy in S.shared.money for the page to use, but uploads it only to its owner's file -- see moneyVaultSync().
+//   * Umang's existing Money is moved out of the shared file once, the first time he opens this version (legacy copy -> his file ->
+//     only then is it dropped from the shared file: see moneyFreeShared()).
+//   * A phone that holds someone else's Money (Chinnu's phone from before this update held a copy of Umang's) drops it: moneyOwnerGuard().
 const MONEY_OWNER = 'umang';
 // Key-order-independent text form of any JSON value: two phones that hold the same data must produce the same text.
 function moneyCanon(v){
@@ -10145,7 +10035,11 @@ function moneyMerge(mine, theirs){
   // tombstones older than ~13 months are dropped (no phone is that far behind)
   const cutoff = Date.now() - 400*864e5;
   Object.keys(deleted).forEach(id=>{ const t = Date.parse(deleted[id]); if(isFinite(t) && t < cutoff) delete deleted[id]; });
-  const useTheirSettings = b.settingsUpdatedAt > a.settingsUpdatedAt || (b.settingsUpdatedAt === a.settingsUpdatedAt && moneyCanon(b.settings) > moneyCanon(a.settings));
+  // v144: a store that was never edited ({} or the first-run defaults) must never outrank real settings on a tie of stamps (a phone starting from a blank
+  // store, or Umang's legacy copy that predates the stamp) -- otherwise the text comparison below could pick the blank one.
+  const blankSettings = n => !n.settingsUpdatedAt && (!Object.keys(n.settings).length || ['umang','chetna'].some(pr=> moneyCanon(n.settings) === moneyCanon(moneyDefaultSettings(pr))));
+  const useTheirSettings = (blankSettings(a) && !blankSettings(b)) ? true : (blankSettings(b) && !blankSettings(a)) ? false
+    : (b.settingsUpdatedAt > a.settingsUpdatedAt || (b.settingsUpdatedAt === a.settingsUpdatedAt && moneyCanon(b.settings) > moneyCanon(a.settings)));
   return {
     __nativeSchema: true,
     settings: useTheirSettings ? b.settings : a.settings,
@@ -10155,65 +10049,149 @@ function moneyMerge(mine, theirs){
     deleted
   };
 }
-// Apply a freshly-read Drive copy to this device's Money. Returns true when this device's Money changed.
-//   Chinnu (not the owner): adopt Drive's copy outright -- she never edits Money, so her copy can only ever be the older one.
-//   Umang: merge. If the merge shows Drive is missing something of his, opts.repair uploads it again.
-let _moneyRepairAt = 0;
+function moneyHasRecords(m){
+  return !!(m && typeof m === 'object' && ((Array.isArray(m.transactions) && m.transactions.length) || (Array.isArray(m.invoices) && m.invoices.length) || (m.deleted && typeof m.deleted === 'object' && Object.keys(m.deleted).length)));
+}
+// First-run values of a person's Money settings. Chinnu has two accounts (SBI, Cash); Umang has three (HDFC, SBI, Cash).
+function moneyDefaultSettings(profile){
+  return { name: profile === 'chetna' ? 'Chetna' : 'Umang Jain', tagline:'', email:'', phone:'', upiId:'', theme:'navy', startNumbers:{},
+    openingBalances: profile === 'chetna' ? {SBI:0, Cash:0} : {HDFC:0, SBI:0, Cash:0} };
+}
+function moneyFreshStore(profile){
+  return { __nativeSchema:true, settings: moneyDefaultSettings(profile), settingsUpdatedAt:0, invoices:[], transactions:[], deleted:{} };
+}
+function moneyFileName(profile){ return 'olympus-money-' + (profile || (S.local && S.local.myProfile)) + '.json'; }
+// This device's cached copy of the shared data may hold Money that belongs to somebody else (Chinnu's phone from before v144 cached
+// Umang's; or the other person signed in on this device). Anything not provably this person's is dropped and replaced by a blank store.
+// Remember whose Money this phone holds. Without the stamp, Chinnu's phone could not tell her own cached Money from an old copy of Umang's and
+// would throw it away on every open. Called wherever this phone's Money is known to be the signed-in person's own.
+function moneyStampOwner(){
+  try{ const me = S.local && S.local.myProfile; if(me && S.local.moneyOwner !== me){ S.local.moneyOwner = me; saveLocal(); } }catch(e){}
+}
+function moneyOwnerGuard(shared){
+  try{
+    const me = S.local && S.local.myProfile;
+    if(!me || !shared) return;
+    const stamp = S.local.moneyOwner;
+    const foreign = stamp ? stamp !== me : me !== MONEY_OWNER;
+    if(foreign){
+      shared.money = moneyFreshStore(me);
+      S.local.moneyVaultOk = false; S.local.moneyDirty = false;
+      PROFILES.forEach(pr=>{ if(pr.id !== me) fcSet(moneyFileName(pr.id), null); }); // and the other person's cached Money file, if one ever came through here
+    }
+    if(S.local.moneyOwner !== me){ S.local.moneyOwner = me; saveLocal(); }
+  }catch(e){ console.warn('moneyOwnerGuard failed', e); }
+}
+// The shared file is uploaded WITHOUT Money once this person's own Money file is safely on Drive. (Umang's phone keeps sending the legacy
+// copy until then, so nothing is ever dropped from the shared file before it has been stored in his private one.)
+function moneyFreeShared(){
+  const me = S.local && S.local.myProfile;
+  if(me === MONEY_OWNER && !S.local.moneyVaultOk) return S.shared;
+  const o = Object.assign({}, S.shared);
+  delete o.money;
+  return o;
+}
+// Old copies of Money sitting in the shared file (Umang only; every old phone of his keeps uploading one until it updates): folded into
+// this phone's Money, and the result goes to his private file. Chinnu's phone never takes Money from the shared file.
 function reconcileMoneyFromRemote(remote, opts){
   try{
     const me = S.local && S.local.myProfile;
-    if(!me || !S.shared || !remote || !moneyLooksNative(remote.money)) return false;
+    if(me !== MONEY_OWNER || !S.shared || !remote || !moneyHasRecords(remote.money)) return false;
     const before = S.shared.money ? moneyDigest(S.shared.money) : null;
-    const remoteDigest = moneyDigest(remote.money);
-    const merged = me === MONEY_OWNER ? moneyMerge(S.shared.money, remote.money) : moneyNormalise(remote.money);
-    const after = moneyDigest(merged);
-    const changed = after !== before;
-    if(changed){
-      S.shared.money = merged;
-      if(typeof window.moneyExternalChange === 'function') window.moneyExternalChange();
-      if(!(opts && opts.skipPersist)) saveShared(null, {skipDrivePush:true});
-    }
-    if(me === MONEY_OWNER && after !== remoteDigest && opts && opts.repair && Date.now() - _moneyRepairAt > 20000){
-      _moneyRepairAt = Date.now();
-      console.warn('Money: Drive is missing recent Money changes (overwritten by another phone\'s save) — uploading again');
-      driveSyncSave();
-    }
-    return changed;
+    const merged = moneyMerge(S.shared.money, remote.money);
+    if(moneyDigest(merged) === before) return false;
+    S.shared.money = merged;
+    S.local.moneyVaultOk = false; S.local.moneyDirty = true; _mvSeq++;   // not in his private file yet -> keep it in the shared file until it is
+    if(typeof window.moneyExternalChange === 'function') window.moneyExternalChange();
+    if(opts && opts.skipPersist) saveLocal(); else saveShared(null, {skipDrivePush:true});
+    moneyVaultSaveSoon();
+    return true;
   }catch(e){ console.warn('reconcileMoneyFromRemote failed', e); return false; }
 }
-// Opening the app / manual Sync adopts Drive's copy of the file: fold this device's own Money back in first (owner only).
+// Opening the app / manual Sync adopts Drive's copy of the shared file: this phone's own Money goes back into it first.
 function moneyKeepLocalOnAdopt(adopted, localShared){
   try{
-    if(!adopted || !localShared || !localShared.money) return false;
-    if(!(S.local && S.local.myProfile === MONEY_OWNER)) return false;
-    if(!moneyLooksNative(localShared.money)) return false;
-    const merged = moneyMerge(localShared.money, adopted.money);
-    const changed = moneyDigest(merged) !== moneyDigest(adopted.money);
-    adopted.money = merged;
-    return changed;
+    const me = S.local && S.local.myProfile;
+    if(!adopted || !me) return false;
+    const mine = (localShared && localShared.money && moneyLooksNative(localShared.money)) ? localShared.money : null;
+    if(me !== MONEY_OWNER){ adopted.money = mine ? moneyNormalise(mine) : moneyFreshStore(me); return false; } // Chinnu: nothing from the shared file, ever
+    const blob = moneyHasRecords(adopted.money) ? adopted.money : null;                                   // Umang: the legacy copy, if still there
+    if(mine && blob){
+      const merged = moneyMerge(mine, blob);
+      if(moneyDigest(merged) !== moneyDigest(mine)){ S.local.moneyVaultOk = false; S.local.moneyDirty = true; _mvSeq++; }
+      adopted.money = merged;
+    } else if(mine){ adopted.money = mine; }
+    else if(blob){ S.local.moneyVaultOk = false; S.local.moneyDirty = true; _mvSeq++; }                  // new phone: the legacy copy is all there is
+    return false;
   }catch(e){ console.warn('moneyKeepLocalOnAdopt failed', e); return false; }
 }
-let _lastSavedMoneyDigest = null, _moneyVerifyToken = 0;
-// A few seconds after an upload that changed Money, look at Drive again: another phone's save that landed at the same moment
-// replaces the whole file, Money included. Merge, and upload again if anything of the owner's is missing.
-function verifyMoneyOnDrive(attempt){
-  if(!S.appSession || !isHosted() || !S.local || S.local.myProfile !== MONEY_OWNER) return;
-  const delays = [4000, 12000, 30000];
-  if(attempt >= delays.length) return;
-  const tok = ++_moneyVerifyToken;
-  setTimeout(async ()=>{
-    if(tok !== _moneyVerifyToken) return;
-    if(_syncPending || _driveSavePromise){ verifyMoneyOnDrive(attempt+1); return; } // an upload is on its way; look after it
-    let remote = null;
-    try{ remote = await driveSyncLoad(); }catch(e){}
-    if(tok !== _moneyVerifyToken) return;
-    if(!remote){ verifyMoneyOnDrive(attempt+1); return; }
-    const mr = migrateShared(remote);
-    _moneyRepairAt = 0; // this IS the repair check -- not rate-limited
-    reconcileMoneyFromRemote(mr, {repair:true});
-    if(moneyDigest(S.shared.money) !== moneyDigest(mr.money)) verifyMoneyOnDrive(attempt+1);
-  }, delays[attempt]);
+// ── The private Money file ──────────────────────────────────────────────────────────────────────────────────────────────
+// Read this person's Money file, merge it into this phone's Money (by record id), and write it back if it was missing anything.
+// Safe to call any time and from several phones: a merge never drops a record except through a tombstone.
+let _mvBusy = false, _mvAgain = false, _mvTimer = null, _mvSeq = 0, _mvLastSyncAt = 0, _mvFailN = 0;
+function moneyVaultActive(){ return !!(S.appSession && isHosted() && S.local && S.local.myProfile); }
+function moneyVaultSaveSoon(){
+  if(!moneyVaultActive()) return;
+  clearTimeout(_mvTimer);
+  _mvTimer = setTimeout(()=>{ moneyVaultSync(); }, 900);
 }
+function moneyVaultFlushIfDirty(){
+  if(S.local && S.local.moneyDirty && moneyVaultActive() && !_mvBusy){ clearTimeout(_mvTimer); moneyVaultSync(); }
+}
+// Called by the Money page after every add / edit / delete / settings change.
+window.moneyChanged = function(){
+  _mvSeq++;
+  if(S.local) S.local.moneyDirty = true;
+  saveShared(null, {skipDrivePush:true});   // this phone's own copy (also persists S.local.moneyDirty); the shared file is not touched
+  moneyVaultSaveSoon();
+};
+async function moneyVaultSync(opts){
+  opts = opts || {};
+  if(!moneyVaultActive()) return false;
+  if(opts.minAgeMs && Date.now() - _mvLastSyncAt < opts.minAgeMs && !S.local.moneyDirty) return false;
+  if(_mvBusy){ _mvAgain = true; return false; }
+  _mvBusy = true;
+  let pushed = false;
+  try{
+    const me = S.local.myProfile, name = moneyFileName(me);
+    let remote;
+    try{ remote = await readDriveFile(name); }
+    catch(e){ console.warn('Money: could not read the private Money file', e); return false; } // never write blind
+    if(S.local.myProfile !== me) return false;
+    _mvLastSyncAt = Date.now();
+    const seq = _mvSeq;
+    const remoteNative = (remote && moneyLooksNative(remote)) ? remote : null;
+    const merged = remoteNative ? moneyMerge(S.shared.money, remoteNative) : moneyNormalise(S.shared.money);
+    if(moneyDigest(merged) !== moneyDigest(S.shared.money)){
+      S.shared.money = merged;
+      if(typeof window.moneyExternalChange === 'function') window.moneyExternalChange();
+      saveShared(null, {skipDrivePush:true});
+    }
+    const remoteDigest = remoteNative ? moneyDigest(remoteNative) : null;
+    const worthStoring = !!remoteNative || moneyHasRecords(merged) || merged.settingsUpdatedAt > 0 || !!S.local.moneyDirty;
+    if(worthStoring && moneyDigest(merged) !== remoteDigest){
+      await writeDriveFile(null, name, moneyNormalise(S.shared.money), name);
+      pushed = true;
+    }
+    _mvFailN = 0;
+    S.local.moneyVaultOk = true;                 // this person's Money is safely in their own file: the shared file can stop carrying it
+    if(seq === _mvSeq) S.local.moneyDirty = false;
+    saveLocal();
+  }catch(e){
+    console.warn('Money: saving to the private Money file failed', e);
+    if(S.local) S.local.moneyDirty = true;       // retried by the next sync / foreground / online ...
+    _mvLastSyncAt = 0;
+    if(_mvFailN < 5){ _mvFailN++; clearTimeout(_mvTimer); _mvTimer = setTimeout(()=>{ moneyVaultSync(); }, 8000 * _mvFailN); } // ... and again after a short wait (8 s, 16 s, ... 40 s)
+  }finally{
+    _mvBusy = false;
+    if(_mvAgain){ _mvAgain = false; setTimeout(()=>{ moneyVaultSync(); }, 50); }
+  }
+  // Another phone of the same person may have written at the same moment (last write wins on Drive): look again shortly and repair.
+  const vn = opts.verifyN || 0;
+  if(pushed && vn < 2) setTimeout(()=>{ moneyVaultSync({verifyN: vn + 1}); }, vn === 0 ? 5000 : 20000);
+  return pushed;
+}
+window.addEventListener('online', ()=>{ moneyVaultFlushIfDirty(); });
 
 function chatClearedAtMax(a, b){
   const ta = a ? new Date(a).getTime() : 0, tb = b ? new Date(b).getTime() : 0;
@@ -10483,7 +10461,7 @@ function unionRecentLocalChat(target, localShared){
 async function readLocalSharedQuiet(){
   try{
     const res = await storageGet('olympusData', true);
-    if(res && res.value) return migrateShared(JSON.parse(res.value));
+    if(res && res.value){ const d = migrateShared(JSON.parse(res.value)); moneyOwnerGuard(d); return d; }
   }catch(e){ console.warn('readLocalSharedQuiet failed', e); }
   return null;
 }
@@ -18250,6 +18228,7 @@ async function doSync(manual){
       const _prevShared = S.shared;
       S.shared = loaded;
       moneyKeepLocalOnAdopt(S.shared, _prevShared);
+      moneyVaultSync(); // v144
       if(typeof window.moneyExternalChange === 'function') window.moneyExternalChange();
       // Persist what was just adopted — without this, a successful manual sync updated
       // what's shown on screen but never wrote it to local storage or bumped
@@ -18700,7 +18679,7 @@ async function performDriveSaveOnce(){
     } catch(e){ console.warn('Pre-save refresh failed, proceeding with local copy:', e); }
     await yieldToMain();
     const snapshotAt = Date.now(), seq = _driveSaveSeq; // both taken in the same tick the body is serialised in
-    const postResp = await appSyncRequest('POST', null, S.shared);
+    const postResp = await appSyncRequest('POST', null, moneyFreeShared()); // v144: without Money once it is safely in the person's own private file
     _lastPostSnapshotAt = snapshotAt; _lastPostDoneAt = Date.now();
     // v131: Drive now holds exactly what was just uploaded (needs a server that returns modifiedTime; otherwise the next read is simply a full one)
     _known = (postResp && postResp.modifiedTime && _lastPostPayloadStr) ? { mt: postResp.modifiedTime, text: '{"data":' + _lastPostPayloadStr + ',"modifiedTime":' + JSON.stringify(postResp.modifiedTime) + '}' } : null;
@@ -18718,11 +18697,6 @@ async function performDriveSaveOnce(){
     // Chat: a concurrent upload from the partner's phone can still overwrite this one (the whole file is replaced on every
     // save), so look again a few seconds later and put the messages back if they are gone -- see verifyChatOnDrive().
     if(chatMoved) verifyChatOnDrive(0);
-    // Same for Money (owner's phone only -- verifyMoneyOnDrive() ignores everyone else)
-    const _md = S.shared.money ? moneyDigest(S.shared.money) : '';
-    const _moneyMoved = _md !== _lastSavedMoneyDigest;
-    _lastSavedMoneyDigest = _md;
-    if(_moneyMoved) verifyMoneyOnDrive(0);
     if(hadUndeliveredOut && S.view==='chat' && typeof renderChatMessagesOnly==='function') renderChatMessagesOnly(); // single tick -> double tick
   } catch(e){
     console.warn('Sync save failed:', e);
@@ -18743,6 +18717,7 @@ function scheduleDriveRetry(){
 // Anything saved locally that Drive has not confirmed yet gets pushed now: called when the network comes back, when the app
 // returns to the foreground, and from initAfterLogin().
 function flushDriveIfDirty(){
+  moneyVaultFlushIfDirty(); // v144: Money has its own file
   if(!S.appSession || !isHosted() || !(S.local && S.local.driveDirty)) return;
   if(_driveSavePromise || _syncPending) return; // one is already on its way
   clearTimeout(_driveRetryTimer);
@@ -18750,6 +18725,7 @@ function flushDriveIfDirty(){
 }
 // Leaving the app: don't sit out the 900 ms debounce -- start the upload now, while the page can still run for a moment.
 function flushPendingSaveNow(){
+  moneyVaultFlushIfDirty();
   if(!_syncPending || !S.appSession || !isHosted()) return;
   clearTimeout(_syncDebounceTimer);
   performDriveSave();
@@ -18853,7 +18829,6 @@ async function initAfterLogin(){
     if(localShared && sharedDataHasContent(localShared)){
       S.shared = localShared;
       _lastSavedChatFingerprint = chatFingerprint();
-      _lastSavedMoneyDigest = S.shared.money ? moneyDigest(S.shared.money) : '';
       S.viewingProfile = S.local.myProfile || 'umang';
       S._justNavigated = true;
       renderNav();
@@ -18913,7 +18888,7 @@ async function initAfterLogin(){
   // "changed this cycle" (and pay for an unneeded merge round-trip) just because the
   // in-memory fingerprint started out null.
   _lastSavedChatFingerprint = chatFingerprint();
-  _lastSavedMoneyDigest = S.shared.money ? moneyDigest(S.shared.money) : '';
+  moneyStampOwner();
   await bootHealCelebratedMilestones();
   S.viewingProfile = S.local.myProfile || 'umang';
   S._justNavigated = true;
@@ -18950,6 +18925,7 @@ function bootStartBackgroundWork(){
   reconcilePushSubscription();  // v128: repair a dropped / renewed push address
   startReminderTicker();        // v139: reminders no longer wait for Home to redraw
   maybeSweepArchive(); // fire-and-forget; gated to once/day/device internally, never blocks load
+  moneyVaultSync();    // v144: this person's private Money file (merge, and move Umang's old in-file Money across the first time)
   // v131: these two big files used to start downloading the instant the app opened, in competition with the main data and with any save. They now
   // start a few seconds later (and come from the local copy unless they changed -- see readDriveFile), and share ONE redraw.
   setTimeout(()=>{
@@ -18990,7 +18966,7 @@ async function bootReconcileWithDrive(bootSaveAt){
     }
   }catch(e){ console.warn('bootReconcileWithDrive failed', e); }
   _lastSavedChatFingerprint = chatFingerprint();
-  _lastSavedMoneyDigest = S.shared.money ? moneyDigest(S.shared.money) : '';
+  moneyStampOwner();
   try{ await bootHealCelebratedMilestones(); }catch(e){}
   if(adopted) redrawAfterAdopt(0);
   else renderNav();
