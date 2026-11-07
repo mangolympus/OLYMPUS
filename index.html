@@ -976,7 +976,7 @@ body.money-no-hdfc .money-view .stat-grid[data-bal]{grid-template-columns:repeat
 .money-view #money-exp-velocity .week-bar{border-radius:4px 4px 0 0;}
 .money-view #money-exp-trend-container svg{max-width:none;}
 .money-view #money-exp-burn-container .hbar-lbl{width:88px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-/* v147: Money dashboard -- chips, hero, insights, donut, weekday pattern, gestures */
+/* v147: Money dashboard -- chips, hero, donut, weekday pattern, gestures */
 .money-view .dash-hidden-select{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; overflow:hidden; clip:rect(0 0 0 0);}
 .money-view .dash-filter{position:sticky; top:60px; z-index:12; margin:0 -16px 12px; padding:8px 16px; background:color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);}
 .money-view .dash-chips{position:relative; display:flex; gap:2px; padding:4px; background:var(--surface2); border:1px solid var(--border); border-radius:14px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
@@ -1021,15 +1021,6 @@ body.money-no-hdfc .money-view .stat-grid[data-bal]{grid-template-columns:repeat
 .money-view .hero-legend{display:flex; gap:12px; font-size:10.5px; font-weight:700; color:var(--muted); margin-top:4px;}
 .money-view .hero-legend i{display:inline-block; width:12px; height:0; border-top:2px solid; margin-right:5px; vertical-align:middle;}
 .money-view .hero-hint{font-size:10.5px; color:var(--text-faint); text-align:center; margin-top:6px;}
-.money-view .ins-row{display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; line-height:1.45; color:var(--ink); animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards;}
-.money-view .ins-row:last-child{border-bottom:none; padding-bottom:0;}
-.money-view .ins-row:first-child{padding-top:0;}
-.money-view .ins-dot{flex:none; width:9px; height:9px; border-radius:50%; margin-top:6px; background:var(--muted);}
-.money-view .ins-dot.bad{background:var(--bad);} .money-view .ins-dot.good{background:var(--good);} .money-view .ins-dot.info{background:var(--active-accent,var(--umang));} .money-view .ins-dot.warn{background:var(--warn);}
-.money-view .ins-row b{font-weight:800; font-variant-numeric:tabular-nums;}
-.money-view .ins-row .ins-go{margin-left:auto; flex:none; color:var(--muted); font-size:12px; font-weight:700; align-self:center;}
-.money-view .ins-row.tap{cursor:pointer;}
-.money-view .ins-row.tap:active{opacity:.7;}
 .money-view .donut-wrap{display:flex; flex-direction:column; align-items:center; gap:14px;}
 .money-view .donut-stage{position:relative; width:176px; height:176px; flex:none;}
 .money-view .donut-stage svg{width:100%; height:100%; display:block; transform:rotate(-90deg);}
@@ -4529,11 +4520,6 @@ function moneyPageHtml(){
         <div class="hero-hint" id="money-hero-hint">Swipe this card to change the time range</div>
       </div>
 
-      <div class="card" id="money-exp-insights-card">
-        <h2><span class="n">💡</span>What Stands Out</h2>
-        <div id="money-exp-insights"></div>
-      </div>
-
       <div class="stat-grid">
         <div class="stat-card">
           <div class="lbl">Avg. Daily Spend</div>
@@ -6280,9 +6266,10 @@ function moneyPageHtml(){
   }
 
   function populateCategorySelect(sel, currentValue){
-    const current = sel.value || currentValue;
+    const current = currentValue || sel.value || 'all';
+    const known = OUTFLOW_CATEGORIES.filter(c=>c!=='Inter Bank Transactions');
     sel.innerHTML = `<option value="all">All Categories</option>` +
-      OUTFLOW_CATEGORIES.filter(c=>c!=='Inter Bank Transactions').map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      known.concat(current && current !== 'all' && known.indexOf(current) < 0 ? [current] : []).map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
     sel.value = current;
     if(sel.value !== current) sel.value = 'all';
   }
@@ -6337,8 +6324,8 @@ function moneyPageHtml(){
       // v147: change vs the previous period shown as a coloured chip (higher spend = red, lower = green) plus a plain-words comparison
       const chip = $('money-hero-chip'), sub = $('money-exp-stat-spent-sub');
       const vs = dashPeriod==='all' ? '' : (prog.daysElapsed >= prog.periodDays ? PREV_NOUN[dashPeriod] : PREV_NOUN[dashPeriod] + ' at this point');
-      chip.className = 'delta-chip';
-      if(dashPeriod==='all'){ chip.textContent = 'All time'; sub.textContent = 'since your first entry'; }
+      chip.className = 'delta-chip'; chip.removeAttribute('aria-label');
+      if(dashPeriod==='all'){ chip.textContent = 'All time'; sub.textContent = spent > 0 ? 'since your first entry' : 'no spending yet'; }
       else if(prevSpent>0){
         const pct = Math.round(((spent-prevSpent)/prevSpent)*100);
         chip.textContent = (pct>0?'\u25B2 ':pct<0?'\u25BC ':'') + Math.abs(pct) + '%';
@@ -6479,9 +6466,9 @@ function moneyPageHtml(){
 
   // ─────────────────────────────────────────────────────────────────────────
   // v147: Dashboard presentation -- period chips, hero summary (count-up, change chip, time-vs-spend bars, cumulative curve with
-  // finger-scrub), plain-words insights, KPI tiles, donut with tap-to-focus, weekday pattern, swipe gestures and light haptics.
+  // finger-scrub), KPI tiles, donut with tap-to-focus, weekday pattern, swipe gestures and light haptics.
   // Money out only. Every number is derived from the same per-period lists renderExpenseDashboard builds, so the tiles, the hero,
-  // the insights and the charts always agree. Motion is skipped under prefers-reduced-motion.
+  // and the charts always agree. Motion is skipped under prefers-reduced-motion.
   // ─────────────────────────────────────────────────────────────────────────
   const PERIOD_ORDER = ['week','month','last30','last3','year','all'];
   const PREV_NOUN  = { week:'last week', month:'last month', last30:'the previous 30 days', last3:'the previous 3 months', year:'last year', all:'' };
@@ -6497,7 +6484,7 @@ function moneyPageHtml(){
 
   const buzz = ms => { try{ if(navigator.vibrate && !prefersReducedMotion()) navigator.vibrate(ms); }catch(_){} };
   const dayLabelOf = key => new Date(key+'T12:00:00').toLocaleDateString('en-IN',{weekday:'short', day:'numeric', month:'short'});
-  const kfmt = v => '₹' + (v>=100000 ? (Math.round(v/10000)/10)+'L' : v>=1000 ? (Math.round(v/100)/10)+'k' : String(Math.round(v)));
+  const kfmt = v => '₹' + (v>=99950 ? (Math.round(v/10000)/10)+'L' : v>=999.5 ? (Math.round(v/100)/10)+'k' : String(Math.round(v)));
   const clamp01 = x => Math.max(0, Math.min(1, x));
 
   function periodTitle(range){
@@ -6590,13 +6577,12 @@ function moneyPageHtml(){
   }
 
   function renderDashExtras(c){
-    const { now, range, prevRange, prevAligned, prog, spent, periodList, allRealExpenses, catMatch, byDay, topDay, topKey, nEntries } = c;
+    const { now, range, prevRange, prevAligned, prog, spent, periodList, allRealExpenses, catMatch, byDay } = c;
     const isAll = dashPeriod === 'all';
     const today = todayStr(now);
     { const h = $('money-hero-hint'); if(h) h.style.display = swipeHintSeen ? 'none' : ''; }
     const keys = periodDayKeys(range, today, periodList);
     const nDays = keys.length;
-    const vsWords = isAll ? '' : (prog.daysElapsed >= prog.periodDays ? PREV_NOUN[dashPeriod] : PREV_NOUN[dashPeriod] + ' at this point');
 
     // per-weekday / weekend / no-spend tallies over the days that have happened
     const dowSum = [0,0,0,0,0,0,0], dowN = [0,0,0,0,0,0,0];
@@ -6606,7 +6592,6 @@ function moneyPageHtml(){
       dowSum[dw] += v; dowN[dw]++; keyedSpend += v; if(!v) noSpend++;
       if(dw === 0 || dw === 6){ wkndSpend += v; wkndDays++; } else { wkdySpend += v; wkdyDays++; }
     });
-    const avgD = isAll ? (nDays ? spent / nDays : 0) : c.avgDaily;
 
     $('money-exp-stat-nospend').textContent = nDays ? String(noSpend) : '—';
     $('money-exp-stat-nospend-sub').textContent = nDays ? 'of ' + nDays + ' day' + (nDays === 1 ? '' : 's') + (isAll ? ' since your first entry' : ' so far') : 'no days yet';
@@ -6677,62 +6662,6 @@ function moneyPageHtml(){
       sparkData = { n, nDays, keys, cum, prevCum, byDay, W, H, Y, X, today, prevShort: PREV_SHORT[dashPeriod], isAll };
       heroReadoutDefault();
     }
-
-    // ── insights ──
-    const ins = [];
-    const addCat = (name) => ` data-cat="${escapeHtml(name)}"`;
-    if(spent <= 0){
-      ins.push({ tone:'info', html: 'Nothing spent ' + (dashCategory === 'all' ? '' : 'on <b>' + escapeHtml(dashCategory) + '</b> ') + PERIOD_LABELS[dashPeriod] + ' yet.' });
-    } else {
-      // pace
-      if(!isAll && prevFull > 0){
-        if(prog.daysElapsed >= prog.periodDays){
-          const d = spent - prevFull;
-          ins.push({ tone: d > 0 ? 'bad' : 'good', html: `You spent <b>${fmt(spent)}</b> ${PERIOD_LABELS[dashPeriod]} — <b>${fmt(Math.abs(d))}</b> ${d > 0 ? 'more' : 'less'} than ${PREV_NOUN[dashPeriod]} (${fmt(prevFull)}).` });
-        } else if(prog.daysElapsed >= 3){
-          const P = spent / prog.daysElapsed * prog.periodDays, d = P - prevFull;
-          ins.push({ tone: d > 0 ? 'bad' : 'good', html: `At this pace you’ll spend <b>${fmt(P)}</b> by the end of ${PERIOD_LABELS[dashPeriod].replace(/^the /,'')} — <b>${fmt(Math.abs(d))}</b> ${d > 0 ? 'above' : 'below'} ${PREV_NOUN[dashPeriod]}’s ${fmt(prevFull)}.` });
-        }
-      }
-      // biggest mover vs the previous period (like for like)
-      if(dashCategory === 'all' && !isAll){
-        const cur = {}, prv = {};
-        periodList.forEach(t=>{ cur[t.category] = (cur[t.category] || 0) + t.amount; });
-        allRealExpenses.forEach(t=>{ if(dateInRange(t.date, prevAligned)) prv[t.category] = (prv[t.category] || 0) + t.amount; });
-        let best = null;
-        new Set([...Object.keys(cur), ...Object.keys(prv)]).forEach(k=>{ const d = (cur[k] || 0) - (prv[k] || 0); if(!best || Math.abs(d) > Math.abs(best.d)) best = { k, d }; });
-        const prevAlignedTotal = Object.values(prv).reduce((a,b)=>a+b, 0);
-        if(best && Math.abs(best.d) >= 100 && Math.abs(best.d) >= 0.1 * Math.max(spent, prevAlignedTotal)){
-          ins.push({ tone: best.d > 0 ? 'warn' : 'good', cat: best.k, html: (prv[best.k] || 0) === 0
-            ? `<b>${escapeHtml(best.k)}</b> is new \u2014 <b>${fmt(best.d)}</b> with nothing in ${PREV_NOUN[dashPeriod]} at this point.`
-            : `<b>${escapeHtml(best.k)}</b> is <b>${fmt(Math.abs(best.d))}</b> ${best.d > 0 ? 'higher' : 'lower'} than ${vsWords}.` });
-        }
-      }
-      // one-day spike
-      if(topDay && nEntries >= 3 && avgD > 0 && topDay[1] / avgD >= 2.5 && nDays >= 5){
-        const byC = {}; periodList.filter(t=>t.date === topDay[0]).forEach(t=>{ const k = dashCategory === 'all' ? t.category : t.source; byC[k] = (byC[k] || 0) + t.amount; });
-        const lead = Object.entries(byC).sort((a,b)=>b[1]-a[1])[0];
-        ins.push({ tone:'warn', html: `Your highest day was <b>${escapeHtml(dayLabelOf(topDay[0]))}</b> — <b>${fmt(topDay[1])}</b>, ${(topDay[1] / avgD).toFixed(1)}× a typical day${lead ? ', mostly <b>' + escapeHtml(lead[0]) + '</b>' : ''}.` });
-      }
-      // concentration
-      if(topKey){
-        const share = Math.round(topKey[1] / spent * 100);
-        if(dashCategory === 'all' && share >= 35 && Object.keys(periodList.reduce((m,t)=>{ m[t.category]=1; return m; }, {})).length >= 2)
-          ins.push({ tone:'info', cat: topKey[0], html: `<b>${escapeHtml(topKey[0])}</b> takes <b>${share}%</b> of your spending (${fmt(topKey[1])}).` });
-        else if(dashCategory !== 'all' && share >= 60)
-          ins.push({ tone:'info', html: `<b>${share}%</b> of your ${escapeHtml(dashCategory)} spending came from <b>${escapeHtml(topKey[0])}</b>.` });
-      }
-      // weekends
-      if(nDays >= 14 && wkndDays > 0 && keyedSpend > 0){
-        const share = wkndSpend / keyedSpend, expect = wkndDays / nDays;
-        if(share >= expect * 1.4 && share >= 0.3) ins.push({ tone:'warn', html: `Weekends are <b>${Math.round(share*100)}%</b> of your spending but only ${Math.round(expect*100)}% of the days.` });
-      }
-      // no-spend days
-      if(nDays >= 5 && noSpend >= 2 && noSpend / nDays >= 0.15) ins.push({ tone:'good', html: `<b>${noSpend} no-spend days</b> out of ${nDays} so far — nicely done.` });
-      if(!ins.length) ins.push({ tone:'info', html: `<b>${fmt(spent)}</b> across <b>${nEntries}</b> ${nEntries === 1 ? 'entry' : 'entries'} ${PERIOD_LABELS[dashPeriod]}.` });
-    }
-    $('money-exp-insights').innerHTML = ins.slice(0, 4).map((r,i)=>
-      `<div class="ins-row${r.cat && dashCategory === 'all' ? ' tap' : ''}"${r.cat && dashCategory === 'all' ? addCat(r.cat) : ''} style="animation-delay:${i*45}ms;"><span class="ins-dot ${r.tone}"></span><div>${r.html}</div>${r.cat && dashCategory === 'all' ? '<span class="ins-go">View ›</span>' : ''}</div>`).join('');
 
     // ── weekday pattern ──
     const order = [1,2,3,4,5,6,0];
@@ -6888,8 +6817,7 @@ function moneyPageHtml(){
     sp.addEventListener('pointerup', ()=> heroScrubEnd(2600));
     sp.addEventListener('pointercancel', ()=> heroScrubEnd(600));
     sp.addEventListener('pointerleave', e=>{ if(e.pointerType === 'mouse') heroScrubEnd(400); });
-    // insights, donut, weekday bars
-    $('money-exp-insights').addEventListener('click', e=>{ const r = e.target.closest('.ins-row.tap'); if(r) focusCategory(r.getAttribute('data-cat')); });
+    // category breakdown rows, donut, weekday bars
     $('money-exp-top-categories').addEventListener('click', e=>{ const r = e.target.closest('.cat-row-tap'); if(r) focusCategory(r.getAttribute('data-cat')); });
     $('money-exp-donut-container').addEventListener('click', e=>{
       const f = e.target.closest('.donut-focus');
@@ -7258,8 +7186,9 @@ function moneyPageHtml(){
     wireTrendTooltips('money-exp-trend-container');
     // v147: touch-scrub -- dragging a finger along the chart walks the tooltip day by day (vertical scrolling still works: touch-action:pan-y)
     const svgEl = host.querySelector('svg'), cursor = svgEl.querySelector('.trend-cursor'), tapGs = svgEl.querySelectorAll('.trend-tap');
-    let lastI = -1;
+    let lastI = -1, endTimer = 0;
     const scrubTo = e=>{
+      clearTimeout(endTimer);
       const box = svgEl.getBoundingClientRect(); if(!box.width) return;
       const x = (e.clientX - box.left) / box.width * W;
       const i = Math.max(0, Math.min(days.length-1, Math.round((x - plotL) / stepX)));
@@ -7271,7 +7200,7 @@ function moneyPageHtml(){
     svgEl.addEventListener('pointerdown', scrubTo);
     let mvEv = null, mvRaf = 0;
     svgEl.addEventListener('pointermove', e=>{ if(!(e.buttons || e.pointerType === 'touch')) return; mvEv = e; if(!mvRaf) mvRaf = requestAnimationFrame(()=>{ mvRaf = 0; scrubTo(mvEv); }); });
-    const scrubEnd = ()=> setTimeout(()=>{ cursor.classList.remove('on'); lastI = -1; }, 1800);
+    const scrubEnd = ()=>{ clearTimeout(endTimer); endTimer = setTimeout(()=>{ cursor.classList.remove('on'); lastI = -1; }, 1800); };
     svgEl.addEventListener('pointerup', scrubEnd); svgEl.addEventListener('pointercancel', scrubEnd);
   }
 

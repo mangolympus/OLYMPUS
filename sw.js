@@ -239,7 +239,10 @@
 // (no-spend days, weekend share), donut with tap-to-focus, weekday pattern, swipe gestures. Index.html only.
 // v148: Dashboard performance and details. Charts no longer rescan every entry once per day shown (a refresh with 12,000 entries went from ~240 ms to ~16 ms); change chip shows
 // an arrow without a double sign; new categories are described as new; screen readers no longer announce every frame of the count-up. Index.html only.
-const CACHE_VERSION = 'olympus-v148';
+// v149: Money Dashboard: "What Stands Out" card removed. Fixes: a category outside the fixed list (older data) can be focused from the donut without the selector blanking, the 30-day
+// scrub highlight no longer vanishes during a second drag, All-time chip no longer keeps a stale screen-reader label or says "since your first entry" with nothing spent, compact
+// rupee amounts round correctly at 1k / 1L. Index.html only.
+const CACHE_VERSION = 'olympus-v149';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
