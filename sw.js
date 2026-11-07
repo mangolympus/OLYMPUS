@@ -233,7 +233,13 @@
 // v145: Money audit. Backup import repaired (settings import always failed after already adding entries in memory; broken entries are skipped; Chinnu's import skips HDFC),
 // invoice save no longer breaks when the PDF tools cannot load offline (no duplicate invoice on a second tap), "Avg. daily spend" counts whole study days, Chinnu's own saved Money is no
 // longer discarded on reopening, the private Money file retries after a failed write.
-const CACHE_VERSION = 'olympus-v145';
+// v146: Money Dashboard (outflow only). New: Last 30 Days range; On Pace For / Entries / Highest Day / Top Category cards; Spend by Account; Biggest Expenses; % share on the
+// category breakdown; an even-pace tick on Budget Burn. Fixed: radar labels clipped at the edges, 15-day axis repeated the month on every bar. Index.html only.
+// v147: Money Dashboard redesign -- range chips, hero summary (count-up, change chip, time-vs-spend bars, spend curve with finger-scrub), plain-words insights, new KPI tiles
+// (no-spend days, weekend share), donut with tap-to-focus, weekday pattern, swipe gestures. Index.html only.
+// v148: Dashboard performance and details. Charts no longer rescan every entry once per day shown (a refresh with 12,000 entries went from ~240 ms to ~16 ms); change chip shows
+// an arrow without a double sign; new categories are described as new; screen readers no longer announce every frame of the count-up. Index.html only.
+const CACHE_VERSION = 'olympus-v148';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

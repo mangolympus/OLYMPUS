@@ -976,6 +976,96 @@ body.money-no-hdfc .money-view .stat-grid[data-bal]{grid-template-columns:repeat
 .money-view #money-exp-velocity .week-bar{border-radius:4px 4px 0 0;}
 .money-view #money-exp-trend-container svg{max-width:none;}
 .money-view #money-exp-burn-container .hbar-lbl{width:88px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+/* v147: Money dashboard -- chips, hero, insights, donut, weekday pattern, gestures */
+.money-view .dash-hidden-select{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; overflow:hidden; clip:rect(0 0 0 0);}
+.money-view .dash-filter{position:sticky; top:60px; z-index:12; margin:0 -16px 12px; padding:8px 16px; background:color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);}
+.money-view .dash-chips{position:relative; display:flex; gap:2px; padding:4px; background:var(--surface2); border:1px solid var(--border); border-radius:14px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+.money-view .dash-chips::-webkit-scrollbar{display:none;}
+.money-view .dash-chip{position:relative; z-index:1; flex:1 0 auto; border:none; background:transparent; color:var(--muted); font-weight:700; font-size:12px; padding:8px 9px; border-radius:10px; cursor:pointer; white-space:nowrap; transition:color var(--dur-fast) var(--ease-out); -webkit-tap-highlight-color:transparent;}
+.money-view .dash-chip:active{transform:scale(.96);}
+.money-view .dash-chip[aria-pressed="true"]{color:var(--active-accent,var(--umang));}
+.money-view .dash-chip-pill{position:absolute; z-index:0; top:4px; bottom:4px; left:0; width:0; border-radius:10px; background:var(--card); box-shadow:0 1px 4px rgba(0,0,0,.22); transition:transform var(--dur-med) var(--ease-spring), width var(--dur-med) var(--ease-out); will-change:transform;}
+.money-view .dash-hero{scroll-margin-top:118px; position:relative; overflow:hidden; touch-action:pan-y; padding:18px 16px 14px;
+  background:radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--active-accent,var(--umang)) 16%, transparent), transparent 62%), var(--card);}
+.money-view .hero-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+.money-view .hero-lbl{font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.2px;}
+.money-view .hero-period{font-size:13px; font-weight:800; color:var(--ink); margin-top:2px;}
+.money-view .hero-cat select{width:auto; max-width:150px; padding:6px 26px 6px 12px; border-radius:999px; font-size:12px; font-weight:700; background-position:right 9px center; background-size:12px;}
+.money-view .hero-amt{font-size:42px; line-height:1.05; font-weight:800; letter-spacing:-1.2px; color:var(--ink); margin-top:12px; font-variant-numeric:tabular-nums; font-family:'Plus Jakarta Sans',sans-serif;}
+.money-view .hero-amt::first-letter{font-size:.55em; font-weight:700; color:var(--muted); letter-spacing:0;}
+.money-view .hero-amt .paise{font-size:.42em; font-weight:700; color:var(--muted); letter-spacing:0;}
+.money-view .hero-amt.tick{animation:heroTick .32s var(--ease-out);}
+@keyframes heroTick{from{opacity:.35; transform:translateY(6px) scale(.97);} to{opacity:1; transform:none;}}
+.money-view .hero-delta{display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; font-weight:600; color:var(--muted); flex-wrap:wrap;}
+.money-view .delta-chip{display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:800; font-variant-numeric:tabular-nums; background:var(--surface2); color:var(--muted);}
+.money-view .delta-chip.up{background:var(--bad-tint); color:var(--bad);}
+.money-view .delta-chip.down{background:var(--green-tint); color:var(--good);}
+.money-view .hero-bars{margin-top:14px; display:grid; gap:9px;}
+.money-view .hb-row .hb-head{display:flex; justify-content:space-between; font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:4px;}
+.money-view .hb-row .hb-head b{color:var(--ink); font-weight:800;}
+.money-view .hb-track{position:relative; height:7px; border-radius:5px; background:var(--surface2);}
+.money-view .hb-fill{height:100%; border-radius:5px; transform-origin:left; animation:barFillIn var(--dur-slow) var(--ease-out) backwards;}
+.money-view .hb-tick{position:absolute; top:-3px; bottom:-3px; width:2px; border-radius:1px; background:var(--ink); opacity:.55;}
+.money-view .hero-pace{margin-top:12px; font-size:12.5px; font-weight:600; color:var(--muted);}
+.money-view .hero-pace b{color:var(--ink); font-weight:800; font-size:14px; font-variant-numeric:tabular-nums;}
+.money-view .hero-spark-wrap{margin-top:10px;}
+.money-view .hero-spark{touch-action:pan-y; user-select:none; -webkit-user-select:none;}
+.money-view .spark-plot{position:relative; cursor:crosshair;}
+.money-view .spark-plot svg{display:block; width:100%; height:auto; overflow:visible;}
+.money-view .spark-cursor{position:absolute; top:0; bottom:0; width:0; border-left:1.5px solid var(--ink); opacity:0; pointer-events:none; transition:opacity var(--dur-fast);}
+.money-view .spark-cursor.on{opacity:.35;}
+.money-view .spark-dot{position:absolute; width:11px; height:11px; margin:-5.5px 0 0 -5.5px; border-radius:50%; background:var(--active-accent,var(--umang)); border:2px solid var(--card); opacity:0; pointer-events:none; transition:opacity var(--dur-fast);}
+.money-view .spark-dot.on{opacity:1;}
+.money-view .hero-readout{min-height:34px; margin-top:8px; font-size:12px; font-weight:600; color:var(--muted); line-height:1.45;}
+.money-view .hero-readout b{color:var(--ink); font-weight:800; font-variant-numeric:tabular-nums;}
+.money-view .hero-legend{display:flex; gap:12px; font-size:10.5px; font-weight:700; color:var(--muted); margin-top:4px;}
+.money-view .hero-legend i{display:inline-block; width:12px; height:0; border-top:2px solid; margin-right:5px; vertical-align:middle;}
+.money-view .hero-hint{font-size:10.5px; color:var(--text-faint); text-align:center; margin-top:6px;}
+.money-view .ins-row{display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; line-height:1.45; color:var(--ink); animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards;}
+.money-view .ins-row:last-child{border-bottom:none; padding-bottom:0;}
+.money-view .ins-row:first-child{padding-top:0;}
+.money-view .ins-dot{flex:none; width:9px; height:9px; border-radius:50%; margin-top:6px; background:var(--muted);}
+.money-view .ins-dot.bad{background:var(--bad);} .money-view .ins-dot.good{background:var(--good);} .money-view .ins-dot.info{background:var(--active-accent,var(--umang));} .money-view .ins-dot.warn{background:var(--warn);}
+.money-view .ins-row b{font-weight:800; font-variant-numeric:tabular-nums;}
+.money-view .ins-row .ins-go{margin-left:auto; flex:none; color:var(--muted); font-size:12px; font-weight:700; align-self:center;}
+.money-view .ins-row.tap{cursor:pointer;}
+.money-view .ins-row.tap:active{opacity:.7;}
+.money-view .donut-wrap{display:flex; flex-direction:column; align-items:center; gap:14px;}
+.money-view .donut-stage{position:relative; width:176px; height:176px; flex:none;}
+.money-view .donut-stage svg{width:100%; height:100%; display:block; transform:rotate(-90deg);}
+.money-view .donut-seg{fill:none; cursor:pointer; transition:stroke-width var(--dur-med) var(--ease-spring), opacity var(--dur-fast) var(--ease-out); -webkit-tap-highlight-color:transparent;}
+.money-view .donut-seg.sel{stroke-width:31px;}
+.money-view .donut-stage.has-sel .donut-seg:not(.sel){opacity:.32;}
+.money-view .donut-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none; padding:0 34px;}
+.money-view .donut-center .dc-top{font-size:10.5px; font-weight:700; color:var(--muted); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.money-view .donut-center .dc-amt{font-size:17px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; margin-top:1px;}
+.money-view .donut-center .dc-sub{font-size:10.5px; font-weight:700; color:var(--muted); margin-top:1px;}
+.money-view .donut-legend{width:100%; display:grid; gap:2px;}
+.money-view .dl-row{display:flex; align-items:center; gap:9px; width:100%; padding:8px 8px; border:none; border-radius:10px; background:transparent; color:var(--ink); font-size:12.5px; font-weight:600; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background var(--dur-fast) var(--ease-out);}
+.money-view .dl-row.sel{background:var(--surface2);}
+.money-view .dl-row .sw{flex:none; width:10px; height:10px; border-radius:3px;}
+.money-view .dl-row .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.money-view .dl-row .am{font-weight:800; font-variant-numeric:tabular-nums;}
+.money-view .dl-row .pc{width:38px; text-align:right; color:var(--muted); font-variant-numeric:tabular-nums;}
+.money-view .donut-focus{align-self:stretch; display:none; padding:11px 14px; border-radius:12px; border:1.5px solid var(--active-accent,var(--umang)); background:transparent; color:var(--active-accent,var(--umang)); font-weight:800; font-size:13px; cursor:pointer;}
+.money-view .donut-focus.show{display:block; animation:popIn var(--dur-fast) var(--ease-out);}
+@keyframes donutSeg{from{stroke-dasharray:0 var(--c);} to{stroke-dasharray:var(--d) var(--c);}}
+.chart-animate.donut-seg.play{animation:donutSeg .55s cubic-bezier(.22,.8,.4,1) both; animation-delay:var(--dl,0s);}
+.chart-animate.spark-prev.play{animation:fadeIn .5s ease .2s both;}
+.money-view .wd-bar{cursor:pointer; -webkit-tap-highlight-color:transparent;}
+.money-view .wd-bar .week-bar{transition:filter var(--dur-fast), opacity var(--dur-fast);}
+.money-view .wd-bar.sel .week-bar{filter:brightness(1.18);}
+.money-view #money-exp-weekday-container .week-bars{height:92px;}
+.money-view #money-exp-weekday-container .week-bar-col{cursor:pointer;}
+.money-view .wd-read{margin-top:10px; font-size:12.5px; font-weight:600; color:var(--muted); line-height:1.45; min-height:36px;}
+.money-view .wd-read b{color:var(--ink); font-weight:800;}
+.money-view #money-exp-trend-container svg{touch-action:pan-y;}
+.money-view .trend-cursor{opacity:0; transition:opacity var(--dur-fast); pointer-events:none;}
+.money-view .trend-cursor.on{opacity:.4;}
+.money-view .v-delta{font-weight:800; font-size:11.5px;}
+.money-view #money-exp-week-container, .money-view #money-exp-fifteen-container{touch-action:pan-y;}
+.money-view .swipe-note{font-size:10.5px; color:var(--text-faint); text-align:center; margin-top:6px;}
+@media (prefers-reduced-motion: reduce){.money-view .dash-chip-pill{transition:none;}}
 .money-view /* Settings */
   .danger-zone{border:1.5px solid var(--danger-bg); background:var(--danger-bg);}
 .money-view .danger-zone h2{color:var(--danger);}
@@ -4395,6 +4485,89 @@ function moneyPageHtml(){
 
     <div class="subpage active" id="money-dash-sub-expenses">
 
+      <div class="dash-filter" id="money-dash-filter">
+        <div class="dash-chips" id="money-dash-chips" role="group" aria-label="Time range">
+          <span class="dash-chip-pill" id="money-dash-chip-pill" aria-hidden="true"></span>
+          <button type="button" class="dash-chip" data-period="week">Week</button>
+          <button type="button" class="dash-chip" data-period="month">Month</button>
+          <button type="button" class="dash-chip" data-period="last30">30 days</button>
+          <button type="button" class="dash-chip" data-period="last3">3 mo</button>
+          <button type="button" class="dash-chip" data-period="year">Year</button>
+          <button type="button" class="dash-chip" data-period="all">All</button>
+        </div>
+      </div>
+      <select id="money-exp-filter-period" class="dash-hidden-select" aria-hidden="true" tabindex="-1">
+        <option value="week">This Week</option>
+        <option value="month" selected>This Month</option>
+        <option value="last30">Last 30 Days</option>
+        <option value="last3">Last 3 Months</option>
+        <option value="year">This Year</option>
+        <option value="all">All Time</option>
+      </select>
+
+      <div class="card dash-hero" id="money-dash-hero">
+        <div id="money-hero-body">
+          <div class="hero-top">
+            <div>
+              <div class="hero-lbl" id="money-exp-stat-spent-lbl">Spent</div>
+              <div class="hero-period" id="money-hero-period">—</div>
+            </div>
+            <div class="hero-cat"><select id="money-exp-filter-category" aria-label="Category"><option value="all">All Categories</option></select></div>
+          </div>
+          <div class="hero-amt" id="money-exp-stat-spent">₹0</div>
+          <div class="hero-delta">
+            <span class="delta-chip" id="money-hero-chip">—</span>
+            <span class="hero-delta-txt" id="money-exp-stat-spent-sub">—</span>
+          </div>
+          <div class="hero-bars" id="money-hero-bars"></div>
+          <div class="hero-pace" id="money-hero-pace">On pace for <b id="money-exp-stat-proj">—</b> <span id="money-exp-stat-proj-sub">—</span></div>
+        </div>
+        <div class="hero-spark-wrap">
+          <div class="hero-spark" id="money-hero-spark"></div>
+          <div class="hero-readout" id="money-hero-readout"></div>
+        </div>
+        <div class="hero-hint" id="money-hero-hint">Swipe this card to change the time range</div>
+      </div>
+
+      <div class="card" id="money-exp-insights-card">
+        <h2><span class="n">💡</span>What Stands Out</h2>
+        <div id="money-exp-insights"></div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="lbl">Avg. Daily Spend</div>
+          <div class="val" id="money-exp-stat-avgday" style="font-size:16px;">₹0</div>
+          <div class="sub" style="color:var(--muted);" id="money-exp-stat-avgday-sub">so far</div>
+        </div>
+        <div class="stat-card">
+          <div class="lbl">Entries</div>
+          <div class="val" id="money-exp-stat-count" style="font-size:16px;">0</div>
+          <div class="sub" style="color:var(--muted);" id="money-exp-stat-count-sub">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="lbl">Highest Day</div>
+          <div class="val" id="money-exp-stat-topday" style="font-size:16px;">—</div>
+          <div class="sub" style="color:var(--muted);" id="money-exp-stat-topday-sub">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="lbl" id="money-exp-stat-topcat-lbl">Top Category</div>
+          <div class="val" id="money-exp-stat-topcat" style="font-size:16px;">—</div>
+          <div class="sub" style="color:var(--muted);" id="money-exp-stat-topcat-sub">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="lbl">No-Spend Days</div>
+          <div class="val" id="money-exp-stat-nospend" style="font-size:16px;">—</div>
+          <div class="sub" style="color:var(--muted);" id="money-exp-stat-nospend-sub">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="lbl">Weekend Share</div>
+          <div class="val" id="money-exp-stat-weekend" style="font-size:16px;">—</div>
+          <div class="sub" style="color:var(--muted);" id="money-exp-stat-weekend-sub">—</div>
+        </div>
+      </div>
+
+
       <div class="card">
         <h2><span class="n">🏦</span>Account Balances</h2>
         <div class="stat-grid" data-bal="1" style="grid-template-columns:repeat(3,1fr); margin-bottom:0;">
@@ -4414,37 +4587,22 @@ function moneyPageHtml(){
         <div class="hint" style="margin-top:10px; margin-bottom:0;">Combined balance: <b id="money-exp-bal-total" style="color:var(--navy-800);">₹0</b></div>
       </div>
 
-      <div class="card">
-        <h2><span class="n">⏱</span>Track Expenses</h2>
-        <div class="row2">
-          <div class="field">
-            <label>Category</label>
-            <select id="money-exp-filter-category"><option value="all">All Categories</option></select>
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label>Time Range</label>
-            <select id="money-exp-filter-period">
-              <option value="week">This Week</option>
-              <option value="month" selected>This Month</option>
-              <option value="last3">Last 3 Months</option>
-              <option value="year">This Year</option>
-              <option value="all">All Time</option>
-            </select>
-          </div>
-        </div>
+      <div class="card" id="money-exp-donut-card">
+        <h2><span class="n">🍩</span><span id="money-exp-donut-title">Where It Went</span></h2>
+        <div class="hint" id="money-exp-donut-hint" style="margin-top:0; margin-bottom:10px;">Tap a slice to see its share.</div>
+        <div id="money-exp-donut-container"></div>
       </div>
 
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="lbl" id="money-exp-stat-spent-lbl">Spent</div>
-          <div class="val" id="money-exp-stat-spent" style="color:var(--danger);">₹0</div>
-          <div class="sub" style="color:var(--muted);" id="money-exp-stat-spent-sub">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="lbl">Avg. Daily Spend</div>
-          <div class="val" id="money-exp-stat-avgday" style="font-size:16px;">₹0</div>
-          <div class="sub" style="color:var(--muted);" id="money-exp-stat-avgday-sub">so far</div>
-        </div>
+      <div class="card">
+        <h2><span class="n">📈</span>30-Day Spending</h2>
+        <div class="hint" id="money-exp-trend-cap" style="margin-top:0; margin-bottom:10px;">Money out, last 30 days. Tap a day for the breakdown.</div>
+        <div class="chart-wrap" id="money-exp-trend-container"></div>
+      </div>
+
+      <div class="card" id="money-exp-weekday-card">
+        <h2><span class="n">🗓</span>Weekday Pattern</h2>
+        <div class="hint" id="money-exp-weekday-hint" style="margin-top:0; margin-bottom:10px;">Average spend on each day of the week.</div>
+        <div id="money-exp-weekday-container"></div>
       </div>
 
       <div class="card" id="money-exp-velocity-card">
@@ -4454,21 +4612,9 @@ function moneyPageHtml(){
       </div>
 
       <div class="card">
-        <h2><span class="n">📈</span>30-Day Spending</h2>
-        <div class="hint" id="money-exp-trend-cap" style="margin-top:0; margin-bottom:10px;">Money out, last 30 days. Tap a day for the breakdown.</div>
-        <div class="chart-wrap" id="money-exp-trend-container"></div>
-      </div>
-
-      <div class="card">
         <h2><span class="n">🔥</span>Budget Burn Rate</h2>
         <div class="hint" id="money-exp-burn-cap" style="margin-top:0; margin-bottom:12px;">Each category vs its spend in the previous period.</div>
         <div id="money-exp-burn-container"></div>
-      </div>
-
-      <div class="card">
-        <h2><span class="n">🕸</span>Category Footprint</h2>
-        <div class="hint" style="margin-top:0; margin-bottom:6px;">How this period’s spend is spread across your top categories.</div>
-        <div class="chart-wrap" id="money-exp-radar-container"></div>
       </div>
 
       <div class="card">
@@ -4510,6 +4656,18 @@ function moneyPageHtml(){
         <h2><span class="n">🏷</span><span id="money-exp-breakdown-title">Category Breakdown</span></h2>
         <div class="hint" style="margin-top:0; margin-bottom:10px;" id="money-exp-breakdown-hint">Inter-bank transfers are excluded — they're internal movement, not real spending.</div>
         <div id="money-exp-top-categories"></div>
+      </div>
+
+      <div class="card" id="money-exp-account-card">
+        <h2><span class="n">🏦</span>Spend by Account</h2>
+        <div class="hint" style="margin-top:0; margin-bottom:10px;" id="money-exp-account-hint">Where the money actually went from.</div>
+        <div id="money-exp-account-container"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="n">💸</span>Biggest Expenses</h2>
+        <div class="hint" style="margin-top:0; margin-bottom:8px;" id="money-exp-biggest-hint">The five largest in this period.</div>
+        <div id="money-exp-biggest-container"></div>
       </div>
     </div>
   </main>
@@ -6033,6 +6191,9 @@ function moneyPageHtml(){
     } else if(period==='month'){
       start = new Date(now.getFullYear(), now.getMonth(), 1, 0,0,0,0);
       end = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59,999);
+    } else if(period==='last30'){
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate()-29, 0,0,0,0);
     } else if(period==='last3'){
       start = new Date(now.getFullYear(), now.getMonth()-2, 1, 0,0,0,0);
       end = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59,999);
@@ -6058,6 +6219,9 @@ function moneyPageHtml(){
     } else if(period==='month'){
       prevStart = new Date(start.getFullYear(), start.getMonth()-1, 1, 0,0,0,0);
       prevEnd = new Date(start.getFullYear(), start.getMonth(), 0, 23,59,59,999);
+    } else if(period==='last30'){
+      prevStart = new Date(start.getFullYear(), start.getMonth(), start.getDate()-30, 0,0,0,0);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate()-1, 23,59,59,999);
     } else if(period==='last3'){
       prevStart = new Date(start.getFullYear(), start.getMonth()-3, 1, 0,0,0,0);
       prevEnd = new Date(start.getFullYear(), start.getMonth(), 0, 23,59,59,999);
@@ -6076,10 +6240,25 @@ function moneyPageHtml(){
     return { start: prevStart, end: prevEnd };
   }
 
-  function dateInRange(dateStr, range){
-    const d = new Date(dateStr + 'T12:00:00');
-    return d >= range.start && d <= range.end;
+  // v148: called once per entry per range, thousands of times per render -- the noon timestamp of each date string is memoised
+  // (a few hundred distinct dates) instead of building a Date every call. Same comparison as before.
+  const _noonMs = new Map();
+  function noonMsOf(dateStr){
+    let v = _noonMs.get(dateStr);
+    if(v === undefined){ v = new Date(dateStr + 'T12:00:00').getTime(); if(_noonMs.size > 5000) _noonMs.clear(); _noonMs.set(dateStr, v); }
+    return v;
   }
+  function dateInRange(dateStr, range){
+    const d = noonMsOf(dateStr);
+    return d >= range.start.getTime() && d <= range.end.getTime();
+  }
+  // v148: one pass -> {date: total}. The per-day chart helpers used to rescan every entry once per day shown (days x entries).
+  function expenseByDate(list, filter){
+    const m = Object.create(null);
+    for(let i = 0; i < list.length; i++){ const t = list[i]; if(filter && !filter(t)) continue; m[t.date] = (m[t.date] || 0) + t.amount; }
+    return m;
+  }
+  const dayTotalFrom = (m, d) => m[localDateStr(d)] || 0;
 
   // Every transaction counts in full on its own actual date — no spreading a large
   // one-off across multiple days for reporting purposes (that's what this app used to
@@ -6093,7 +6272,7 @@ function moneyPageHtml(){
     return dateInRange(t.date, range) ? t.amount : 0;
   }
 
-  const PERIOD_LABELS = { week:'this week', month:'this month', last3:'the last 3 months', year:'this year', all:'all time' };
+  const PERIOD_LABELS = { week:'this week', month:'this month', last30:'the last 30 days', last3:'the last 3 months', year:'this year', all:'all time' };
 
   function populateExpenseCategoryFilter(){
     populateCategorySelect($('money-exp-filter-category'), dashCategory);
@@ -6108,6 +6287,15 @@ function moneyPageHtml(){
     if(sel.value !== current) sel.value = 'all';
   }
 
+  // How far through a period are we, in whole STUDY days (to the end of today's study day)?
+  function periodProgress(range, now){
+    const todayEnd = new Date(todayStr(now) + 'T23:59:59.999');
+    const periodDays = Math.max(1, Math.round((range.end.getTime() + 1 - range.start.getTime()) / 86400000));
+    const daysElapsed = Math.max(1, Math.min(periodDays, Math.floor((Math.min(todayEnd.getTime(), range.end.getTime()) - range.start.getTime()) / 86400000) + 1));
+    return { daysElapsed, periodDays };
+  }
+  const pctOf = (v, total) => total > 0 ? Math.max(1, Math.round(v / total * 100)) : 0;
+
   function renderExpenseDashboard(){
     populateExpenseCategoryFilter();
     $('money-exp-filter-category').value = dashCategory;
@@ -6118,8 +6306,8 @@ function moneyPageHtml(){
     const prevRange = getPreviousRange(range.start, range.end, dashPeriod);
     // v145: elapsed time is counted in whole STUDY days (to the end of today's study day). It used the raw clock, so after midday the current day was
     // counted twice (a half day rounds up, then +1) and "Avg. daily spend" came out too low; between midnight and 5 AM it ran a day ahead.
-    const todayEnd = new Date(todayStr(now) + 'T23:59:59.999');
-    const daysElapsed = dashPeriod==='all' ? 0 : Math.max(1, Math.floor((Math.min(todayEnd.getTime(), range.end.getTime()) - range.start.getTime()) / 86400000) + 1);
+    const prog = periodProgress(range, now);
+    const daysElapsed = dashPeriod==='all' ? 0 : prog.daysElapsed;
     const elapsedNow = daysElapsed * 86400000;
     const prevAligned = getPreviousRange(range.start, range.end, dashPeriod, elapsedNow); // like-for-like, for the "% vs previous" line only
     const catMatch = t => dashCategory==='all' || t.category===dashCategory;
@@ -6143,20 +6331,93 @@ function moneyPageHtml(){
     const prevSpent = dashPeriod==='all' ? 0 : allRealExpenses.reduce((s,t)=> catMatch(t) ? s + expenseContributionInRange(t, prevAligned) : s, 0);
 
     $('money-exp-stat-spent-lbl').textContent = dashCategory==='all' ? 'Spent' : dashCategory + ' Spend';
-    $('money-exp-stat-spent').textContent = fmt(spent);
-    let changeText = 'No prior data to compare';
-    if(prevSpent>0){
-      const pct = Math.round(((spent-prevSpent)/prevSpent)*100);
-      changeText = (pct>=0?'+':'') + pct + '% vs same point of the previous period';
-    } else if(spent>0){
-      changeText = 'New spending vs previous period';
+    setHeroAmount(spent);
+    $('money-hero-period').textContent = periodTitle(range, now);
+    {
+      // v147: change vs the previous period shown as a coloured chip (higher spend = red, lower = green) plus a plain-words comparison
+      const chip = $('money-hero-chip'), sub = $('money-exp-stat-spent-sub');
+      const vs = dashPeriod==='all' ? '' : (prog.daysElapsed >= prog.periodDays ? PREV_NOUN[dashPeriod] : PREV_NOUN[dashPeriod] + ' at this point');
+      chip.className = 'delta-chip';
+      if(dashPeriod==='all'){ chip.textContent = 'All time'; sub.textContent = 'since your first entry'; }
+      else if(prevSpent>0){
+        const pct = Math.round(((spent-prevSpent)/prevSpent)*100);
+        chip.textContent = (pct>0?'\u25B2 ':pct<0?'\u25BC ':'') + Math.abs(pct) + '%';
+        chip.setAttribute('aria-label', (pct>0?'Up ':pct<0?'Down ':'Same, ') + Math.abs(pct) + ' percent');
+        if(pct>0) chip.classList.add('up'); else if(pct<0) chip.classList.add('down');
+        sub.textContent = 'vs ' + vs + ' (' + fmt(prevSpent) + ')';
+      } else if(spent>0){ chip.textContent = 'New'; sub.textContent = 'nothing spent ' + vs; }
+      else { chip.textContent = '\u2014'; sub.textContent = 'no spending yet'; }
+      sub.style.color = '';
     }
-    $('money-exp-stat-spent-sub').textContent = changeText;
-    $('money-exp-stat-spent-sub').style.color = prevSpent>0 && spent>prevSpent ? 'var(--danger)' : (prevSpent>0 && spent<prevSpent ? 'var(--good)' : 'var(--muted)');
 
     const avgDaily = dashPeriod==='all' ? 0 : spent / daysElapsed;
     $('money-exp-stat-avgday').textContent = dashPeriod==='all' ? '—' : fmt(avgDaily);
     $('money-exp-stat-avgday-sub').textContent = dashPeriod==='all' ? 'select a period' : daysElapsed + ' day' + (daysElapsed===1?'':'s') + ' so far';
+
+    // v146: insight cards -- everything below honours the category filter and the time range, and leaves out inter-bank transfers
+    const periodList = allRealExpenses.filter(t=> catMatch(t) && dateInRange(t.date, range));
+    const nEntries = periodList.length;
+    $('money-exp-stat-count').textContent = String(nEntries);
+    $('money-exp-stat-count-sub').textContent = nEntries ? 'avg ' + fmt(spent / nEntries) + ' each' : 'none yet';
+    // on pace for: what the period would total if every remaining day looked like the days so far
+    // the pace line is only meaningful while a calendar period is still running (not All time, not the rolling 30 days, not its last day)
+    $('money-hero-pace').style.display = (dashPeriod==='all' || dashPeriod==='last30' || prog.daysElapsed >= prog.periodDays) ? 'none' : '';
+    if(dashPeriod==='all'){
+      $('money-exp-stat-proj').textContent = '—'; $('money-exp-stat-proj-sub').textContent = 'pick a period';
+    } else if(prog.daysElapsed >= prog.periodDays){
+      $('money-exp-stat-proj').textContent = fmt(spent); $('money-exp-stat-proj-sub').textContent = 'period complete';
+    } else if(prog.daysElapsed < 3){
+      $('money-exp-stat-proj').textContent = '—'; $('money-exp-stat-proj-sub').textContent = 'needs a few more days';
+    } else {
+      $('money-exp-stat-proj').textContent = fmt(spent / prog.daysElapsed * prog.periodDays);
+      $('money-exp-stat-proj-sub').textContent = 'by the end of ' + PERIOD_LABELS[dashPeriod].replace(/^the /,'');
+    }
+    // highest day
+    const byDay = {}; periodList.forEach(t=>{ byDay[t.date] = (byDay[t.date]||0) + t.amount; });
+    const topDay = Object.entries(byDay).sort((a,b)=> b[1]-a[1] || (a[0] < b[0] ? 1 : -1))[0];
+    $('money-exp-stat-topday').textContent = topDay ? fmt(topDay[1]) : '—';
+    $('money-exp-stat-topday-sub').textContent = topDay ? rowDateLabel(topDay[0]) : 'no spending';
+    // top category (or, when one category is chosen, the account it was mostly paid from)
+    const byKey = {}; periodList.forEach(t=>{ const k = dashCategory==='all' ? t.category : t.source; byKey[k] = (byKey[k]||0) + t.amount; });
+    const topKey = Object.entries(byKey).sort((a,b)=> b[1]-a[1])[0];
+    $('money-exp-stat-topcat-lbl').textContent = dashCategory==='all' ? 'Top Category' : 'Mostly Paid From';
+    $('money-exp-stat-topcat').textContent = topKey ? topKey[0] : '—';
+    $('money-exp-stat-topcat-sub').textContent = topKey ? fmt(topKey[1]) + ' · ' + pctOf(topKey[1], spent) + '%' : 'no spending';
+    const dctx = { now, range, prevRange, prevAligned, prog, spent, prevSpent, periodList, allRealExpenses, catMatch, byDay, topDay, topKey, nEntries, avgDaily };
+    renderDashExtras(dctx);
+
+    // spend by account (hidden when one category is chosen -- the breakdown card below already splits that by account)
+    const acctCard = $('money-exp-account-card');
+    if(acctCard){
+      acctCard.style.display = dashCategory==='all' ? '' : 'none';
+      if(dashCategory==='all'){
+        const bySrc = {}; periodList.forEach(t=>{ bySrc[t.source] = (bySrc[t.source]||0) + t.amount; });
+        const srcRows = mySources().map(sn=>[sn, bySrc[sn]||0]).concat(Object.keys(bySrc).filter(k=>!mySources().includes(k)).map(k=>[k, bySrc[k]])).sort((a,b)=>b[1]-a[1]);
+        const srcTotal = srcRows.reduce((a,r)=>a+r[1],0), srcMax = Math.max(1, ...srcRows.map(r=>r[1]));
+        $('money-exp-account-hint').textContent = 'Showing ' + PERIOD_LABELS[dashPeriod] + '. Inter-bank transfers are excluded.';
+        $('money-exp-account-container').innerHTML = srcTotal ? srcRows.map(([sn,v],i)=>`
+          <div style="margin-bottom:10px; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${i*40}ms;">
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px;">
+              <span style="font-weight:600; color:var(--ink);">${escapeHtml(sn)}</span>
+              <span style="font-weight:700; color:var(--navy-800);">${fmt(v)}<span style="color:var(--muted); font-weight:600;"> · ${pctOf(v, srcTotal)}%</span></span>
+            </div>
+            <div style="height:6px; background:var(--border); border-radius:4px; overflow:hidden;">
+              <div class="bar-fill" style="height:100%; width:${v>0 ? Math.max((v/srcMax)*100,4) : 0}%; background:var(--umang); border-radius:4px; animation-delay:${i*40+80}ms;"></div>
+            </div>
+          </div>`).join('') : `<div class="hint" style="margin:0;">No spending in ${PERIOD_LABELS[dashPeriod]}.</div>`;
+      }
+    }
+    // biggest expenses
+    const big = periodList.slice().sort((a,b)=> b.amount - a.amount || (String(a.date) < String(b.date) ? 1 : -1)).slice(0,5);
+    $('money-exp-biggest-hint').textContent = (dashCategory==='all' ? 'The five largest' : 'The five largest ' + dashCategory + ' entries') + ' in ' + PERIOD_LABELS[dashPeriod] + '.';
+    $('money-exp-biggest-container').innerHTML = big.length ? big.map((t,i)=>`
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${i*30}ms;">
+        <div style="min-width:0;">
+          <div style="font-weight:700; color:var(--ink);">${escapeHtml(t.category)}</div>
+          <div style="font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(rowDateLabel(t.date))} · ${escapeHtml(t.source)}${t.remarks ? ' · ' + escapeHtml(t.remarks) : ''}</div>
+        </div>
+        <div style="font-weight:700; color:var(--danger); flex:none; margin-left:10px;">-${fmt(t.amount)}</div>
+      </div>`).join('') : `<div class="hint" style="margin:0;">No spending in ${PERIOD_LABELS[dashPeriod]}.</div>`;
 
     renderWeeklyTracker(now);
     renderFifteenDayTracker(now);
@@ -6168,11 +6429,12 @@ function moneyPageHtml(){
       const catEntries = categorySpendEntries(range);
       const colorMap = categoryColorMap(catEntries.map(e=>e[0]));
       const catMax = catEntries.length ? catEntries[0][1] : 1;
+      const catTotal = catEntries.reduce((a,e)=>a+e[1],0);
       $('money-exp-top-categories').innerHTML = catEntries.length ? catEntries.map(([cat,val],i)=>`
-        <div style="margin-bottom:10px; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${i*40}ms;">
+        <div class="cat-row-tap" data-cat="${escapeHtml(cat)}" style="margin-bottom:10px; cursor:pointer; animation:fadeSlideIn var(--dur-fast) var(--ease-out) backwards; animation-delay:${i*40}ms;">
           <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px;">
             <span style="font-weight:600; color:var(--ink);"><span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:${colorMap[cat]}; margin-right:6px; vertical-align:middle;"></span>${escapeHtml(cat)}</span>
-            <span style="font-weight:700; color:var(--navy-800);">${fmt(val)}</span>
+            <span style="font-weight:700; color:var(--navy-800);">${fmt(val)}<span style="color:var(--muted); font-weight:600;"> · ${pctOf(val, catTotal)}%</span></span>
           </div>
           <div style="height:6px; background:var(--border); border-radius:4px; overflow:hidden;">
             <div class="bar-fill" style="height:100%; width:${Math.max((val/catMax)*100,4)}%; background:${colorMap[cat]}; border-radius:4px; animation-delay:${i*40+80}ms;"></div>
@@ -6207,11 +6469,440 @@ function moneyPageHtml(){
     renderVelocitySparkline(now);
     renderThirtyDayTrend(now);
     renderBudgetBurn(range, prevRange);
-    renderCategoryRadar(range);
+    renderDonut(range, dctx);
+    syncChips();
     // Fire entrance animations for the new .chart-animate elements, scoped to the Expenses
     // subpage so the Weekly/15-Day trackers (their own bar-grow system) and the Sales
     // dashboard are untouched. triggerChartAnimations() no-ops under reduced motion.
     triggerChartAnimations($('money-dash-sub-expenses'));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // v147: Dashboard presentation -- period chips, hero summary (count-up, change chip, time-vs-spend bars, cumulative curve with
+  // finger-scrub), plain-words insights, KPI tiles, donut with tap-to-focus, weekday pattern, swipe gestures and light haptics.
+  // Money out only. Every number is derived from the same per-period lists renderExpenseDashboard builds, so the tiles, the hero,
+  // the insights and the charts always agree. Motion is skipped under prefers-reduced-motion.
+  // ─────────────────────────────────────────────────────────────────────────
+  const PERIOD_ORDER = ['week','month','last30','last3','year','all'];
+  const PREV_NOUN  = { week:'last week', month:'last month', last30:'the previous 30 days', last3:'the previous 3 months', year:'last year', all:'' };
+  const PREV_SHORT = { week:'last week', month:'last month', last30:'prior 30 days', last3:'prior 3 months', year:'last year', all:'' };
+  const DOW_PLURAL = ['Sundays','Mondays','Tuesdays','Wednesdays','Thursdays','Fridays','Saturdays'];
+  const DOW_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let swipeHintSeen = false; try{ swipeHintSeen = localStorage.getItem('olympusDashSwipeHint') === '1'; }catch(_){}
+  function dismissSwipeHint(){
+    if(!swipeHintSeen){ swipeHintSeen = true; try{ localStorage.setItem('olympusDashSwipeHint','1'); }catch(_){} }
+    const h = $('money-hero-hint'); if(h) h.style.display = 'none';
+  }
+  let dashEnter = false, heroShown = 0, heroRaf = 0, donutData = null, donutSel = null, sparkData = null, weekdayData = null;
+
+  const buzz = ms => { try{ if(navigator.vibrate && !prefersReducedMotion()) navigator.vibrate(ms); }catch(_){} };
+  const dayLabelOf = key => new Date(key+'T12:00:00').toLocaleDateString('en-IN',{weekday:'short', day:'numeric', month:'short'});
+  const kfmt = v => '₹' + (v>=100000 ? (Math.round(v/10000)/10)+'L' : v>=1000 ? (Math.round(v/100)/10)+'k' : String(Math.round(v)));
+  const clamp01 = x => Math.max(0, Math.min(1, x));
+
+  function periodTitle(range){
+    const f = (d,o)=> d.toLocaleDateString('en-IN',o);
+    if(dashPeriod==='week') return f(range.start,{day:'numeric',month:'short'}) + ' – ' + f(range.end,{day:'numeric',month:'short'});
+    if(dashPeriod==='month') return f(range.start,{month:'long',year:'numeric'});
+    if(dashPeriod==='last30') return 'Last 30 days';
+    if(dashPeriod==='last3') return f(range.start,{month:'short'}) + ' – ' + f(range.end,{month:'short',year:'numeric'});
+    if(dashPeriod==='year') return String(range.start.getFullYear());
+    return 'All time';
+  }
+
+  // whole rupees big, paise small -- textContent stays the exact fmt() string
+  function heroHtml(v){
+    const s = fmt(v), i = s.lastIndexOf('.');
+    return i > 0 ? escapeHtml(s.slice(0,i)) + '<span class="paise">' + escapeHtml(s.slice(i)) + '</span>' : escapeHtml(s);
+  }
+  // First view of the page counts up from zero; later changes (filter, sync) swap straight to the exact figure with a short pop.
+  function setHeroAmount(v){
+    const el = $('money-exp-stat-spent'); if(!el) return;
+    cancelAnimationFrame(heroRaf);
+    el.setAttribute('data-final', fmt(v));
+    const before = heroShown; heroShown = v;
+    if(dashEnter && v > 0 && !prefersReducedMotion()){
+      dashEnter = false;
+      const t0 = performance.now(), dur = 850;
+      const step = now => {
+        const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+        el.innerHTML = heroHtml(p < 1 ? v * e : v);
+        if(p < 1) heroRaf = requestAnimationFrame(step);
+      };
+      heroRaf = requestAnimationFrame(step);
+      return;
+    }
+    dashEnter = false;
+    el.innerHTML = heroHtml(v);
+    if(before !== v && !prefersReducedMotion()){ el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick'); }
+  }
+
+  function syncChips(){
+    const bar = $('money-dash-chips'), pill = $('money-dash-chip-pill'); if(!bar || !pill) return;
+    let act = null;
+    bar.querySelectorAll('.dash-chip').forEach(b=>{ const on = b.getAttribute('data-period')===dashPeriod; b.setAttribute('aria-pressed', on ? 'true' : 'false'); if(on) act = b; });
+    if(act && act.offsetWidth){
+      pill.style.width = act.offsetWidth + 'px';
+      pill.style.transform = 'translateX(' + act.offsetLeft + 'px)';
+      if(bar.scrollWidth > bar.clientWidth + 2) bar.scrollTo({ left: Math.max(0, act.offsetLeft - (bar.clientWidth - act.offsetWidth) / 2), behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    }
+  }
+  function setPeriod(p, dir){
+    if(p === dashPeriod || PERIOD_ORDER.indexOf(p) < 0) return;
+    dashPeriod = p;
+    renderExpenseDashboard();
+    const body = $('money-hero-body');
+    if(dir && body && !prefersReducedMotion()){ body.classList.remove('chart-slide-l','chart-slide-r'); void body.offsetWidth; body.classList.add(dir > 0 ? 'chart-slide-l' : 'chart-slide-r'); }
+    buzz(8);
+  }
+
+  // a horizontal swipe (touch / pen / mouse drag) that is clearly more sideways than vertical; the click that follows it is swallowed
+  function attachSwipe(el, onLeft, onRight, skip){
+    if(!el) return;
+    let sx = 0, sy = 0, st = 0, pid = null;
+    el.addEventListener('pointerdown', e=>{ if(skip && skip(e.target)){ pid = null; return; } pid = e.pointerId; sx = e.clientX; sy = e.clientY; st = Date.now(); });
+    const end = e=>{
+      if(pid === null || e.pointerId !== pid) return;
+      pid = null;
+      if(e.type === 'pointercancel') return;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if(Date.now() - st < 900 && Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.6){
+        const stop = ev=>{ ev.stopPropagation(); ev.preventDefault(); };
+        el.addEventListener('click', stop, true);
+        setTimeout(()=> el.removeEventListener('click', stop, true), 350);
+        (dx < 0 ? onLeft : onRight)();
+      }
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+
+  // consecutive study-day keys from the start of the period up to today (or the period's end if it is already over)
+  function periodDayKeys(range, today, periodList){
+    let s = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate());
+    if(dashPeriod === 'all'){ const first = periodList.reduce((m,t)=> t.date < m ? t.date : m, today); s = new Date(first + 'T00:00:00'); }
+    const endKey = localDateStr(range.end) < today ? localDateStr(range.end) : today;
+    const keys = [];
+    for(let d = s; keys.length < 4000; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)){
+      const k = localDateStr(d); if(k > endKey) break; keys.push(k);
+    }
+    return keys;
+  }
+
+  function renderDashExtras(c){
+    const { now, range, prevRange, prevAligned, prog, spent, periodList, allRealExpenses, catMatch, byDay, topDay, topKey, nEntries } = c;
+    const isAll = dashPeriod === 'all';
+    const today = todayStr(now);
+    { const h = $('money-hero-hint'); if(h) h.style.display = swipeHintSeen ? 'none' : ''; }
+    const keys = periodDayKeys(range, today, periodList);
+    const nDays = keys.length;
+    const vsWords = isAll ? '' : (prog.daysElapsed >= prog.periodDays ? PREV_NOUN[dashPeriod] : PREV_NOUN[dashPeriod] + ' at this point');
+
+    // per-weekday / weekend / no-spend tallies over the days that have happened
+    const dowSum = [0,0,0,0,0,0,0], dowN = [0,0,0,0,0,0,0];
+    let noSpend = 0, wkndSpend = 0, wkndDays = 0, wkdySpend = 0, wkdyDays = 0, keyedSpend = 0;
+    keys.forEach(k=>{
+      const v = byDay[k] || 0, dw = new Date(k + 'T12:00:00').getDay();
+      dowSum[dw] += v; dowN[dw]++; keyedSpend += v; if(!v) noSpend++;
+      if(dw === 0 || dw === 6){ wkndSpend += v; wkndDays++; } else { wkdySpend += v; wkdyDays++; }
+    });
+    const avgD = isAll ? (nDays ? spent / nDays : 0) : c.avgDaily;
+
+    $('money-exp-stat-nospend').textContent = nDays ? String(noSpend) : '—';
+    $('money-exp-stat-nospend-sub').textContent = nDays ? 'of ' + nDays + ' day' + (nDays === 1 ? '' : 's') + (isAll ? ' since your first entry' : ' so far') : 'no days yet';
+    $('money-exp-stat-weekend').textContent = keyedSpend > 0 ? Math.round(wkndSpend / keyedSpend * 100) + '%' : '—';
+    $('money-exp-stat-weekend-sub').textContent = keyedSpend <= 0 ? 'no spending' : (wkndDays && wkdyDays ? kfmt(wkndSpend / wkndDays) + '/day vs ' + kfmt(wkdySpend / wkdyDays) + ' on weekdays' : (wkndDays ? wkndDays + ' weekend day' + (wkndDays === 1 ? '' : 's') + ' so far' : 'no weekend yet'));
+
+    // previous period, whole and like-for-like (aligned) -- both honour the category filter
+    const prevFull = isAll ? 0 : allRealExpenses.reduce((s,t)=> catMatch(t) ? s + expenseContributionInRange(t, prevRange) : s, 0);
+
+    // ── hero: time vs spend bars ──
+    const bars = $('money-hero-bars');
+    if(isAll){ bars.innerHTML = ''; }
+    else {
+      const frac = Math.min(1, prog.daysElapsed / prog.periodDays);
+      let html = dashPeriod === 'last30' ? '' : `<div class="hb-row"><div class="hb-head"><span>Time</span><span><b>Day ${prog.daysElapsed}</b> of ${prog.periodDays}</span></div>
+        <div class="hb-track"><div class="hb-fill" style="width:${(frac*100).toFixed(1)}%; background:color-mix(in srgb, var(--muted) 55%, transparent);"></div></div></div>`;
+      if(prevFull > 0){
+        const ratio = spent / prevFull;
+        const col = ratio > 1 ? 'var(--bad)' : (ratio > frac + 0.001 ? 'var(--warn)' : 'var(--good)');
+        html += `<div class="hb-row"><div class="hb-head"><span>Spend vs ${PREV_SHORT[dashPeriod]}</span><span><b>${Math.round(ratio*100)}%</b> of ${fmt(prevFull)}</span></div>
+          <div class="hb-track"><div class="hb-fill" style="width:${Math.min(100, ratio*100).toFixed(1)}%; background:${col};"></div>${frac < 1 && dashPeriod !== 'last30' ? `<div class="hb-tick" style="left:calc(${(frac*100).toFixed(1)}% - 1px);" title="Even pace"></div>` : ''}</div></div>`;
+      }
+      bars.innerHTML = html;
+    }
+
+    // ── hero: cumulative curve (this period vs the previous one) ──
+    const sparkHost = $('money-hero-spark'), readout = $('money-hero-readout');
+    const cum = []; { let a = 0; keys.forEach(k=>{ a += byDay[k] || 0; cum.push(a); }); }
+    const n = Math.max(2, isAll ? nDays : prog.periodDays);
+    let prevCum = [], prevKeys = [];
+    if(!isAll){
+      const pDays = Math.min(n, Math.round((prevRange.end.getTime() + 1 - prevRange.start.getTime()) / 86400000));
+      const pBy = {};
+      allRealExpenses.forEach(t=>{ if(catMatch(t) && dateInRange(t.date, prevRange)) pBy[t.date] = (pBy[t.date] || 0) + t.amount; });
+      let a = 0, k = localDateStr(prevRange.start);
+      for(let i = 0; i < pDays; i++){ a += pBy[k] || 0; prevCum.push(a); prevKeys.push(k); k = plusDayKey(k, 1); }
+    }
+    sparkData = null;
+    if(spent <= 0 && !(prevCum.length && prevCum[prevCum.length-1] > 0)){
+      sparkHost.innerHTML = '<div class="hint" style="margin:0; text-align:center;">No spending in ' + PERIOD_LABELS[dashPeriod] + (dashCategory === 'all' ? '' : ' for ' + escapeHtml(dashCategory)) + ' yet.</div>';
+      readout.innerHTML = '';
+    } else {
+      const W = 300, H = 84, pT = 8, pB = 4;
+      const proj = (!isAll && nDays >= 3 && nDays < n) ? cum[nDays-1] / nDays * n : null;
+      const yMax = Math.max(1, cum[nDays-1] || 0, proj || 0, prevCum.length ? prevCum[prevCum.length-1] : 0);
+      const X = i => (i / (n - 1)) * W, Y = v => H - pB - (v / yMax) * (H - pT - pB);
+      const pts = cum.map((v,i)=> [X(i), Y(v)]);
+      const pathOf = a => a.map((p,i)=> (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+      let len = 0; for(let i = 1; i < pts.length; i++){ len += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); }
+      const line = pts.length > 1 ? pathOf(pts) : `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)} L${(pts[0][0]+0.01).toFixed(2)},${pts[0][1].toFixed(1)}`;
+      const area = pts.length > 1 ? line + ` L${pts[pts.length-1][0].toFixed(1)},${H-pB} L${pts[0][0].toFixed(1)},${H-pB} Z` : '';
+      const prevPts = prevCum.map((v,i)=> [X(i), Y(v)]);
+      const gid = 'hs' + Math.round(Math.random() * 1e6);
+      const projLine = proj != null ? `<path d="M${pts[nDays-1][0].toFixed(1)},${pts[nDays-1][1].toFixed(1)} L${X(n-1).toFixed(1)},${Y(proj).toFixed(1)}" fill="none" stroke="var(--active-accent,var(--umang))" stroke-width="1.6" stroke-dasharray="2 4" stroke-linecap="round" opacity=".7"/>` : '';
+      sparkHost.innerHTML = `
+        <div class="spark-plot" id="money-hero-plot">
+          <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative spend through ${PERIOD_LABELS[dashPeriod]}">
+            <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--active-accent,var(--umang))" stop-opacity=".30"/><stop offset="1" stop-color="var(--active-accent,var(--umang))" stop-opacity="0"/></linearGradient></defs>
+            <line x1="0" y1="${H-pB}" x2="${W}" y2="${H-pB}" stroke="var(--border)" stroke-width="1"/>
+            ${prevPts.length > 1 ? `<path class="chart-animate spark-prev" d="${pathOf(prevPts)}" fill="none" stroke="var(--text-faint)" stroke-width="1.6" stroke-dasharray="4 3" stroke-linejoin="round"/>` : ''}
+            ${area ? `<path class="chart-animate trend-area" d="${area}" fill="url(#${gid})"/>` : ''}
+            <path class="chart-animate trend-line" d="${line}" fill="none" stroke="var(--active-accent,var(--umang))" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${len.toFixed(1)}" style="--dash-len:${len.toFixed(1)}"/>
+            ${projLine}
+          </svg>
+          <div class="spark-cursor" id="money-hero-cursor"></div><div class="spark-dot" id="money-hero-dot"></div>
+        </div>
+        <div class="hero-legend"><span><i style="border-color:var(--active-accent,var(--umang));"></i>${isAll ? 'Cumulative' : 'This period'}</span>${prevPts.length > 1 ? `<span><i style="border-color:var(--text-faint); border-top-style:dashed;"></i>${PREV_SHORT[dashPeriod]}</span>` : ''}${proj != null ? `<span><i style="border-color:var(--active-accent,var(--umang)); border-top-style:dotted;"></i>If pace holds</span>` : ''}</div>`;
+      sparkData = { n, nDays, keys, cum, prevCum, byDay, W, H, Y, X, today, prevShort: PREV_SHORT[dashPeriod], isAll };
+      heroReadoutDefault();
+    }
+
+    // ── insights ──
+    const ins = [];
+    const addCat = (name) => ` data-cat="${escapeHtml(name)}"`;
+    if(spent <= 0){
+      ins.push({ tone:'info', html: 'Nothing spent ' + (dashCategory === 'all' ? '' : 'on <b>' + escapeHtml(dashCategory) + '</b> ') + PERIOD_LABELS[dashPeriod] + ' yet.' });
+    } else {
+      // pace
+      if(!isAll && prevFull > 0){
+        if(prog.daysElapsed >= prog.periodDays){
+          const d = spent - prevFull;
+          ins.push({ tone: d > 0 ? 'bad' : 'good', html: `You spent <b>${fmt(spent)}</b> ${PERIOD_LABELS[dashPeriod]} — <b>${fmt(Math.abs(d))}</b> ${d > 0 ? 'more' : 'less'} than ${PREV_NOUN[dashPeriod]} (${fmt(prevFull)}).` });
+        } else if(prog.daysElapsed >= 3){
+          const P = spent / prog.daysElapsed * prog.periodDays, d = P - prevFull;
+          ins.push({ tone: d > 0 ? 'bad' : 'good', html: `At this pace you’ll spend <b>${fmt(P)}</b> by the end of ${PERIOD_LABELS[dashPeriod].replace(/^the /,'')} — <b>${fmt(Math.abs(d))}</b> ${d > 0 ? 'above' : 'below'} ${PREV_NOUN[dashPeriod]}’s ${fmt(prevFull)}.` });
+        }
+      }
+      // biggest mover vs the previous period (like for like)
+      if(dashCategory === 'all' && !isAll){
+        const cur = {}, prv = {};
+        periodList.forEach(t=>{ cur[t.category] = (cur[t.category] || 0) + t.amount; });
+        allRealExpenses.forEach(t=>{ if(dateInRange(t.date, prevAligned)) prv[t.category] = (prv[t.category] || 0) + t.amount; });
+        let best = null;
+        new Set([...Object.keys(cur), ...Object.keys(prv)]).forEach(k=>{ const d = (cur[k] || 0) - (prv[k] || 0); if(!best || Math.abs(d) > Math.abs(best.d)) best = { k, d }; });
+        const prevAlignedTotal = Object.values(prv).reduce((a,b)=>a+b, 0);
+        if(best && Math.abs(best.d) >= 100 && Math.abs(best.d) >= 0.1 * Math.max(spent, prevAlignedTotal)){
+          ins.push({ tone: best.d > 0 ? 'warn' : 'good', cat: best.k, html: (prv[best.k] || 0) === 0
+            ? `<b>${escapeHtml(best.k)}</b> is new \u2014 <b>${fmt(best.d)}</b> with nothing in ${PREV_NOUN[dashPeriod]} at this point.`
+            : `<b>${escapeHtml(best.k)}</b> is <b>${fmt(Math.abs(best.d))}</b> ${best.d > 0 ? 'higher' : 'lower'} than ${vsWords}.` });
+        }
+      }
+      // one-day spike
+      if(topDay && nEntries >= 3 && avgD > 0 && topDay[1] / avgD >= 2.5 && nDays >= 5){
+        const byC = {}; periodList.filter(t=>t.date === topDay[0]).forEach(t=>{ const k = dashCategory === 'all' ? t.category : t.source; byC[k] = (byC[k] || 0) + t.amount; });
+        const lead = Object.entries(byC).sort((a,b)=>b[1]-a[1])[0];
+        ins.push({ tone:'warn', html: `Your highest day was <b>${escapeHtml(dayLabelOf(topDay[0]))}</b> — <b>${fmt(topDay[1])}</b>, ${(topDay[1] / avgD).toFixed(1)}× a typical day${lead ? ', mostly <b>' + escapeHtml(lead[0]) + '</b>' : ''}.` });
+      }
+      // concentration
+      if(topKey){
+        const share = Math.round(topKey[1] / spent * 100);
+        if(dashCategory === 'all' && share >= 35 && Object.keys(periodList.reduce((m,t)=>{ m[t.category]=1; return m; }, {})).length >= 2)
+          ins.push({ tone:'info', cat: topKey[0], html: `<b>${escapeHtml(topKey[0])}</b> takes <b>${share}%</b> of your spending (${fmt(topKey[1])}).` });
+        else if(dashCategory !== 'all' && share >= 60)
+          ins.push({ tone:'info', html: `<b>${share}%</b> of your ${escapeHtml(dashCategory)} spending came from <b>${escapeHtml(topKey[0])}</b>.` });
+      }
+      // weekends
+      if(nDays >= 14 && wkndDays > 0 && keyedSpend > 0){
+        const share = wkndSpend / keyedSpend, expect = wkndDays / nDays;
+        if(share >= expect * 1.4 && share >= 0.3) ins.push({ tone:'warn', html: `Weekends are <b>${Math.round(share*100)}%</b> of your spending but only ${Math.round(expect*100)}% of the days.` });
+      }
+      // no-spend days
+      if(nDays >= 5 && noSpend >= 2 && noSpend / nDays >= 0.15) ins.push({ tone:'good', html: `<b>${noSpend} no-spend days</b> out of ${nDays} so far — nicely done.` });
+      if(!ins.length) ins.push({ tone:'info', html: `<b>${fmt(spent)}</b> across <b>${nEntries}</b> ${nEntries === 1 ? 'entry' : 'entries'} ${PERIOD_LABELS[dashPeriod]}.` });
+    }
+    $('money-exp-insights').innerHTML = ins.slice(0, 4).map((r,i)=>
+      `<div class="ins-row${r.cat && dashCategory === 'all' ? ' tap' : ''}"${r.cat && dashCategory === 'all' ? addCat(r.cat) : ''} style="animation-delay:${i*45}ms;"><span class="ins-dot ${r.tone}"></span><div>${r.html}</div>${r.cat && dashCategory === 'all' ? '<span class="ins-go">View ›</span>' : ''}</div>`).join('');
+
+    // ── weekday pattern ──
+    const order = [1,2,3,4,5,6,0];
+    const avgs = order.map(d=> dowN[d] ? dowSum[d] / dowN[d] : 0);
+    const maxAvg = Math.max(...avgs);
+    const wdHost = $('money-exp-weekday-container');
+    $('money-exp-weekday-hint').textContent = 'Average spend on each day of the week — ' + PERIOD_LABELS[dashPeriod] + (dashCategory === 'all' ? '.' : ', ' + dashCategory + ' only.');
+    weekdayData = { order, avgs, dowSum, dowN, maxAvg };
+    if(!(maxAvg > 0)){
+      wdHost.innerHTML = '<div class="hint" style="margin:0;">No spending to compare yet.</div>';
+    } else {
+      const cols = order.map((d,i)=>{
+        const v = avgs[i], h = v > 0 ? Math.max(v / maxAvg * 100, 6) : 2, peak = v === maxAvg;
+        return `<div class="week-bar-col wd-bar${peak ? ' peak' : ''}" data-i="${i}" role="button" tabindex="0" aria-label="${DOW_PLURAL[d]} average ${fmt(v)}"><div class="week-bar" style="height:${h}%; background:${peak ? 'var(--bad)' : 'linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)))'};"></div></div>`;
+      }).join('');
+      wdHost.innerHTML = `
+        <div class="week-vals">${avgs.map(v=>`<div class="week-val-cell">${v > 0 ? kfmt(v).replace('₹','') : ''}</div>`).join('')}</div>
+        <div class="week-bars">${cols}</div>
+        <div class="week-dates">${order.map(d=>`<div class="week-date-cell">${DOW_SHORT[d]}</div>`).join('')}</div>
+        <div class="wd-read" id="money-exp-weekday-read"></div>`;
+      weekdayReadout(avgs.indexOf(maxAvg), true);
+    }
+  }
+  function plusDayKey(key, n){ const d = new Date(key + 'T12:00:00'); d.setDate(d.getDate() + n); return localDateStr(d); }
+
+  function weekdayReadout(i, isDefault){
+    const r = $('money-exp-weekday-read'), w = weekdayData; if(!r || !w) return;
+    const d = w.order[i];
+    document.querySelectorAll('#money-exp-weekday-container .wd-bar').forEach(el=> el.classList.toggle('sel', !isDefault && Number(el.getAttribute('data-i')) === i));
+    if(isDefault){
+      const live = w.order.map((dd,k)=>({ k, v: w.avgs[k], n: w.dowN[dd] })).filter(x=>x.n > 0);
+      const low = live.slice().sort((a,b)=>a.v-b.v)[0];
+      r.innerHTML = `<b>${DOW_PLURAL[d]}</b> are your priciest day — <b>${fmt(w.avgs[i])}</b> on average` + (low && low.k !== i ? (low.v > 0 ? `, ${(w.avgs[i] / low.v).toFixed(1)}× your quietest day (${DOW_PLURAL[w.order[low.k]]}).` : `, versus nothing on ${DOW_PLURAL[w.order[low.k]]}.`) : '.') + ' <span style="font-weight:500;">Tap a bar for details.</span>';
+    } else {
+      r.innerHTML = `<b>${DOW_PLURAL[d]}</b> average <b>${fmt(w.avgs[i])}</b> across ${w.dowN[d]} day${w.dowN[d] === 1 ? '' : 's'} (<b>${fmt(w.dowSum[d])}</b> in total).`;
+    }
+  }
+
+  // hero readout: default line, or the day under the finger
+  function heroReadoutDefault(){
+    const r = $('money-hero-readout'), s = sparkData; if(!r || !s) return;
+    const last = s.keys[s.keys.length - 1];
+    const todayAmt = last === s.today ? (s.byDay[s.today] || 0) : null;
+    r.innerHTML = (todayAmt != null ? `Today so far <b>${fmt(todayAmt)}</b> · ` : '') + 'drag across the curve to explore any day';
+    const c = $('money-hero-cursor'), dt = $('money-hero-dot'); if(c) c.classList.remove('on'); if(dt) dt.classList.remove('on');
+  }
+  let _sparkIdx = -1, _sparkTimer = 0;
+  function heroScrub(e){
+    const s = sparkData, plot = $('money-hero-plot'); if(!s || !plot) return;
+    const rect = plot.getBoundingClientRect(); if(!rect.width) return;
+    let i = Math.round(clamp01((e.clientX - rect.left) / rect.width) * (s.n - 1));
+    i = Math.max(0, Math.min(i, s.nDays - 1));
+    clearTimeout(_sparkTimer);
+    const k = s.keys[i], dayAmt = s.byDay[k] || 0;
+    const cur = $('money-hero-cursor'), dot = $('money-hero-dot');
+    const x = s.X(i) / s.W * 100, y = s.Y(s.cum[i]) / s.H * 100;
+    cur.style.left = x + '%'; dot.style.left = x + '%'; dot.style.top = y + '%';
+    cur.classList.add('on'); dot.classList.add('on');
+    $('money-hero-readout').innerHTML = `<b>${escapeHtml(dayLabelOf(k))}</b> · ${dayAmt > 0 ? '<b>' + fmt(dayAmt) + '</b> that day' : 'no spending'} · <b>${fmt(s.cum[i])}</b> so far` + (s.prevCum[i] != null ? ` · ${s.prevShort} <b>${fmt(s.prevCum[i])}</b> by then` : '');
+    if(i !== _sparkIdx && e.pointerType === 'touch' && dayAmt > 0) buzz(4);
+    _sparkIdx = i;
+  }
+  function heroScrubEnd(delay){ clearTimeout(_sparkTimer); _sparkTimer = setTimeout(()=>{ _sparkIdx = -1; heroReadoutDefault(); }, delay); }
+
+  // ── donut ──
+  function renderDonut(range, c){
+    const host = $('money-exp-donut-container'); if(!host) return;
+    const byCat = dashCategory === 'all';
+    let rows;
+    if(byCat) rows = categorySpendEntries(range);
+    else { const m = {}; c.periodList.forEach(t=>{ m[t.source] = (m[t.source] || 0) + t.amount; }); rows = Object.entries(m).sort((a,b)=>b[1]-a[1]); }
+    const total = rows.reduce((a,r)=>a + r[1], 0);
+    $('money-exp-donut-title').textContent = byCat ? 'Where It Went' : dashCategory + ' — By Account';
+    donutSel = null; donutData = null;
+    if(!(total > 0)){
+      $('money-exp-donut-hint').textContent = 'Nothing to split yet.';
+      host.innerHTML = `<div class="hint" style="margin:0;">No ${byCat ? '' : escapeHtml(dashCategory) + ' '}spending in ${PERIOD_LABELS[dashPeriod]}.</div>` + (byCat ? '' : '<button type="button" class="donut-focus show" data-act="clear" style="margin-top:12px; width:100%;">← All categories</button>');
+      return;
+    }
+    $('money-exp-donut-hint').textContent = 'Tap a slice or a row to see its share' + (byCat ? ' — then focus the whole dashboard on it.' : '.');
+    const cmap = categoryColorMap(rows.map(r=>r[0]));
+    let segs = rows.map(r=>({ name:r[0], v:r[1], color: cmap[r[0]] }));
+    if(segs.length > 6){
+      const rest = segs.slice(5); segs = segs.slice(0,5).concat([{ name:'Other', v: rest.reduce((a,r)=>a + r.v, 0), color:'var(--text-faint)', other: rest.length }]);
+    }
+    const R = 62, SW = 24, C = 2 * Math.PI * R, GAP = segs.length > 1 ? 2.5 : 0;
+    let cum = 0;
+    const circles = segs.map((sg,i)=>{
+      const len = sg.v / total * C, dash = Math.max(len - GAP, 1.5);
+      const el = `<circle class="donut-seg chart-animate" data-i="${i}" cx="88" cy="88" r="${R}" stroke="${sg.color}" stroke-width="${SW}" stroke-dasharray="${dash.toFixed(2)} ${(C - dash).toFixed(2)}" stroke-dashoffset="${(-cum).toFixed(2)}" style="--c:${C.toFixed(2)}; --d:${dash.toFixed(2)}; --dl:${(cum / C * 0.55).toFixed(2)}s"><title>${escapeHtml(sg.name)} ${fmt(sg.v)}</title></circle>`;
+      cum += len; return el;
+    }).join('');
+    donutData = { segs, total, byCat };
+    host.innerHTML = `
+      <div class="donut-wrap">
+        <div class="donut-stage" id="money-donut-stage">
+          <svg viewBox="0 0 176 176" role="img" aria-label="Spending split">${circles}</svg>
+          <div class="donut-center"><div class="dc-top" id="money-donut-c1"></div><div class="dc-amt" id="money-donut-c2"></div><div class="dc-sub" id="money-donut-c3"></div></div>
+        </div>
+        <div class="donut-legend">${segs.map((sg,i)=>`<button type="button" class="dl-row" data-i="${i}"><span class="sw" style="background:${sg.color};"></span><span class="nm">${escapeHtml(sg.name)}${sg.other ? ' (' + sg.other + ')' : ''}</span><span class="am">${fmt(sg.v)}</span><span class="pc">${pctOf(sg.v, total)}%</span></button>`).join('')}</div>
+        <button type="button" class="donut-focus" id="money-donut-focus" data-act="${byCat ? 'focus' : 'clear'}"></button>
+      </div>`;
+    donutPaint();
+  }
+  function donutPaint(){
+    const d = donutData; if(!d) return;
+    const sel = donutSel != null ? d.segs[donutSel] : null;
+    $('money-donut-c1').textContent = sel ? sel.name : (d.byCat ? 'Total spent' : dashCategory);
+    $('money-donut-c2').textContent = fmt(sel ? sel.v : d.total);
+    $('money-donut-c3').textContent = sel ? pctOf(sel.v, d.total) + '% of total' : d.segs.length + (d.byCat ? ' categor' + (d.segs.length === 1 ? 'y' : 'ies') : ' account' + (d.segs.length === 1 ? '' : 's'));
+    $('money-donut-stage').classList.toggle('has-sel', !!sel);
+    document.querySelectorAll('#money-exp-donut-container .donut-seg').forEach(el=> el.classList.toggle('sel', Number(el.getAttribute('data-i')) === donutSel));
+    document.querySelectorAll('#money-exp-donut-container .dl-row').forEach(el=> el.classList.toggle('sel', Number(el.getAttribute('data-i')) === donutSel));
+    const fb = $('money-donut-focus');
+    if(d.byCat){ fb.classList.toggle('show', !!sel && !sel.other); fb.textContent = sel && !sel.other ? 'Show only ' + sel.name + ' →' : ''; fb.setAttribute('data-name', sel && !sel.other ? sel.name : ''); }
+    else { fb.classList.add('show'); fb.textContent = '← All categories'; }
+  }
+
+  // one tap re-points the whole dashboard at a category (or back to all) and brings the hero into view
+  function focusCategory(name){
+    if(!name || name === dashCategory) return;
+    dashCategory = name; renderExpenseDashboard(); buzz(8);
+    const h = $('money-dash-hero'); if(h) h.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+  }
+  function initDashGestures(){
+    // period chips
+    $('money-dash-chips').addEventListener('click', e=>{
+      const b = e.target.closest('.dash-chip'); if(!b) return;
+      const p = b.getAttribute('data-period');
+      setPeriod(p, PERIOD_ORDER.indexOf(p) > PERIOD_ORDER.indexOf(dashPeriod) ? 1 : -1);
+    });
+    window.addEventListener('resize', syncChips);
+    // swipe the hero: change the time range
+    attachSwipe($('money-dash-hero'),
+      ()=> { const i = PERIOD_ORDER.indexOf(dashPeriod); if(i < PERIOD_ORDER.length - 1){ setPeriod(PERIOD_ORDER[i+1], 1); dismissSwipeHint(); } },
+      ()=> { const i = PERIOD_ORDER.indexOf(dashPeriod); if(i > 0){ setPeriod(PERIOD_ORDER[i-1], -1); dismissSwipeHint(); } },
+      t => !!(t.closest && t.closest('.spark-plot, select, button')));
+    // swipe the weekly / 15-day charts: older <- -> newer
+    attachSwipe($('money-exp-week-container'),
+      ()=> { if(weekOffset < 0){ weekOffset += 1; renderWeeklyTracker(new Date(), 'next'); buzz(6); } },
+      ()=> { weekOffset -= 1; renderWeeklyTracker(new Date(), 'prev'); buzz(6); });
+    attachSwipe($('money-exp-fifteen-container'),
+      ()=> { if(fifteenOffset < 0){ fifteenOffset += 1; renderFifteenDayTracker(new Date(), 'next'); buzz(6); } },
+      ()=> { fifteenOffset -= 1; renderFifteenDayTracker(new Date(), 'prev'); buzz(6); });
+    // finger-scrub on the hero curve
+    const sp = $('money-hero-spark');
+    sp.addEventListener('pointerdown', e=>{ heroScrub(e); });
+    let scrubEv = null, scrubRaf = 0;
+    sp.addEventListener('pointermove', e=>{
+      if(!(e.pointerType === 'mouse' || e.buttons || e.pointerType === 'touch')) return;
+      scrubEv = e; if(!scrubRaf) scrubRaf = requestAnimationFrame(()=>{ scrubRaf = 0; heroScrub(scrubEv); });
+    });
+    sp.addEventListener('pointerup', ()=> heroScrubEnd(2600));
+    sp.addEventListener('pointercancel', ()=> heroScrubEnd(600));
+    sp.addEventListener('pointerleave', e=>{ if(e.pointerType === 'mouse') heroScrubEnd(400); });
+    // insights, donut, weekday bars
+    $('money-exp-insights').addEventListener('click', e=>{ const r = e.target.closest('.ins-row.tap'); if(r) focusCategory(r.getAttribute('data-cat')); });
+    $('money-exp-top-categories').addEventListener('click', e=>{ const r = e.target.closest('.cat-row-tap'); if(r) focusCategory(r.getAttribute('data-cat')); });
+    $('money-exp-donut-container').addEventListener('click', e=>{
+      const f = e.target.closest('.donut-focus');
+      if(f){
+        if(f.getAttribute('data-act') === 'clear') focusCategory('all');
+        else if(f.getAttribute('data-name')) focusCategory(f.getAttribute('data-name'));
+        return;
+      }
+      const t = e.target.closest('.donut-seg, .dl-row'); if(!t || !donutData) return;
+      const i = Number(t.getAttribute('data-i')); donutSel = donutSel === i ? null : i; donutPaint(); buzz(5);
+    });
+    $('money-exp-weekday-container').addEventListener('click', e=>{ const b = e.target.closest('.wd-bar'); if(b){ weekdayReadout(Number(b.getAttribute('data-i')), false); buzz(4); } });
+    $('money-exp-weekday-container').addEventListener('keydown', e=>{ if((e.key === 'Enter' || e.key === ' ') && e.target.closest('.wd-bar')){ e.preventDefault(); weekdayReadout(Number(e.target.closest('.wd-bar').getAttribute('data-i')), false); } });
   }
 
   function renderWeeklyTracker(now, navDir){
@@ -6233,7 +6924,8 @@ function moneyPageHtml(){
     $('money-week-next-btn').style.opacity = weekOffset>=0 ? .4 : 1;
 
     const allRealExpenses = transactions.filter(isRealExpense);
-    const weekTotals = weekDays.map(d=> allRealExpenses.reduce((s,t)=> s + dailyExpenseContribution(t, d), 0));
+    const weekMap = expenseByDate(allRealExpenses);
+    const weekTotals = weekDays.map(d=> dayTotalFrom(weekMap, d));
     const weekTotal = weekTotals.reduce((a,b)=>a+b,0);
     const weekMax = Math.max(...weekTotals, 1);
     const wBarW=28, wGap=11, wH=150, wOffsetX=16;
@@ -6332,7 +7024,10 @@ function moneyPageHtml(){
 
     const catFilter15 = t => fifteenCategory==='all' || t.category===fifteenCategory;
     const allRealExpenses15 = transactions.filter(t=> isRealExpense(t) && catFilter15(t));
-    const dayTotals = days.map(d=> allRealExpenses15.reduce((s,t)=> s + dailyExpenseContribution(t, d), 0));
+    const dayMap15 = expenseByDate(allRealExpenses15);
+    const dayTotals = days.map(d=> dayTotalFrom(dayMap15, d));
+    const txByDate15 = Object.create(null);
+    allRealExpenses15.forEach(t=>{ (txByDate15[t.date] || (txByDate15[t.date] = [])).push(t); });
     const windowTotal = dayTotals.reduce((a,b)=>a+b,0);
     const dMax = Math.max(...dayTotals, 1);
     const todayKey = localDateStr(base);
@@ -6355,7 +7050,7 @@ function moneyPageHtml(){
       if(dayTotals[idx]>0){
         dBars += `<text x="${x+dBarW/2}" y="${y-5}" text-anchor="middle" font-size="8" font-weight="700" style="fill:var(--navy-900);" font-family="Inter,sans-serif">${Math.round(dayTotals[idx])>=1000? (Math.round(dayTotals[idx]/100)/10)+'k' : Math.round(dayTotals[idx])}</text>`;
       }
-      dBars += `<text x="${x+dBarW/2}" y="${dH-20}" text-anchor="middle" font-size="9" font-weight="${isToday?'800':'500'}" style="fill:${isToday?'var(--navy-900)':'var(--muted)'};" font-family="Inter,sans-serif">${d.toLocaleDateString('en-IN',{month:'short'})}</text>`;
+      dBars += `<text x="${x+dBarW/2}" y="${dH-20}" text-anchor="middle" font-size="9" font-weight="${isToday?'800':'500'}" style="fill:${isToday?'var(--navy-900)':'var(--muted)'};" font-family="Inter,sans-serif">${(idx===0 || d.getDate()===1) ? d.toLocaleDateString('en-IN',{month:'short'}) : ''}</text>`;
       dBars += `<text x="${x+dBarW/2}" y="${dH-8}" text-anchor="middle" font-size="9" font-weight="${isToday?'800':'500'}" style="fill:${isToday?'var(--navy-900)':'var(--muted)'};" font-family="Inter,sans-serif">${d.getDate()}</text>`;
     });
     const dSvgW = dOffsetX*2 + 15*dBarW + 14*dGap;
@@ -6376,7 +7071,7 @@ function moneyPageHtml(){
     // date-wise details list (only days with spending), most recent first
     const detailDays = days.map((d,idx)=>({ d, total: dayTotals[idx] })).filter(x=>x.total>0).reverse();
     $('money-exp-fifteen-details').innerHTML = detailDays.length ? detailDays.map(({d,total}, i)=>{
-      const dayContribs = allRealExpenses15.map(t=>({ t, c: dailyExpenseContribution(t, d) })).filter(x=>x.c>0);
+      const dayContribs = (txByDate15[localDateStr(d)] || []).map(t=>({ t, c: t.amount })).filter(x=>x.c>0);
       const byCatForDay = {};
       dayContribs.forEach(({t,c})=>{ byCatForDay[t.category] = (byCatForDay[t.category]||0) + c; });
       const catLine = fifteenCategory==='all'
@@ -6447,13 +7142,18 @@ function moneyPageHtml(){
     const days=[]; for(let i=6;i>=0;i--){ days.push(new Date(base.getFullYear(), base.getMonth(), base.getDate()-i)); }
     const catMatch = t => dashCategory==='all' || t.category===dashCategory;
     const realExp = transactions.filter(t=> isRealExpense(t) && catMatch(t));
-    const totals = days.map(d=> realExp.reduce((s,t)=> s + dailyExpenseContribution(t,d),0));
+    const velMap = expenseByDate(realExp);
+    const totals = days.map(d=> dayTotalFrom(velMap, d));
     const max = Math.max(1, ...totals);
     const nonZero = totals.filter(v=>v>0);
     const mean = nonZero.length ? nonZero.reduce((a,b)=>a+b,0)/nonZero.length : 0;
     const highThreshold = mean>0 ? mean*1.5 : Infinity;
     const week = totals.reduce((a,b)=>a+b,0);
     const avg = week/7;
+    // v147: the 7 days before these, for a plain "up / down" read
+    const priorDays = []; for(let i=13;i>=7;i--){ priorDays.push(new Date(base.getFullYear(), base.getMonth(), base.getDate()-i)); }
+    const prior = priorDays.reduce((s,d)=> s + dayTotalFrom(velMap, d), 0);
+    const vDelta = prior > 0 ? Math.round((week - prior) / prior * 100) : null;
     const compact = v => Math.round(v)>=1000 ? (Math.round(v/100)/10)+'k' : Math.round(v);
     const valsRow = totals.map(v=>`<div class="week-val-cell">${v>0?compact(v):''}</div>`).join('');
     const barsRow = totals.map((v,i)=>{
@@ -6466,13 +7166,14 @@ function moneyPageHtml(){
     const anyHigh = totals.some(v=>v>0 && v>=highThreshold);
     host.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
-        <div style="font-size:11.5px; color:var(--muted); font-weight:600;">7-day total <b style="color:var(--navy-900);">${fmt(week)}</b></div>
+        <div style="font-size:11.5px; color:var(--muted); font-weight:600;">7-day total <b style="color:var(--navy-900);">${fmt(week)}</b>${vDelta != null ? ` <span class="v-delta" style="color:${vDelta > 0 ? 'var(--bad)' : vDelta < 0 ? 'var(--good)' : 'var(--muted)'};">${vDelta > 0 ? '\u25B2 +' : vDelta < 0 ? '\u25BC ' : ''}${vDelta}%</span>` : ''}</div>
         <div style="font-size:11.5px; color:var(--muted); font-weight:600;">avg / day <b style="color:var(--navy-900);">${fmt(avg)}</b></div>
       </div>
       <div class="week-vals">${valsRow}</div>
       <div class="week-bars">${barsRow}</div>
       <div class="week-dates">${datesRow}</div>
-      ${anyHigh?`<div class="hint" style="margin-top:8px; margin-bottom:0;"><span style="color:var(--danger); font-weight:800;">&#9679;</span> Flagged days are well above your typical daily spend.</div>`:''}`;
+      ${anyHigh?`<div class="hint" style="margin-top:8px; margin-bottom:0;"><span style="color:var(--danger); font-weight:800;">&#9679;</span> Flagged days are well above your typical daily spend.</div>`:''}
+      ${vDelta != null ? `<div class="hint" style="margin-top:6px; margin-bottom:0;">Compared with the 7 days before (${fmt(prior)}).</div>` : ''}`;
   }
 
   // #2 — 30-Day Spending (v145: money out only; it used to overlay money in). Honours the
@@ -6489,13 +7190,14 @@ function moneyPageHtml(){
     const base = new Date(todayStr(now) + 'T00:00:00');
     const days=[]; for(let i=29;i>=0;i--){ days.push(new Date(base.getFullYear(), base.getMonth(), base.getDate()-i)); }
     const realExp = transactions.filter(isRealExpense);
-    const outDaily = days.map(d => realExp.reduce((s,t)=> catMatch(t) ? s + dailyExpenseContribution(t,d) : s, 0));
+    const outMap = expenseByDate(realExp, catMatch);
+    const outDaily = days.map(d => dayTotalFrom(outMap, d));
     const maxVal = Math.max(1, ...outDaily);
 
     const cap = $('money-exp-trend-cap');
     if(cap){ cap.innerHTML = dashCategory==='all'
-      ? 'Money out, last 30 days. Tap a day for the breakdown.'
-      : escapeHtml(dashCategory)+' spend, last 30 days. Tap a day for the breakdown.'; }
+      ? 'Money out, last 30 days. Tap a day for the breakdown, or drag across to scrub.'
+      : escapeHtml(dashCategory)+' spend, last 30 days. Tap a day for the breakdown, or drag across to scrub.'; }
 
     const W=330, padL=30, padR=10, padT=14, padB=24;
     const plotL=padL, plotR=W-padR, plotW=plotR-plotL;
@@ -6519,6 +7221,9 @@ function moneyPageHtml(){
       <text x="${plotL-4}" y="${(plotT+3).toFixed(1)}" font-size="8" fill="var(--muted)" text-anchor="end">${compact(maxVal)}</text>`;
     const tickIdx = [0,7,14,21,29];
     const xLabels = tickIdx.map(i=>`<text x="${xAt(i).toFixed(1)}" y="${H-7}" font-size="8" fill="var(--muted)" text-anchor="${i===0?'start':i===29?'end':'middle'}">${days[i].toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</text>`).join('');
+    // v147: trailing 7-day average, drawn dashed behind the daily line so the underlying trend shows through the spikes
+    const maPts = outDaily.map((v,i)=>{ if(i < 6) return null; let a = 0; for(let j=i-6;j<=i;j++) a += outDaily[j]; return [xAt(i), yAt(a/7)]; }).filter(Boolean);
+    const maLine = maPts.length > 1 ? maPts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ') : '';
     const dotsOut = outPts.map((p,i)=> outDaily[i]>0 ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.3" fill="var(--danger)" class="chart-animate trend-dot" style="animation-delay:${(i*0.02).toFixed(2)}s"/>`:'').join('');
     const hitW = Math.max(stepX, 8);
     const hits = days.map((d,i)=>{
@@ -6534,6 +7239,7 @@ function moneyPageHtml(){
     host.innerHTML = `
       <div style="display:flex; gap:14px; align-items:center; margin-bottom:8px; font-size:11px; font-weight:700;">
         <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:11px;height:3px;border-radius:2px;background:var(--danger);display:inline-block;"></span><span style="color:var(--muted);">Money out</span></span>
+        ${maLine ? `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:11px;height:0;border-top:2px dashed var(--text-faint);display:inline-block;"></span><span style="color:var(--muted);">7-day average</span></span>` : ''}
       </div>
       <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
         <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
@@ -6544,10 +7250,29 @@ function moneyPageHtml(){
         ${xLabels}
         <path d="${outArea}" fill="url(#${gid})" class="chart-animate trend-area"/>
         <path d="${outLine}" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${outLen.toFixed(1)}" style="--dash-len:${outLen.toFixed(1)}" class="chart-animate trend-line"/>
+        ${maLine ? `<path d="${maLine}" fill="none" stroke="var(--text-faint)" stroke-width="1.5" stroke-dasharray="4 3" stroke-linejoin="round" class="trend-avg"/>` : ''}
         ${dotsOut}
+        <line class="trend-cursor" x1="0" y1="${plotT}" x2="0" y2="${plotB.toFixed(1)}" stroke="var(--ink)" stroke-width="1"/>
         ${hits}
       </svg>`;
     wireTrendTooltips('money-exp-trend-container');
+    // v147: touch-scrub -- dragging a finger along the chart walks the tooltip day by day (vertical scrolling still works: touch-action:pan-y)
+    const svgEl = host.querySelector('svg'), cursor = svgEl.querySelector('.trend-cursor'), tapGs = svgEl.querySelectorAll('.trend-tap');
+    let lastI = -1;
+    const scrubTo = e=>{
+      const box = svgEl.getBoundingClientRect(); if(!box.width) return;
+      const x = (e.clientX - box.left) / box.width * W;
+      const i = Math.max(0, Math.min(days.length-1, Math.round((x - plotL) / stepX)));
+      cursor.setAttribute('x1', xAt(i).toFixed(1)); cursor.setAttribute('x2', xAt(i).toFixed(1)); cursor.classList.add('on');
+      showChartTooltip(tapGs[i], host);
+      if(i !== lastI && e.pointerType === 'touch' && outDaily[i] > 0) buzz(4);
+      lastI = i;
+    };
+    svgEl.addEventListener('pointerdown', scrubTo);
+    let mvEv = null, mvRaf = 0;
+    svgEl.addEventListener('pointermove', e=>{ if(!(e.buttons || e.pointerType === 'touch')) return; mvEv = e; if(!mvRaf) mvRaf = requestAnimationFrame(()=>{ mvRaf = 0; scrubTo(mvEv); }); });
+    const scrubEnd = ()=> setTimeout(()=>{ cursor.classList.remove('on'); lastI = -1; }, 1800);
+    svgEl.addEventListener('pointerup', scrubEnd); svgEl.addEventListener('pointercancel', scrubEnd);
   }
 
   // #4 — Budget Burn Rate. No per-category budget exists in the data model, so the
@@ -6564,8 +7289,10 @@ function moneyPageHtml(){
       host.innerHTML = `<div class="hint" style="margin:0;">Pick a specific range (This Week, This Month, …) so there's a previous period to measure against.</div>`;
       return;
     }
-    const prevLabel = ({week:'week', month:'month', last3:'3 months', year:'year'})[dashPeriod] || 'period';
-    if(cap) cap.textContent = 'Soft budget = each category\u2019s spend in the previous '+prevLabel+'.';
+    const prevLabel = ({week:'week', month:'month', last30:'30 days', last3:'3 months', year:'year'})[dashPeriod] || 'period';
+    const pg = periodProgress(range, new Date()), paceFrac = pg.daysElapsed >= pg.periodDays ? 0 : pg.daysElapsed / pg.periodDays;
+    if(cap) cap.textContent = 'Soft budget = each category\u2019s spend in the previous '+prevLabel+'.' + (paceFrac ? ' The tick shows an even pace for today.' : '');
+    const tick = paceFrac ? `<div style="position:absolute; left:${(paceFrac*100).toFixed(1)}%; top:-3px; bottom:-3px; width:2px; background:var(--ink); opacity:.6; border-radius:1px;"></div>` : '';
 
     const catMatch = t => dashCategory==='all' || t.category===dashCategory;
     const realExp = transactions.filter(t=> isRealExpense(t) && catMatch(t));
@@ -6599,59 +7326,14 @@ function moneyPageHtml(){
       return `
         <div class="hbar-row" style="margin-bottom:3px; ${delay}">
           <div class="hbar-lbl" style="color:var(--ink); font-weight:700;">${escapeHtml(c)}</div>
-          <div class="hbar-track"><div class="hbar-fill" style="width:${barW}%; background:${color};"></div></div>
+          <div class="hbar-track" style="position:relative; overflow:visible;"><div class="hbar-fill" style="width:${barW}%; background:${color};"></div>${tick}</div>
           <div class="hbar-val" style="color:${color};">${pct}%</div>
         </div>
         <div class="hint" style="margin:-2px 0 10px; font-size:10.5px;">${fmt(spent)} of ${fmt(budget)}${pct>100?' \u00b7 over by '+fmt(spent-budget):''}</div>`;
     }).join('');
   }
 
-  // #3 — Category Footprint (radar). Axes are the top spend categories (up to 6)
-  // for the current period, coloured with the shared category map so they line up
-  // with the breakdown bars. Only meaningful across categories, so it needs the
-  // All Categories filter and at least 3 categories with spend; otherwise a hint.
-  function renderCategoryRadar(range){
-    const host = $('money-exp-radar-container');
-    if(!host) return;
-    if(dashCategory!=='all'){
-      host.innerHTML = `<div class="hint" style="margin:0;">Set the category filter to <b>All Categories</b> to see how your spend is spread.</div>`;
-      return;
-    }
-    const all = categorySpendEntries(range);
-    const entries = all.slice(0,6);
-    if(entries.length < 3){
-      host.innerHTML = `<div class="hint" style="margin:0;">Not enough spread yet — the footprint needs at least 3 categories with spending ${PERIOD_LABELS[dashPeriod]}.</div>`;
-      return;
-    }
-    const colorMap = categoryColorMap(all.map(e=>e[0]));
-    const n = entries.length;
-    const maxVal = entries[0][1] || 1;
-    const cx=110, cy=104, R=72;
-    const angleFor = i => -Math.PI/2 + i*(2*Math.PI/n);
-    const pt = (i,val)=>{ const a=angleFor(i); const r=R*(val/maxVal); return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; };
-    const ring = frac => { let d=''; for(let i=0;i<n;i++){ const a=angleFor(i); const x=cx+R*frac*Math.cos(a), y=cy+R*frac*Math.sin(a); d+=(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1); } return d+'Z'; };
-    const spokes = entries.map((_,i)=>{ const a=angleFor(i); const x=cx+R*Math.cos(a), y=cy+R*Math.sin(a); return `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`; }).join('');
-    const polyPts = entries.map(([c,v],i)=>pt(i,v));
-    const polyD = polyPts.map(([x,y],i)=>(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)).join('')+'Z';
-    const dots = polyPts.map(([x,y],i)=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${colorMap[entries[i][0]]}"/>`).join('');
-    const labels = entries.map(([c,v],i)=>{
-      const a=angleFor(i); const lx=cx+(R+15)*Math.cos(a), ly=cy+(R+15)*Math.sin(a);
-      const anchor = Math.abs(Math.cos(a))<0.35 ? 'middle' : (Math.cos(a)>0 ? 'start':'end');
-      const short = c.length>10 ? c.slice(0,9)+'\u2026' : c;
-      return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle">
-        <tspan font-size="9" font-weight="700" fill="${colorMap[c]}">${escapeHtml(short)}</tspan>
-        <tspan x="${lx.toFixed(1)}" dy="10" font-size="8" font-weight="700" fill="var(--muted)">${fmt(v)}</tspan>
-      </text>`;
-    }).join('');
-    host.innerHTML = `
-      <svg viewBox="0 0 220 212" width="100%" style="max-width:340px;display:block;margin:0 auto;overflow:visible">
-        ${[0.25,0.5,0.75,1].map(f=>`<path d="${ring(f)}" fill="none" stroke="var(--border)" stroke-width="1"/>`).join('')}
-        ${spokes}
-        <path d="${polyD}" fill="var(--umang)" fill-opacity="0.16" stroke="var(--umang)" stroke-width="1.6" class="chart-animate radar-poly"/>
-        ${dots}
-        ${labels}
-      </svg>`;
-  }
+  // (v147: the radar "Category Footprint" was replaced by the donut in renderDonut -- a ring with a legend reads faster than a spider chart.)
 
   /* ---------- Tab switching ---------- */
   function switchTab(name){
@@ -6660,8 +7342,10 @@ function moneyPageHtml(){
     if(name==='transactions'){ renderTransactionsList($('money-txn-search').value); computeBalances(); }
     if(name==='invoices') renderRecords($('money-rec-search').value);
     if(name==='dashboard'){
+      dashEnter = true; heroShown = 0;
       renderDashboard();
       renderExpenseDashboard();
+      requestAnimationFrame(syncChips);
     }
     if(name==='settings') refreshStartNumberField();
     window.scrollTo(0,0); // land at the top of whichever page we just switched to, not wherever the previous one happened to be scrolled to
@@ -6808,6 +7492,7 @@ async function init(){
       b.addEventListener('click', ()=> switchInvoiceSub(b.getAttribute('data-sub')));
     });
 
+    initDashGestures();
     $('money-exp-filter-category').addEventListener('change', e=>{ dashCategory = e.target.value; renderExpenseDashboard(); });
     $('money-exp-filter-period').addEventListener('change', e=>{ dashPeriod = e.target.value; renderExpenseDashboard(); });
 
