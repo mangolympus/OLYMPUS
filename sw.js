@@ -242,7 +242,10 @@
 // v149: Money Dashboard: "What Stands Out" card removed. Fixes: a category outside the fixed list (older data) can be focused from the donut without the selector blanking, the 30-day
 // scrub highlight no longer vanishes during a second drag, All-time chip no longer keeps a stale screen-reader label or says "since your first entry" with nothing spent, compact
 // rupee amounts round correctly at 1k / 1L. Index.html only.
-const CACHE_VERSION = 'olympus-v149';
+// v150 — Paper 1 (FR) chapters replaced by the Ind AS-wise list (36 chapters) with a one-time progress-preserving migration
+//        (old list backed up in shared.frChaptersLegacy), plus a pen button + drag/keyboard reorder for the chapter sequence
+//        on every paper's Chapters tab. index.html only.
+const CACHE_VERSION = 'olympus-v150';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
