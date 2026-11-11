@@ -464,6 +464,13 @@ textarea.jsonbox{width:100%;height:90px;border:1px solid var(--border);border-ra
 /* WORKSPACE */
 .ptab{padding:7px 13px;border-radius:20px;font-size:11.5px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted)}
 .ptab.active{background:linear-gradient(135deg, var(--active-accent,var(--umang)), var(--active-accent-2,var(--umang-2)));border-color:var(--active-accent,var(--umang));color:#fff}
+.ws-head{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.ws-head .ws-title{flex:1;min-width:0;text-align:left}
+.ws-eyebrow{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--active-accent,var(--umang))}
+.ws-h1{margin:2px 0 0;font-size:22px;line-height:1.18;font-weight:800;letter-spacing:-.01em;color:var(--text)}
+.ws-score{flex-shrink:0;text-align:center;min-width:48px;padding:6px 8px;border-radius:12px;background:var(--surface2);border:1px solid var(--border)}
+.ws-score b{display:block;font-size:15px;font-weight:800;color:var(--active-accent,var(--umang))}
+.ws-score small{display:block;font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-top:1px}
 .ch-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)}
 .ch-row:last-child{border-bottom:none}
 .ch-tag{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.2px;padding:2px 6px;border-radius:4px;margin-right:6px;background:var(--surface2);color:var(--active-accent,var(--umang));border:1px solid var(--border);white-space:nowrap;vertical-align:1px}
@@ -4253,6 +4260,35 @@ function confirmLeaveTest(){
   }
   return false;
 }
+// ── Phone back button on a paper's workspace ─────────────────────────────────────────────────────────────────────────────
+// The workspace has no on-screen Back button (v152): it holds one history entry while it is open, so the phone/browser back button
+// returns to the Timer page. Leaving by any other route (bottom nav, chat) hands that entry back so Home never needs a double press.
+let _wsHistToken = 0, _wsSilentPops = 0;
+function wsHistEnter(){
+  if(_wsHistToken) return;
+  _wsHistToken = Date.now();
+  try{ history.pushState({olympusWs:_wsHistToken}, '', location.href); }catch(e){ _wsHistToken = 0; }
+}
+function wsHistLeave(newView){
+  if(!_wsHistToken || newView==='workspace') return;
+  _wsHistToken = 0;
+  if(newView==='chat') return; // chat pushes its own entry right now; the workspace's one is skipped over later (see below)
+  _wsSilentPops++; try{ history.back(); }catch(e){ _wsSilentPops--; }
+}
+window.addEventListener('popstate', e=>{
+  if(_wsSilentPops>0){ _wsSilentPops--; return; }
+  // Landed on an entry that is not the workspace's own while the workspace is showing = the workspace entry was popped = "go back".
+  // (Landing on it again after closing a popup that opened on top of it is not.)
+  if(_wsHistToken && S.view==='workspace' && !(e.state && e.state.olympusWs===_wsHistToken)){
+    if(leavingActiveTest() && !confirm('Leave this test in progress? Your answers so far will be lost.')){
+      _wsHistToken = Date.now(); try{ history.pushState({olympusWs:_wsHistToken}, '', location.href); }catch(err){ _wsHistToken = 0; }
+      return;
+    }
+    _wsHistToken = 0;
+    if(S.testSession){ if(S.testSession.timerHandle) clearInterval(S.testSession.timerHandle); S.testSession = null; }
+    switchView('timer');
+  }
+});
 function switchView(v){
   if(!confirmLeaveTest()) return;
   if(v==='money' && !S.local.myProfile) return;
@@ -4260,6 +4296,7 @@ function switchView(v){
   const enteringChat = v==='chat' && S.view!=='chat';
   if(enteringChat) S._chatReturnView = (S.view==='workspace' ? 'timer' : S.view) || 'home';
   S.view=v;
+  wsHistLeave(v);
   if(v==='planner' && !S.plannerDateFilter){
     S.plannerDateFilter = todayStr();
     S.selectedCalDay = todayStr();
@@ -4355,6 +4392,7 @@ setInterval(()=>{ if(!document.hidden) renderIfStudyDayChanged(); }, 20000);
 function openWorkspace(paperId, tab){
   if(!confirmLeaveTest()) return;
   S.workspacePaper = paperId; S.workspaceTab = tab||'chapters'; S.view='workspace'; S.practice=null;
+  wsHistEnter();
   S._justNavigated = true;
   renderNav(); renderApp();
 }
@@ -14924,11 +14962,14 @@ function viewWorkspace(){
 
   return `
   <div>
-    <button class="btn" style="margin-bottom:14px" onclick="switchView('timer')">← Back</button>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
-      <button class="icon-btn" style="width:28px;height:28px;${idx===0?'opacity:.35;pointer-events:none':''}" onclick="swipeToPaper(-1)">‹</button>
-      <div class="section-title" style="flex:1;margin-bottom:0">${paper.code} · ${paper.nick} · ${paper.name}<span class="mono" style="color:var(--active-accent,var(--umang))">${comp.prepScore}%</span></div>
-      <button class="icon-btn" style="width:28px;height:28px;${idx===PAPERS.length-1?'opacity:.35;pointer-events:none':''}" onclick="swipeToPaper(1)">›</button>
+    <div class="ws-head">
+      <button class="icon-btn" aria-label="Previous paper" style="width:32px;height:32px;${idx===0?'opacity:.35;pointer-events:none':''}" onclick="swipeToPaper(-1)">‹</button>
+      <div class="ws-title">
+        <div class="ws-eyebrow">${paper.code} · ${paper.nick}</div>
+        <h1 class="ws-h1">${paper.name}</h1>
+      </div>
+      <div class="ws-score mono" title="Preparation score"><b>${comp.prepScore}%</b><small>Prep</small></div>
+      <button class="icon-btn" aria-label="Next paper" style="width:32px;height:32px;${idx===PAPERS.length-1?'opacity:.35;pointer-events:none':''}" onclick="swipeToPaper(1)">›</button>
     </div>
     <div style="display:flex;gap:4px;justify-content:center;margin-bottom:14px">
       ${PAPERS.map((p,i)=>`<span style="width:5px;height:5px;border-radius:50%;background:${i===idx?'var(--active-accent,var(--umang))':'var(--border)'}"></span>`).join('')}

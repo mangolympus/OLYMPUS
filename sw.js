@@ -247,7 +247,9 @@
 //        on every paper's Chapters tab. index.html only.
 // v151 — AFM (Paper 2) chapter sequence set to the user's list (Advanced Capital Budgeting Decisions moved to last; one-time, only for
 //        lists still in the old default order, progress untouched); frChaptersLegacy registered as a per-profile synced key. index.html only.
-const CACHE_VERSION = 'olympus-v151';
+// v152 — paper workspace: real heading (paper name large, paper code + prep score alongside), on-screen Back button removed and the
+//        phone/browser back button returns to the Timer page instead. index.html only.
+const CACHE_VERSION = 'olympus-v152';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
