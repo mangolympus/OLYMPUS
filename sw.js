@@ -245,7 +245,9 @@
 // v150 — Paper 1 (FR) chapters replaced by the Ind AS-wise list (36 chapters) with a one-time progress-preserving migration
 //        (old list backed up in shared.frChaptersLegacy), plus a pen button + drag/keyboard reorder for the chapter sequence
 //        on every paper's Chapters tab. index.html only.
-const CACHE_VERSION = 'olympus-v150';
+// v151 — AFM (Paper 2) chapter sequence set to the user's list (Advanced Capital Budgeting Decisions moved to last; one-time, only for
+//        lists still in the old default order, progress untouched); frChaptersLegacy registered as a per-profile synced key. index.html only.
+const CACHE_VERSION = 'olympus-v151';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

@@ -2088,11 +2088,12 @@ const DEFAULT_CHAPTERS = {
     'Difference between AS & Ind AS','Division II of Schedule III to The Companies Act, 2013',
   ],
   afm: [
-    'Financial Policy and Corporate Strategy','Risk Management','Advanced Capital Budgeting Decisions',
+    // v151: sequence is the user's own (Advanced Capital Budgeting Decisions last, not third) -- see migrateAfmOrder()
+    'Financial Policy and Corporate Strategy','Risk Management',
     'Security Analysis','Security Valuation','Portfolio Management','Securitization','Mutual Funds',
     'Derivatives Analysis and Valuation','Foreign Exchange Exposure and Risk Management',
     'International Financial Management','Interest Rate Risk Management','Business Valuation',
-    'Mergers, Acquisitions and Corporate Restructuring','Startup Finance',
+    'Mergers, Acquisitions and Corporate Restructuring','Startup Finance','Advanced Capital Budgeting Decisions',
   ],
   audit: [
     'Quality Control',"General Auditing Principles and Auditor's Responsibilities",'Audit Planning, Strategy and Execution',
@@ -3341,6 +3342,20 @@ const FR_OLD_BUNDLED = [ // old chapters that bundled several standards (no sing
 ];
 const FR_OLD_ASSETS = FR_OLD_BUNDLED[2];
 function frChapterId(name){ return 'fr2-' + name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+// v151: AFM (Paper 2) now lists 'Advanced Capital Budgeting Decisions' last instead of third. Same 15 chapters, so nothing is renamed or
+// lost -- only an existing list that still has the old default order (never reordered by hand) is moved, and only once per profile
+// (flag in that profile's own prefs), so a priority order the person sets later with the pen button is never undone.
+const AFM_OLD_ORDER = ['Financial Policy and Corporate Strategy','Risk Management','Advanced Capital Budgeting Decisions','Security Analysis','Security Valuation','Portfolio Management','Securitization','Mutual Funds','Derivatives Analysis and Valuation','Foreign Exchange Exposure and Risk Management','International Financial Management','Interest Rate Risk Management','Business Valuation','Mergers, Acquisitions and Corporate Restructuring','Startup Finance'];
+function migrateAfmOrder(data, profileId){
+  const prefs = data.prefs && data.prefs[profileId]; if(!prefs || prefs.afmOrderV151) return;
+  prefs.afmOrderV151 = true;
+  const arr = data.chapters && data.chapters[profileId] && data.chapters[profileId].afm; if(!Array.isArray(arr)) return;
+  const known = arr.map(c=>c.name).filter(n=>AFM_OLD_ORDER.includes(n));
+  if(known.length!==AFM_OLD_ORDER.length || known.some((n,i)=>n!==AFM_OLD_ORDER[i])) return; // already reordered / edited by the person
+  const i = arr.findIndex(c=>c.name==='Advanced Capital Budgeting Decisions'), j = arr.findIndex(c=>c.name==='Startup Finance');
+  if(i<0 || j<0 || i>j) return;
+  const [c] = arr.splice(i,1); arr.splice(j,0,c); // after the splice Startup Finance sits at j-1, so index j is the slot right after it
+}
 function migrateFrChapters(data, profileId){
   const cur = data.chapters && data.chapters[profileId] && data.chapters[profileId].fr;
   if(!Array.isArray(cur)) return;
@@ -3562,6 +3577,7 @@ function migrateShared(data){
     if(!data.mockScores[p.id]) data.mockScores[p.id] = {};
     if(!data.tasks[p.id]) data.tasks[p.id] = [];
     if(!data.logs[p.id]) data.logs[p.id] = [];
+    migrateAfmOrder(data, p.id);
     PAPERS.forEach(pp=>{
       if(!data.chapters[p.id][pp.id]) data.chapters[p.id][pp.id] = defaultChaptersFor(pp.id);
       // Backfill a topics array on any chapter saved before this feature existed.
@@ -10602,7 +10618,8 @@ function chatStatusInfo(otherId){
 const SINGLE_OWNER_SHARED_KEYS = ['logs','targets','chapters','lectures','mockScores','tasks',
   'profileInfo','dailyTargetOverride','prefs','celebratedMilestones','habits','habitLog',
   'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','dailyQuote','pushSubscriptions','pushPrefs',
-  'diaryMood','diaryReflections','dailyChallenges','dcState'];
+  'diaryMood','diaryReflections','dailyChallenges','dcState','frChaptersLegacy'];
+// v150: frChaptersLegacy (the pre-Ind AS-wise FR chapter list, kept as a backup per profile) is each person's own slice too.
 // v136: the Diary's reflections (and the mistakes log inside them) and the daily-challenge records are each person's own too, but were
 // never registered here, so a partner's save made from a stale copy could roll back a diary entry you had just written, and her diary
 // view on your phone only updated when you reopened the app. Same protection as the other per-person data now.
