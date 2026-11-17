@@ -249,7 +249,16 @@
 //        lists still in the old default order, progress untouched); frChaptersLegacy registered as a per-profile synced key. index.html only.
 // v152 — paper workspace: real heading (paper name large, paper code + prep score alongside), on-screen Back button removed and the
 //        phone/browser back button returns to the Timer page instead. index.html only.
-const CACHE_VERSION = 'olympus-v152';
+// v153 — removed the 'close yesterday's diary before the timer can start' rule (v138): the timer always starts; Close day stays optional.
+//        index.html only.
+// v154 — chat audit: reactions/stars no longer lost when both phones touch a message at once; an archive read failure can no longer wipe
+//        the saved older history (sweep / Clear chat); edit-of-a-deleted-message feedback; phone-back after opening Chat from a paper.
+//        Also api/send-push.js now requires a signed-in session.
+// v155 — grand celebration (fireworks, confetti cannons, medal, haptics) for reaching the daily target and for clearing the day's Planner.
+//        index.html only.
+// v156 — celebration polish: synthesized fanfare/cheer/firework sound (per-device toggle + previews in Settings → Display), target is
+//        celebrated live the moment a running session crosses it, streak chip, focus kept in the dialog, phone-back closes it. index.html only.
+const CACHE_VERSION = 'olympus-v156';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

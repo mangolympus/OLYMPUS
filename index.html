@@ -93,6 +93,50 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;
 @keyframes viewFadeSlide{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 #app-root.view-enter{animation:viewFadeSlide .28s cubic-bezier(.22,.8,.4,1)}
 
+
+/* GRAND CELEBRATION (v155) — full-screen victory moment for the daily target and a cleared planner day */
+.grand-celeb{position:fixed;inset:0;z-index:950;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(circle at 50% 42%,rgba(255,200,70,.20),rgba(6,8,20,.86) 62%);
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);opacity:0;animation:gcFadeIn .35s ease forwards;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.grand-celeb.out{animation:gcFadeOut .45s ease forwards;pointer-events:none}
+@keyframes gcFadeIn{to{opacity:1}}
+@keyframes gcFadeOut{from{opacity:1}to{opacity:0}}
+.gc-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.gc-card{position:relative;width:min(340px,100%);text-align:center;color:#fff;padding:30px 22px 22px;border-radius:26px;
+  background:linear-gradient(165deg,#212a52 0%,#10152e 100%);border:1.5px solid rgba(255,214,102,.55);
+  box-shadow:0 0 0 6px rgba(255,214,102,.08),0 24px 70px rgba(0,0,0,.55),0 0 80px rgba(255,190,60,.28);
+  transform:scale(.4) translateY(40px);opacity:0;animation:gcCardIn .7s cubic-bezier(.2,1.5,.35,1) .12s forwards;overflow:hidden}
+@keyframes gcCardIn{to{transform:none;opacity:1}}
+.gc-card::after{content:"";position:absolute;top:-30%;bottom:-30%;width:38%;left:-60%;transform:skewX(-20deg);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);animation:gcShine 2.4s ease 1s infinite}
+@keyframes gcShine{0%{left:-60%}55%,100%{left:130%}}
+.gc-rays{position:absolute;left:50%;top:78px;width:360px;height:360px;margin:-180px 0 0 -180px;pointer-events:none;opacity:.55;
+  background:repeating-conic-gradient(from 0deg,rgba(255,214,102,.30) 0deg 7deg,transparent 7deg 22deg);
+  -webkit-mask-image:radial-gradient(circle,#000 8%,transparent 66%);mask-image:radial-gradient(circle,#000 8%,transparent 66%);animation:gcSpin 14s linear infinite}
+@keyframes gcSpin{to{transform:rotate(360deg)}}
+.gc-medal{position:relative;width:104px;height:104px;margin:0 auto 10px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 35% 30%,#fff3b0,#ffc83d 55%,#d98a00);box-shadow:0 0 0 5px rgba(255,214,102,.25),0 10px 30px rgba(255,170,0,.45);
+  animation:gcMedalPop .9s cubic-bezier(.2,1.6,.3,1) .35s both,gcFloat 2.6s ease-in-out 1.3s infinite}
+@keyframes gcMedalPop{0%{transform:scale(0) rotate(-200deg)}100%{transform:scale(1) rotate(0)}}
+@keyframes gcFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.gc-icon{font-size:54px;line-height:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.25))}
+.gc-ring{position:absolute;inset:0;border-radius:50%;border:3px solid rgba(255,214,102,.8);opacity:0;animation:gcRing 1.8s ease-out .5s infinite}
+.gc-ring.r2{animation-delay:1.1s}
+@keyframes gcRing{0%{transform:scale(1);opacity:.85}100%{transform:scale(2.3);opacity:0}}
+.gc-kicker{position:relative;font-size:11px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#ffd666;opacity:0;animation:gcUp .5s ease .75s forwards}
+.gc-title{position:relative;margin:4px 0 6px;font-size:30px;line-height:1.1;font-weight:900;letter-spacing:-.01em;
+  background:linear-gradient(180deg,#fff,#ffd666);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:0;animation:gcUp .55s ease .9s forwards}
+.gc-sub{position:relative;font-size:13.5px;line-height:1.45;color:rgba(255,255,255,.86);opacity:0;animation:gcUp .5s ease 1.05s forwards}
+.gc-chips{position:relative;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px;opacity:0;animation:gcUp .5s ease 1.2s forwards}
+.gc-chip{font-size:11px;font-weight:700;padding:5px 10px;border-radius:20px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16)}
+.gc-btn{position:relative;margin-top:18px;border:none;border-radius:14px;padding:12px 26px;font-size:14px;font-weight:800;color:#2a1a00;cursor:pointer;
+  background:linear-gradient(180deg,#ffe38a,#ffb92e);box-shadow:0 6px 18px rgba(255,170,0,.4);opacity:0;animation:gcUp .5s ease 1.4s forwards}
+.gc-btn:active{transform:scale(.97)}
+@keyframes gcUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .grand-celeb,.gc-card,.gc-medal,.gc-kicker,.gc-title,.gc-sub,.gc-chips,.gc-btn{animation-duration:.01s!important;animation-delay:0s!important;animation-iteration-count:1!important}
+  .gc-card::after,.gc-rays,.gc-ring{display:none}
+}
 /* CONFETTI */
 .confetti-layer{position:fixed;inset:0;pointer-events:none;z-index:900;overflow:hidden}
 .loading-dots{display:flex;justify-content:center;gap:5px;margin-bottom:8px}
@@ -2343,12 +2387,211 @@ function pumpCelebrations(){
   if(document.hidden || covered){ setTimeout(pumpCelebrations, 700); return; }
   _celebBusy = true;
   const text = _celebQ.shift();
+  if(text && typeof text === 'object'){   // v155: a grand celebration -- stays "busy" until the person closes it (or it times out)
+    _celebLastAt = Date.now();
+    try{ playGrandCelebration(text, ()=>{ _celebBusy = false; setTimeout(pumpCelebrations, 350); }); }
+    catch(e){ console.warn('Grand celebration failed:', e); _celebBusy = false; }
+    return;
+  }
   _celebLastText = text; _celebLastAt = Date.now();
   fireConfetti();
   showMilestoneToast(text);
   setTimeout(()=>{ _celebBusy = false; pumpCelebrations(); }, 3300);
 }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pumpCelebrations(); });
+
+// ── v155: GRAND celebration ─────────────────────────────────────────────────────────────────────────────────────────────
+// A full-screen victory moment (fireworks + confetti cannons on a canvas, a spinning medal, haptic burst) used for the two things that
+// deserve more than a toast: reaching the daily study target, and clearing every Planner task of the day. It goes through the same
+// queue as the small celebrations, so it still waits for a visible, uncovered app and never overlaps another one.
+const GC_COLORS = ['#FFD54A','#FF6B6B','#4FCB92','#5AA9FF','#B388FF','#FF9F43','#FFFFFF','#FF7AC6'];
+const GC_LINES = ['Discipline beats motivation.','One more brick in the wall.','Future you says thank you.','Small wins, big rank.','This is how toppers are made.','Consistency looks great on you.'];
+function gcHM(hours){
+  const m = Math.round(Number(hours||0)*60), h = Math.floor(m/60), mm = m%60;
+  return h ? (mm ? `${h}h ${mm}m` : `${h}h`) : `${mm}m`;
+}
+
+// ── v156: celebration audio (synthesized with Web Audio — no sound files to download or cache) ──────────────────────────────
+// Target = brass-style fanfare + crowd cheer + sparkles; Planner = brighter bell run + sparkles. Fireworks add soft "pops" as they burst.
+// On/off is a per-device setting (Settings → Display → Celebrations). Browsers only let a page make sound after the person has touched
+// it once, so the audio engine is created on the first tap; if the phone still refuses, the celebration simply plays silent.
+function celebSoundOn(){ return !(S.local && S.local.celebSound === false); }
+let _gcCtx = null, _gcNoise = null;
+function gcAudioCtx(){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null;
+    if(!_gcCtx) _gcCtx = new AC();
+    if(_gcCtx.state === 'suspended') _gcCtx.resume().catch(()=>{});
+    return _gcCtx;
+  }catch(e){ return null; }
+}
+(function(){ // unlock on the first real tap/key so a celebration that fires later (timer stop, live target) is allowed to play
+  const unlock = ()=>{ if(celebSoundOn()) gcAudioCtx(); if(_gcCtx && _gcCtx.state==='running'){ document.removeEventListener('pointerdown', unlock, true); document.removeEventListener('keydown', unlock, true); } };
+  document.addEventListener('pointerdown', unlock, true); document.addEventListener('keydown', unlock, true);
+})();
+function gcNoiseBuf(c){
+  if(_gcNoise && _gcNoise.sampleRate===c.sampleRate) return _gcNoise;
+  const b = c.createBuffer(1, c.sampleRate, c.sampleRate), d = b.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  return (_gcNoise = b);
+}
+// Returns {pop(), stop()} or null when sound is off / unavailable.
+function gcAudioStart(kind){
+  if(!celebSoundOn()) return null;
+  const c = gcAudioCtx(); if(!c) return null;
+  try{
+    const now = c.currentTime + 0.04;
+    const master = c.createGain(); master.gain.value = 0.34;
+    const comp = c.createDynamicsCompressor(); master.connect(comp); comp.connect(c.destination);
+    const tone = (f, t, dur, type, vol, glide)=>{
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, now+t); if(glide) o.frequency.exponentialRampToValueAtTime(glide, now+t+dur);
+      g.gain.setValueAtTime(0.0001, now+t); g.gain.exponentialRampToValueAtTime(vol, now+t+0.02); g.gain.exponentialRampToValueAtTime(0.0001, now+t+dur);
+      o.connect(g); g.connect(master); o.start(now+t); o.stop(now+t+dur+0.05);
+    };
+    const noise = (t, dur, f, q, vol, type)=>{
+      const src = c.createBufferSource(); src.buffer = gcNoiseBuf(c); src.loop = true;
+      const flt = c.createBiquadFilter(); flt.type = type||'bandpass'; flt.frequency.value = f; flt.Q.value = q||1;
+      const g = c.createGain(); g.gain.setValueAtTime(0.0001, now+t); g.gain.exponentialRampToValueAtTime(vol, now+t+Math.min(0.03,dur/3)); g.gain.exponentialRampToValueAtTime(0.0001, now+t+dur);
+      src.connect(flt); flt.connect(g); g.connect(master); src.start(now+t, Math.random()*0.5); src.stop(now+t+dur+0.05);
+    };
+    const hz = n => 440*Math.pow(2, (n-69)/12);           // MIDI note -> Hz
+    if(kind === 'planner'){
+      [79,83,86,91].forEach((n,i)=>{ tone(hz(n), i*0.10, 0.55, 'sine', 0.30); tone(hz(n)*2, i*0.10, 0.35, 'sine', 0.08); });   // G5 B5 D6 G6 bell run
+      [79,83,86,91].forEach(n=> tone(hz(n), 0.46, 1.5, 'triangle', 0.14));                                                    // ringing chord
+      tone(hz(103), 0.5, 0.9, 'sine', 0.06);
+    } else {
+      [60,64,67,72].forEach((n,i)=>{ tone(hz(n), i*0.13, 0.22, 'sawtooth', 0.16); tone(hz(n)*2, i*0.13, 0.22, 'square', 0.04); }); // C E G C fanfare
+      [60,64,67,72,76].forEach(n=>{ tone(hz(n), 0.56, 1.6, 'sawtooth', 0.10); tone(hz(n), 0.56, 1.6, 'triangle', 0.12); });       // held chord
+      tone(110, 0.0, 0.5, 'sine', 0.30, 45);                                                                                     // timpani-ish thump
+      tone(hz(84), 1.5, 0.9, 'sine', 0.07);
+      for(let i=0;i<46;i++) noise(0.55 + Math.random()*2.3, 0.05 + Math.random()*0.08, 1400+Math.random()*2400, 0.8, 0.05 + Math.random()*0.05); // applause
+      noise(0.5, 1.8, 900, 0.4, 0.035);                                                                                              // crowd swell
+    }
+    for(let i=0;i<9;i++) tone(2200 + Math.random()*2600, 0.6 + Math.random()*1.9, 0.18, 'sine', 0.035);                              // sparkles
+    let lastPop = 0;
+    return {
+      pop(){ const t = c.currentTime; if(t-lastPop < 0.22) return; lastPop = t;
+        const o = c.createOscillator(), g = c.createGain(); o.type='sine'; o.frequency.setValueAtTime(170, t); o.frequency.exponentialRampToValueAtTime(40, t+0.16);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.20, t+0.01); g.gain.exponentialRampToValueAtTime(0.0001, t+0.2);
+        o.connect(g); g.connect(master); o.start(t); o.stop(t+0.25);
+        const src = c.createBufferSource(); src.buffer = gcNoiseBuf(c); const f = c.createBiquadFilter(); f.type='highpass'; f.frequency.value=1500;
+        const ng = c.createGain(); ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.10, t+0.005); ng.gain.exponentialRampToValueAtTime(0.0001, t+0.14);
+        src.connect(f); f.connect(ng); ng.connect(master); src.start(t, Math.random()*0.5); src.stop(t+0.18); },
+      stop(){ try{ const t = c.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(0.0001, t+0.35); setTimeout(()=>{ try{ master.disconnect(); comp.disconnect(); }catch(e){} }, 600); }catch(e){} }
+    };
+  }catch(e){ console.warn('Celebration audio failed:', e); return null; }
+}
+function playGrandCelebration(item, onClosed){
+  const reduced = prefersReducedMotion();
+  const root = document.createElement('div');
+  root.className = 'grand-celeb';
+  root.setAttribute('role','dialog'); root.setAttribute('aria-modal','true'); root.setAttribute('aria-label', item.title||'Celebration');
+  root.innerHTML = `<canvas class="gc-canvas"></canvas>
+    <div class="gc-card"><div class="gc-rays"></div>
+      <div class="gc-medal"><span class="gc-ring"></span><span class="gc-ring r2"></span><span class="gc-icon"></span></div>
+      <div class="gc-kicker"></div><div class="gc-title"></div><div class="gc-sub"></div><div class="gc-chips"></div>
+      <button class="gc-btn" type="button"></button></div>`;
+  // Text goes in with textContent (chapter/task names can contain HTML characters).
+  root.querySelector('.gc-icon').textContent = item.icon || '🏆';
+  root.querySelector('.gc-kicker').textContent = item.kicker || '';
+  root.querySelector('.gc-title').textContent = item.title || 'Victory!';
+  root.querySelector('.gc-sub').textContent = item.sub || '';
+  const chips = root.querySelector('.gc-chips');
+  (item.chips||[]).forEach(c=>{ const e = document.createElement('span'); e.className='gc-chip'; e.textContent = c; chips.appendChild(e); });
+  if(!(item.chips||[]).length) chips.remove();
+  const btn = root.querySelector('.gc-btn'); btn.textContent = item.button || 'Keep going 💪';
+  document.body.appendChild(root);
+  try{ if(navigator.vibrate && !reduced) navigator.vibrate([70,40,70,40,70,60,260]); }catch(e){}
+  const audio = gcAudioStart(item.sound || (item.kind==='planner' ? 'planner' : 'target'));
+
+  let raf = 0, closed = false, autoTimer = 0, stopLaunch = false;
+  const cv = root.querySelector('.gc-canvas'); let ctx = null, W = 0, H = 0;
+  const parts = [];
+  if(!reduced){
+    try{
+      const dpr = Math.min(window.devicePixelRatio||1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+      ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+    }catch(e){ ctx = null; }
+  }
+  const rnd = (a,b)=> a + Math.random()*(b-a);
+  const pick = ()=> GC_COLORS[(Math.random()*GC_COLORS.length)|0];
+  function cannon(x, dir){                           // confetti cannon from a bottom corner
+    for(let i=0;i<46;i++){
+      const a = (-Math.PI/2) + dir*rnd(0.15,0.75), v = rnd(9,17);
+      parts.push({t:'c', x, y:H+6, vx:Math.cos(a)*v, vy:Math.sin(a)*v, g:.30, drag:.985, w:rnd(5,9), h:rnd(3,6), r:rnd(0,6.28), vr:rnd(-.3,.3), life:1, decay:rnd(.006,.011), col:pick()});
+    }
+  }
+  function rocket(){                                  // firework: rises, then bursts
+    parts.push({t:'r', x:rnd(W*.15,W*.85), y:H+4, vx:rnd(-.6,.6), vy:-rnd(11,15), g:.18, tx:rnd(H*.12,H*.5), col:pick(), life:1});
+  }
+  function burst(x, y, col){
+    const n = 54;
+    for(let i=0;i<n;i++){
+      const a = (i/n)*6.283 + rnd(-.05,.05), v = rnd(2.2,6.2);
+      parts.push({t:'s', x, y, vx:Math.cos(a)*v, vy:Math.sin(a)*v, g:.07, drag:.965, life:1, decay:rnd(.012,.02), col: Math.random()<.25 ? '#FFFFFF' : col, sz:rnd(1.6,2.8)});
+    }
+    if(audio) audio.pop();
+  }
+  let started = performance.now(), nextRocket = 300;
+  function frame(now){
+    raf = requestAnimationFrame(frame);
+    if(!ctx) return;
+    const el = now - started;
+    if(!stopLaunch && el > nextRocket){ rocket(); nextRocket += rnd(260,520); if(el > 5200) stopLaunch = true; }
+    ctx.clearRect(0,0,W,H);
+    for(let i=parts.length-1;i>=0;i--){
+      const p = parts[i];
+      if(p.t==='r'){
+        p.x += p.vx; p.y += p.vy; p.vy += p.g;
+        ctx.fillStyle = p.col; ctx.globalAlpha = 1; ctx.fillRect(p.x-1.5, p.y-1.5, 3, 3);
+        if(p.y <= p.tx || p.vy >= -1){ burst(p.x, p.y, p.col); parts.splice(i,1); }
+        continue;
+      }
+      p.vx *= p.drag; p.vy = p.vy*p.drag + p.g; p.x += p.vx; p.y += p.vy; p.life -= p.decay;
+      if(p.life <= 0 || p.y > H+30){ parts.splice(i,1); continue; }
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life*1.4)); ctx.fillStyle = p.col;
+      if(p.t==='c'){ p.r += p.vr; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); }
+      else { ctx.beginPath(); ctx.arc(p.x,p.y,p.sz,0,6.283); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+    if(parts.length > 700) parts.splice(0, parts.length-700);
+    if(stopLaunch && !parts.length){ cancelAnimationFrame(raf); raf = 0; }
+  }
+  if(ctx){
+    cannon(0, 1); cannon(W, -1);
+    setTimeout(()=>{ if(!closed && ctx){ cannon(0,1); cannon(W,-1); } }, 1400);
+    raf = requestAnimationFrame(frame);
+  }
+  const prevFocus = document.activeElement;
+  function close(){
+    if(closed) return; closed = true;
+    clearTimeout(autoTimer); cancelAnimationFrame(raf);
+    document.removeEventListener('keydown', onKey, true); window.removeEventListener('popstate', close);
+    if(audio) audio.stop();
+    root.classList.add('out');
+    setTimeout(()=>{ root.remove(); try{ if(prevFocus && prevFocus.focus) prevFocus.focus(); }catch(e){} if(onClosed) onClosed(); }, reduced ? 20 : 460);
+  }
+  function onKey(e){
+    if(e.key==='Escape' || e.key==='Enter' || e.key===' '){ e.preventDefault(); e.stopPropagation(); close(); }
+    else if(e.key==='Tab'){ e.preventDefault(); try{ btn.focus({preventScroll:true}); }catch(err){} }   // keep keyboard focus inside the dialog
+  }
+  document.addEventListener('keydown', onKey, true);
+  window.addEventListener('popstate', close); // phone-back while it is showing just closes it (the page behind navigates as usual)
+  root.addEventListener('click', close);
+  btn.addEventListener('click', e=>{ e.stopPropagation(); close(); });
+  setTimeout(()=>{ try{ btn.focus({preventScroll:true}); }catch(e){} }, 1500);
+  autoTimer = setTimeout(close, reduced ? 4500 : 9000);
+}
+// Queue a grand celebration (plays next, ahead of any waiting small toasts; one of each kind at a time).
+function celebrateGrand(item){
+  if(!item || !item.kind) return;
+  if(_celebQ.some(q=>q && typeof q==='object' && q.kind===item.kind)) return;
+  _celebQ.unshift(Object.assign({}, item));
+  pumpCelebrations();
+}
 function emptyState(icon, text){
   return `<div class="placeholder-note"><div class="big">${icon}</div>${text}</div>`;
 }
@@ -3122,6 +3365,7 @@ function syncPlannerTaskFromSource(linkType, linkCategory, profileId, paperId, r
     }
   });
   if(changed) saveShared();
+  if(changed && doneState) setTimeout(()=>checkPlannerDayCelebration(profileId), 0); // v155: ticking a lecture/chapter elsewhere can finish the day's plan
 }
 
 // Storage adapter: uses window.storage (syncs across a shared/published link) when available.
@@ -4263,7 +4507,7 @@ function confirmLeaveTest(){
 // ── Phone back button on a paper's workspace ─────────────────────────────────────────────────────────────────────────────
 // The workspace has no on-screen Back button (v152): it holds one history entry while it is open, so the phone/browser back button
 // returns to the Timer page. Leaving by any other route (bottom nav, chat) hands that entry back so Home never needs a double press.
-let _wsHistToken = 0, _wsSilentPops = 0;
+let _wsHistToken = 0, _wsSilentPops = 0, _wsStaleEntry = false;
 function wsHistEnter(){
   if(_wsHistToken) return;
   _wsHistToken = Date.now();
@@ -4272,7 +4516,7 @@ function wsHistEnter(){
 function wsHistLeave(newView){
   if(!_wsHistToken || newView==='workspace') return;
   _wsHistToken = 0;
-  if(newView==='chat') return; // chat pushes its own entry right now; the workspace's one is skipped over later (see below)
+  if(newView==='chat'){ _wsStaleEntry = true; return; } // chat pushes its own entry right now; the workspace's one is handed back when chat closes (finishLeavingChat)
   _wsSilentPops++; try{ history.back(); }catch(e){ _wsSilentPops--; }
 }
 window.addEventListener('popstate', e=>{
@@ -7996,6 +8240,7 @@ function diaryLearningToggle(date, id){
   e.done = nowDone;
   if(e.taskId){ const t = manualTasksFor(S.local.myProfile).find(x=>x.id===e.taskId); if(t) t.done = nowDone; }
   driveSyncSaveNow(); renderDiaryPage();
+  if(nowDone) checkPlannerDayCelebration(S.local.myProfile);
 }
 function diaryLearningToPlanner(date, id){
   const me = S.local.myProfile, e = diaryFindLearning(date, id); if(!e || e.taskId) return;
@@ -8137,12 +8382,7 @@ function toggleDayClosed(){
   const refl = ensureDiaryReflection(me, S.diarySelectedDate);
   refl.closedAt = refl.closedAt ? null : Date.now();
   driveSyncSaveNow();
-  const _g = diaryYesterdayGate();
-  if(refl.closedAt && S._diaryGateReturn && S.diarySelectedDate === _g.date && !_g.blocked){
-    S._diaryGateReturn = false;
-    showToast("Yesterday's diary is closed. You can start your timer now.");
-  } else showToast(refl.closedAt ? 'Day closed.' : 'Day reopened.');
-  if(S.diarySelectedDate === _g.date) renderApp(); // the Start button / notice behind the Diary follows the new state
+  showToast(refl.closedAt ? 'Day closed.' : 'Day reopened.');
   renderDiaryPage();
 }
 function diaryBack(){ if(S.diaryView === 'history'){ S.diaryView = 'day'; renderDiaryPage(); } else exitDiaryPopup(); }
@@ -8276,41 +8516,7 @@ function renderDiaryPage(){
 }
 
 
-// ── v138: yesterday's diary must be closed before today's timer can start ──────────────────────────────────────────────
-// "Closed" = the Close day button on that day's Diary page (one tap after writing). Only a NEW session is blocked; a running one,
-// Pause/Resume/Stop, manual "Log study time" and everything else work as before. An account with no history at all (nothing logged
-// before today, no diary entries) has no yesterday to close, so it is never blocked.
-function diaryYesterdayGate(){
-  const me = S.local && S.local.myProfile;
-  if(!me || !S.shared) return {blocked:false};
-  const today = todayStr(), y = tgAddDays(today, -1);
-  const hasHistory = logsFor(me).some(l=>l.date && l.date < today) || Object.keys((S.shared.diaryReflections||{})[me]||{}).length > 0 || Object.keys((S.shared.diary||{})[me]||{}).length > 0;
-  if(!hasHistory) return {blocked:false, date:y};
-  return {blocked: !getDiaryReflection(me, y).closedAt, date:y};
-}
-function showDiaryGate(date){
-  hideDiaryGate();
-  const label = new Date(date+'T00:00:00').toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
-  const el = document.createElement('div');
-  el.id = 'diary-gate'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true');
-  el.style.cssText = 'position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px';
-  el.innerHTML = `<div style="width:100%;max-width:360px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 20px;box-shadow:var(--shadow-sm,0 10px 40px rgba(0,0,0,.4));text-align:center">
-    <div style="font-size:34px;margin-bottom:6px">📓</div>
-    <div style="font-size:16px;font-weight:800;margin-bottom:6px">Close yesterday's diary first</div>
-    <div style="font-size:12.5px;color:var(--text-muted);line-height:1.5;margin-bottom:16px">Before today's timer can start, write a few lines about <b style="color:var(--text)">${label}</b> and tap <b style="color:var(--text)">Close day</b>.</div>
-    <button class="btn btn-accent" style="width:100%" onclick="diaryGateOpenDiary('${date}')">Open yesterday's diary</button>
-    <button class="btn" style="width:100%;margin-top:8px" onclick="hideDiaryGate()">Not now</button>
-  </div>`;
-  document.body.appendChild(el);
-}
-function hideDiaryGate(){ const el = document.getElementById('diary-gate'); if(el) el.remove(); }
-function diaryGateOpenDiary(date){
-  hideDiaryGate();
-  const me = S.local.myProfile;
-  S._diaryGateReturn = true; // so closing it can say "you can start now"
-  if(S.viewingProfile !== me){ try{ setViewingProfile(me); }catch(e){ S.viewingProfile = me; } }
-  if(!S.diaryPopupOpen) openDiary(date); else selectDiaryDate(date);
-}
+// v153: the v138 rule 'close yesterday's diary before today's timer can start' was removed -- the timer always starts; Close day on the Diary is optional.
 
 // ═══════════════════════════════════════════════════════════
 // TARGETS — full-screen overlay, same pattern as Diary/Habits above. Rebuilt from scratch as
@@ -10946,6 +11152,32 @@ function chatClearedAtMax(a, b){
   if(!(ta > 0) && !(tb > 0)) return null;
   return (tb > ta || !(ta > 0)) ? b : a;
 }
+// v154: reactions and stars belong to the person who made them. The merge below keeps whichever whole copy of a message is newer, so
+// when both phones touched the same message close together (she reacted while I starred it) the older copy's change was thrown away on
+// BOTH phones without a trace. Each person's own entries now come from their own copy: mine from this phone, hers from Drive.
+function mergeOwnedMsgFields(pick, local, remote, me){
+  if(!me || !pick || !local || !remote || pick.deleted || local.deleted || remote.deleted) return pick;
+  const other = otherProfileId(me);
+  const lsb = local.starredBy || {}, rsb = remote.starredBy || {};
+  const sb = {};
+  const sme = (me in lsb) ? lsb[me] : rsb[me], soth = (other in rsb) ? rsb[other] : lsb[other];
+  if(sme !== undefined) sb[me] = !!sme;
+  if(soth !== undefined) sb[other] = !!soth;
+  const lr = local.reactions || {}, rr = remote.reactions || {};
+  const rx = {};
+  new Set(Object.keys(lr).concat(Object.keys(rr))).forEach(e=>{
+    const mine = (lr[e]||[]).includes(me);
+    const hers = (rr[e]||[]).includes(other);
+    const ppl = PROFILES.map(p=>p.id).filter(id=> id===me ? mine : (id===other ? hers : false));
+    if(ppl.length) rx[e] = ppl;
+  });
+  const truthyKeys = o=>JSON.stringify(Object.keys(o||{}).filter(k=>o[k]).sort());
+  const sameSb = truthyKeys(sb) === truthyKeys(pick.starredBy);
+  const normRx = o=>JSON.stringify(Object.keys(o||{}).filter(k=>(o[k]||[]).length).sort().map(k=>[k,(o[k]||[]).slice().sort()]));
+  if(sameSb && normRx(rx) === normRx(pick.reactions)) return pick;
+  // Differs from the copy we kept: write the combined one as the newest version so it is what both phones converge on.
+  return Object.assign({}, pick, {starredBy:sb, reactions:rx, updatedAt: nowISO()});
+}
 function mergeChatFromRemote(remoteShared){
   _chatMergeListChanged = false;
   if(!remoteShared || !remoteShared.chat) return false;
@@ -10966,7 +11198,9 @@ function mergeChatFromRemote(remoteShared){
     else{
       const eT = new Date(existing.updatedAt||existing.createdAt).getTime();
       const rT = new Date(m.updatedAt||m.createdAt).getTime();
-      if(rT > eT){ byId[m.id]=m; changed=true; }
+      const pick = rT > eT ? m : existing;
+      const fin = mergeOwnedMsgFields(pick, existing, m, S.local && S.local.myProfile);
+      if(fin !== existing){ byId[m.id] = fin; changed = true; }
     }
   });
   const merged = Object.values(byId).sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
@@ -11255,10 +11489,13 @@ function enterChat(){
 }
 // Common cleanup, used whether chat was left via the in-app back arrow or the hardware/browser back button.
 function finishLeavingChat(){
+  const _viaHistory = _chatHistoryActive;
   if(_chatHistoryActive){
     window.removeEventListener('popstate', onChatBackButton);
     _chatHistoryActive = false;
   }
+  // v154: chat opened from a paper page: going back lands on that page's (now unused) history entry -- give it back, so the next phone-back isn't swallowed.
+  if(_wsStaleEntry){ _wsStaleEntry = false; if(_viaHistory && !_wsHistToken){ _wsSilentPops++; try{ history.back(); }catch(e){ _wsSilentPops--; } } }
   stopChatPolling();
   stopChatHeartbeat();
   const el = document.getElementById('chat-root');
@@ -11826,6 +12063,7 @@ async function loadOlderMessages(){
     ? msgList.appendChild(Object.assign(document.createElement('div'), {id:'chat-archive-loading', className:'chat-load-older', textContent:'Loading older messages…'}))
     : null;
   try{ await loadArchive(); }catch(e){ console.warn('Chat archive fetch failed:', e); }
+  if(S.sharedArchive && S.sharedArchive.__readFailed){ S._archiveChecked = false; showToast("Couldn't load older messages — tap again to retry."); } // v154: was silently given up on until a reload
   if(loadingEl) loadingEl.remove();
   const newTotal = chatAllMessagesIncludingArchive().length;
   const prevHeight = msgList ? msgList.scrollHeight : 0;
@@ -11936,7 +12174,7 @@ const ARCHIVE_FILE_NAME = 'olympus-archive.json';
 function blankArchive(){ return {chat:[], logs:{}, habitLog:{}}; }
 let _archiveLoadPromise = null; // in-flight guard — see loadArchive()
 async function loadArchive(){
-  if(S.sharedArchive) return S.sharedArchive; // already fetched this session — one fetch, not one per scroll
+  if(S.sharedArchive && !S.sharedArchive.__readFailed) return S.sharedArchive; // already fetched this session — one fetch, not one per scroll (a stand-in left by a FAILED read is retried)
   // Two near-simultaneous callers (e.g. initAfterLogin()'s eager load landing in the same
   // tick as a chat scroll or a Stats/Planner render) would otherwise both see S.sharedArchive
   // still unset and each kick off their own Drive read. Sharing the one in-flight promise
@@ -11964,7 +12202,14 @@ async function loadArchive(){
       } else {
         S.sharedArchive = blankArchive(); // nothing archived yet — normal until the app's been used 30+ days
       }
-    }catch(e){ console.warn('Archive load failed:', e); S.sharedArchive = S.sharedArchive || blankArchive(); }
+    }catch(e){
+      console.warn('Archive load failed:', e);
+      // v154: the read failed (weak signal, 20 s timeout), so what we hold is an EMPTY stand-in, not the real archive. It may be shown
+      // (nothing older appears) but must never be written back: the daily sweep and "Clear chat" both saved it, which replaced the
+      // real archive on Drive with an empty one and silently dropped every log/diary-habit/chat older than 30 days.
+      if(!S.sharedArchive) S.sharedArchive = blankArchive();
+      S.sharedArchive.__readFailed = true;
+    }
     return S.sharedArchive;
   })();
   try{ return await _archiveLoadPromise; } finally { _archiveLoadPromise = null; }
@@ -11985,12 +12230,13 @@ async function loadArchive(){
 // trigger is exactly what already got missed once (Stats was fixed, Planner wasn't, because
 // it's a separate view function with its own render path).
 function ensureArchiveLoaded(){
-  if(S.sharedArchive || !S.appSession || !isHosted()) return;
+  if((S.sharedArchive && !S.sharedArchive.__readFailed) || !S.appSession || !isHosted()) return;
   loadArchive().then(()=> renderAppSoon());
 }
 let _archiveSaveDebounceTimer = null;
 function saveArchive(){
   if(!S.appSession || !isHosted()) return;
+  if(S.sharedArchive && S.sharedArchive.__readFailed) return; // v154: an empty stand-in from a failed read must never overwrite the real archive
   clearTimeout(_archiveSaveDebounceTimer);
   _archiveSaveDebounceTimer = setTimeout(async ()=>{
     try{
@@ -12121,6 +12367,7 @@ function archiveCutoffStr(){
 async function sweepToArchive(){
   const cutoff = archiveCutoffStr();
   const archive = await loadArchive();
+  if(archive && archive.__readFailed) return 0; // v154: couldn't read the real archive -- sweeping into an empty one would lose data; try again another day
   let moved = 0;
 
   const msgs = S.shared.chat.messages || [];
@@ -12218,6 +12465,7 @@ function sendChatMessage(){
   if(S._chatEditing){
     const msg = findMsg(S._chatEditing);
     if(msg && msg.from===me && !msg.deleted && text && text !== (msg.text||'')){ msg.text=text; msg.edited=true; msg.editedAt=now; msg.updatedAt=now; } // v140: unchanged text isn't an edit; a message deleted on another phone isn't revived
+    else if(!msg || msg.deleted){ showToast('That message was deleted, so it can\'t be edited.'); } // v154: the typed text was dropped without a word
     S._chatEditing = null;
   } else {
     S.shared.chat.messages.push({id:uid(), from:me, type:'text', text, replyTo:S._chatReplyTo||null,
@@ -12384,9 +12632,11 @@ async function clearChatHistory(){
   if(S.appSession && isHosted()){
     try{
       const archive = await loadArchive();
-      archive.chat = [];
-      S.sharedArchive = archive;
-      saveArchive();
+      if(archive && !archive.__readFailed){   // v154: if the archive couldn't be read, leave it alone (clearedAt already hides its older messages)
+        archive.chat = [];
+        S.sharedArchive = archive;
+        saveArchive();
+      }
     }catch(e){ console.warn('Archive clear failed:', e); }
   } else if(S.sharedArchive){
     S.sharedArchive.chat = [];
@@ -12754,9 +13004,6 @@ function fmtHMS(totalSeconds){
 }
 function timerStart(paperId, category, itemId, itemLabel, countdownTargetMs){
   const me = S.local.myProfile; if(!me) return false;
-  // v138: yesterday's diary has to be closed before today's timer can start (every way of starting a session comes through here)
-  const _gate = diaryYesterdayGate();
-  if(_gate.blocked){ showDiaryGate(_gate.date); return false; }
   // v140: never overwrite a session that is already running/on a break (a second tap on a Plan row, a stale picker, or the other
   // phone having started one) -- the old one would have vanished without being logged.
   const _cur = myLiveStatus();
@@ -13076,8 +13323,18 @@ function timerTickBody(){
   // sessions list, trends — is a "live region" rebuilt from the SAME helpers the full render uses (see liveRegion()).
   // Run it BEFORE the stop check below so a session that just ended is drawn as ended, not left frozen.
   patchLiveRegions();
+  // v156: the target is celebrated the moment the running session carries today's total across it (every 5 s is plenty), not only when the
+  // session is saved. The stamp it leaves makes the save-time check a no-op, so it never plays twice.
+  if(me && ts.startTime && ts.status==='running'){
+    const nowMs = Date.now();
+    if(nowMs - _lastLiveTargetCheck >= 5000){
+      _lastLiveTargetCheck = nowMs;
+      if(!celebStamped('target', me) && checkDailyTargetForPush(me, true)) checkMinHoursCelebration(me, true);
+    }
+  }
   if(!anyActive) stopTimerTick();
 }
+let _lastLiveTargetCheck = 0;
 function stopTimerTick(){ if(_timerTickInterval){ clearInterval(_timerTickInterval); _timerTickInterval=null; } }
 
 // ── Category + item picker (Feature 2 expansion: "what specifically are you studying") ──
@@ -13290,8 +13547,7 @@ function timerCardHtml(){
         <div id="timer-category-select-wrap"></div>
         <div id="timer-item-select-wrap"></div>
       </div>
-      ${diaryYesterdayGate().blocked ? `<div onclick="showDiaryGate('${diaryYesterdayGate().date}')" style="margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--amber-tint);border:1px solid var(--amber);color:var(--text);font-size:12px;line-height:1.45;cursor:pointer"><b>Close yesterday's diary to start.</b> Tap to open it — it takes a minute.</div>` : ''}
-      <button class="btn btn-accent" style="width:100%;margin-top:${diaryYesterdayGate().blocked?'8':'12'}px" onclick="startTimerFromPicker()">▶ Start Studying</button>
+      <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="startTimerFromPicker()">▶ Start Studying</button>
       <button class="btn" style="width:100%;margin-top:8px" onclick="toggleStrictCountdownPicker()">⏳ Strict Countdown</button>
       ${S._showCountdownPicker ? `
       <div style="margin-top:2px">
@@ -16247,6 +16503,7 @@ function toggleManualTask(profileId, taskId){
   }
   saveShared(); renderApp();
   if(t.done && t.linkType) checkMilestones(profileId, t.paperId, t.linkType==='chapter' ? t.refId : null);
+  if(t.done) checkPlannerDayCelebration(profileId);
 }
 // Wipes every Planner task from today onward for the signed-in profile (Settings → Profile & Targets).
 // History is never touched: past days stay exactly as they are, and so do tasks already completed today.
@@ -16373,6 +16630,7 @@ function setTaskStatus(profileId, taskId, status){
     saveShared();
   }
   renderApp();
+  if(status==='completed') checkPlannerDayCelebration(profileId);
 }
 function setPlannerDateFilter(dateStr){
   // No fallback of any kind here per the stricter re-spec — if the date input is cleared
@@ -18097,7 +18355,7 @@ const SETTINGS_SECTIONS = [
   {key:'account', title:'Account & Sync', sub:'Sign-in, sync status', icon:'<path d="M17.5 16a4 4 0 000-8 5.5 5.5 0 00-10.6-1.7A4.5 4.5 0 007.5 16h10z"/>', render:'settingsSectionAccount'},
   {key:'notifications', title:'Notifications', sub:'Push alerts & in-app reminders', icon:'<path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>', render:'settingsSectionNotifications'},
   {key:'appearance', title:'Appearance', sub:'Dark mode, background theme', icon:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor" stroke="none"/>', render:'settingsSectionAppearance'},
-  {key:'display', title:'Display', sub:'Home page cards & lecture paper', icon:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>', render:'settingsSectionDisplay'},
+  {key:'display', title:'Display', sub:'Home page cards, lecture paper & celebrations', icon:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>', render:'settingsSectionDisplay'},
   {key:'ai', title:'AI Personalization', sub:'Helps Coach, Chat & Doubt Solver tailor to you', icon:'<path d="M12 2l1.7 5.8L19 9l-5.3 1.2L12 16l-1.7-5.8L5 9l5.3-1.2z"/>', render:'settingsSectionAI'},
   {key:'data', title:'Data & Backup', sub:'Export / import your progress', icon:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/>', render:'settingsSectionData'},
   {key:'admin', title:'Admin Tools', sub:'Privacy & app announcements', icon:'<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>', render:'settingsSectionAdmin', umangOnly:true},
@@ -18391,7 +18649,26 @@ function settingsSectionDisplay(){
     }).join('')}
     </div>
     <div style="padding:10px 14px 14px"><button class="btn" style="width:100%" onclick="resetHomeLayout()">Reset Home to default</button></div>
+  </div>
+  <div class="card settings-group" style="margin-top:12px">
+    <div style="padding:12px 14px 0"><div class="settings-row-lbl" style="font-weight:700">Celebrations</div><div class="settings-row-sub">The victory screen when you hit your daily target or clear your planner. This setting is for this device only.</div></div>
+    <div style="padding:0 14px">
+      <div class="settings-row"><div><div class="settings-row-lbl">Celebration sound</div><div class="settings-row-sub">Fanfare, cheer and fireworks</div></div>
+        <div class="toggle ${celebSoundOn()?'on':''}" onclick="toggleCelebSound()" role="switch" aria-checked="${celebSoundOn()}" aria-label="Celebration sound"></div></div>
+    </div>
+    <div style="padding:6px 14px 14px;display:flex;gap:8px"><button class="btn" style="flex:1" onclick="previewCelebration('target')">🏆 Preview target</button><button class="btn" style="flex:1" onclick="previewCelebration('planner')">✅ Preview planner</button></div>
   </div>`;
+}
+function toggleCelebSound(){
+  S.local.celebSound = !celebSoundOn(); saveLocal();
+  if(S.local.celebSound) gcAudioCtx(); // this tap is the gesture that lets the browser allow sound later
+  renderApp();
+}
+function previewCelebration(kind){
+  if(document.querySelector('.grand-celeb')) return;
+  playGrandCelebration(kind==='planner'
+    ? {kind:'planner', icon:'✅', kicker:'Planner cleared', title:'PLAN COMPLETE!', sub:'Every task for today is done.', chips:['📋 Planner 5/5'], button:'Yes! 🙌'}
+    : {kind:'target', icon:'🏆', kicker:'Daily target', title:'TARGET CRUSHED!', sub:'You reached today\'s study goal.', chips:['⏱ 6h 30m today','🎯 Goal 6h 0m','🔥 7-day study streak'], button:'Keep going 💪'});
 }
 
 // Same visual pattern as notifToggleRow, but for the newer S.shared-backed per-profile
@@ -20551,10 +20828,10 @@ function celebStamp(kind, profileId){
   S.local.celebDay[kind+':'+profileId] = t;
   saveLocal();
 }
-function checkDailyTargetForPush(profileId){
+function checkDailyTargetForPush(profileId, live){
   if(profileId==='umang' && umangHasBlocked()) return false;
   const target = effectiveTodayTarget(profileId);
-  if(hoursOnDate(profileId, todayStr()) < target) return false;
+  if((live ? todayHoursLive(profileId) : hoursOnDate(profileId, todayStr())) < target) return false;
   if(celebStamped('target', profileId)) return false;
   if(!S.shared.pushState) S.shared.pushState = {targetHitDate:{}, minHoursHitDate:{}};
   if(!S.shared.pushState.targetHitDate) S.shared.pushState.targetHitDate = {};
@@ -20565,11 +20842,36 @@ function checkDailyTargetForPush(profileId){
   // Local celebration (confetti + toast) only for the profile that actually hit it, on
   // their own device — the partner still gets the push below, not a confetti burst on a
   // screen they're not looking at.
-  if(profileId===S.local.myProfile) celebrateMilestone(`Daily target hit — ${target}h logged today!`);
+  if(profileId===S.local.myProfile){
+    const got = live ? todayHoursLive(profileId) : hoursOnDate(profileId, todayStr());
+    const chips = [`⏱ ${gcHM(got)} today`, `🎯 Goal ${gcHM(target)}`];
+    const pl = manualTasksFor(profileId).filter(t=>t.date===todayStr());
+    if(pl.length) chips.push(`📋 Planner ${pl.filter(t=>t.done).length}/${pl.length}`);
+    const stk = liveStreak(profileId); if(stk >= 2) chips.push(`🔥 ${stk}-day study streak`);
+    celebrateGrand({kind:'target', icon:'🏆', kicker:'Daily target', title:'TARGET CRUSHED!',
+      sub:`${gcHM(got)} of focused study logged today. ${GC_LINES[Math.floor(Math.random()*GC_LINES.length)]}`, chips, button:'Keep going 💪'});
+  }
   const other = otherProfileId(profileId);
   if(!pushPrefEnabled(other, 'targetHit')) return true;
   const prof = profileById(profileId);
   sendPush(other, `🎯 ${prof.nick} hit today's target!`, `${target}h logged today.`, {url:'./'}, {urgency:'normal', ttl:21600});
+  return true;
+}
+// v155: every Planner task dated today is done -> grand celebration, once per study day (device-local stamp, same as the daily target).
+// Called after a task is completed, from any route (Planner tick, status menu, a lecture/chapter ticked elsewhere, Diary learning).
+function checkPlannerDayCelebration(profileId){
+  if(!profileId || !S.local || profileId !== S.local.myProfile) return false;
+  const today = todayStr();
+  const tasks = manualTasksFor(profileId).filter(t=>t.date===today);
+  if(!tasks.length || tasks.some(t=>!t.done)) return false;
+  if(celebStamped('planner', profileId)) return false;
+  celebStamp('planner', profileId);
+  const got = hoursOnDate(profileId, today), target = effectiveTodayTarget(profileId);
+  const chips = [`✅ ${tasks.length} of ${tasks.length} tasks done`];
+  if(got > 0) chips.push(`⏱ ${gcHM(got)} today`);
+  if(got >= target) chips.push('🏆 Target hit');
+  celebrateGrand({kind:'planner', icon:'✅', kicker:'Planner cleared', title:'PLAN COMPLETE!',
+    sub: (tasks.length===1 ? "Today's task is done." : `All ${tasks.length} tasks on today's plan are done.`) + ' ' + GC_LINES[Math.floor(Math.random()*GC_LINES.length)], chips, button:'Yes! 🙌'});
   return true;
 }
 // Separate from the Daily Target above: S.shared.targets is the Settings floor/minimum,
