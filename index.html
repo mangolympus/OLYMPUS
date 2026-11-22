@@ -94,49 +94,12 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;
 #app-root.view-enter{animation:viewFadeSlide .28s cubic-bezier(.22,.8,.4,1)}
 
 
-/* GRAND CELEBRATION (v155) — full-screen victory moment for the daily target and a cleared planner day */
-.grand-celeb{position:fixed;inset:0;z-index:950;display:flex;align-items:center;justify-content:center;padding:20px;
-  background:radial-gradient(circle at 50% 42%,rgba(255,200,70,.20),rgba(6,8,20,.86) 62%);
-  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);opacity:0;animation:gcFadeIn .35s ease forwards;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.grand-celeb.out{animation:gcFadeOut .45s ease forwards;pointer-events:none}
+/* GRAND CELEBRATION (v155, v156: background-only) — fireworks + confetti cannons drawn over the app, never blocking it (no card, no taps captured) */
+.grand-celeb{position:fixed;inset:0;z-index:950;pointer-events:none;opacity:0;animation:gcFadeIn .3s ease forwards}
+.grand-celeb.out{animation:gcFadeOut .6s ease forwards}
 @keyframes gcFadeIn{to{opacity:1}}
 @keyframes gcFadeOut{from{opacity:1}to{opacity:0}}
 .gc-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.gc-card{position:relative;width:min(340px,100%);text-align:center;color:#fff;padding:30px 22px 22px;border-radius:26px;
-  background:linear-gradient(165deg,#212a52 0%,#10152e 100%);border:1.5px solid rgba(255,214,102,.55);
-  box-shadow:0 0 0 6px rgba(255,214,102,.08),0 24px 70px rgba(0,0,0,.55),0 0 80px rgba(255,190,60,.28);
-  transform:scale(.4) translateY(40px);opacity:0;animation:gcCardIn .7s cubic-bezier(.2,1.5,.35,1) .12s forwards;overflow:hidden}
-@keyframes gcCardIn{to{transform:none;opacity:1}}
-.gc-card::after{content:"";position:absolute;top:-30%;bottom:-30%;width:38%;left:-60%;transform:skewX(-20deg);
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);animation:gcShine 2.4s ease 1s infinite}
-@keyframes gcShine{0%{left:-60%}55%,100%{left:130%}}
-.gc-rays{position:absolute;left:50%;top:78px;width:360px;height:360px;margin:-180px 0 0 -180px;pointer-events:none;opacity:.55;
-  background:repeating-conic-gradient(from 0deg,rgba(255,214,102,.30) 0deg 7deg,transparent 7deg 22deg);
-  -webkit-mask-image:radial-gradient(circle,#000 8%,transparent 66%);mask-image:radial-gradient(circle,#000 8%,transparent 66%);animation:gcSpin 14s linear infinite}
-@keyframes gcSpin{to{transform:rotate(360deg)}}
-.gc-medal{position:relative;width:104px;height:104px;margin:0 auto 10px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(circle at 35% 30%,#fff3b0,#ffc83d 55%,#d98a00);box-shadow:0 0 0 5px rgba(255,214,102,.25),0 10px 30px rgba(255,170,0,.45);
-  animation:gcMedalPop .9s cubic-bezier(.2,1.6,.3,1) .35s both,gcFloat 2.6s ease-in-out 1.3s infinite}
-@keyframes gcMedalPop{0%{transform:scale(0) rotate(-200deg)}100%{transform:scale(1) rotate(0)}}
-@keyframes gcFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-.gc-icon{font-size:54px;line-height:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.25))}
-.gc-ring{position:absolute;inset:0;border-radius:50%;border:3px solid rgba(255,214,102,.8);opacity:0;animation:gcRing 1.8s ease-out .5s infinite}
-.gc-ring.r2{animation-delay:1.1s}
-@keyframes gcRing{0%{transform:scale(1);opacity:.85}100%{transform:scale(2.3);opacity:0}}
-.gc-kicker{position:relative;font-size:11px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#ffd666;opacity:0;animation:gcUp .5s ease .75s forwards}
-.gc-title{position:relative;margin:4px 0 6px;font-size:30px;line-height:1.1;font-weight:900;letter-spacing:-.01em;
-  background:linear-gradient(180deg,#fff,#ffd666);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:0;animation:gcUp .55s ease .9s forwards}
-.gc-sub{position:relative;font-size:13.5px;line-height:1.45;color:rgba(255,255,255,.86);opacity:0;animation:gcUp .5s ease 1.05s forwards}
-.gc-chips{position:relative;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px;opacity:0;animation:gcUp .5s ease 1.2s forwards}
-.gc-chip{font-size:11px;font-weight:700;padding:5px 10px;border-radius:20px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16)}
-.gc-btn{position:relative;margin-top:18px;border:none;border-radius:14px;padding:12px 26px;font-size:14px;font-weight:800;color:#2a1a00;cursor:pointer;
-  background:linear-gradient(180deg,#ffe38a,#ffb92e);box-shadow:0 6px 18px rgba(255,170,0,.4);opacity:0;animation:gcUp .5s ease 1.4s forwards}
-.gc-btn:active{transform:scale(.97)}
-@keyframes gcUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){
-  .grand-celeb,.gc-card,.gc-medal,.gc-kicker,.gc-title,.gc-sub,.gc-chips,.gc-btn{animation-duration:.01s!important;animation-delay:0s!important;animation-iteration-count:1!important}
-  .gc-card::after,.gc-rays,.gc-ring{display:none}
-}
 /* CONFETTI */
 .confetti-layer{position:fixed;inset:0;pointer-events:none;z-index:900;overflow:hidden}
 .loading-dots{display:flex;justify-content:center;gap:5px;margin-bottom:8px}
@@ -1194,75 +1157,142 @@ body.games-mode #games-root{display:flex}
 .feature-card:active{transform:scale(.96)}
 @media (hover:hover){.feature-card:hover{transform:scale(1.02);box-shadow:0 6px 18px rgba(0,0,0,.28)}}
 
-/* DAILY CHALLENGES — full-screen overlay, same convention as Habits/Diary/Stats above. */
+/* CHALLENGES (v157 — rebuilt from scratch): short, finish-line challenges; auto-tracked from study data or a one-tap check-in; rest days; duo with the partner. */
 body.daily-challenges-mode header,
 body.daily-challenges-mode .bottomnav,
 body.daily-challenges-mode .fab{display:none!important}
 body.daily-challenges-mode{padding-bottom:0;overflow:hidden}
 #daily-challenges-root{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;flex-direction:column;contain:strict}
 body.daily-challenges-mode #daily-challenges-root{display:flex}
-#daily-challenges-root .stats-exit-bar{flex:0 0 auto;display:flex;align-items:center;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
-#daily-challenges-root .stats-exit-bar button{background:none;border:none;color:var(--text);font-size:15px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;cursor:pointer}
-#daily-challenges-root .stats-exit-bar button:active{background:var(--surface2)}
-#daily-challenges-root .dc-scroll{flex:1 1 auto;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
-
-/* CHALLENGE CARDS */
-.dc-challenge-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:transform .15s ease,box-shadow .15s ease}
-.dc-challenge-card.dc-done{background:color-mix(in srgb, var(--active-accent,var(--umang)) 6%, var(--surface));border-color:color-mix(in srgb, var(--active-accent,var(--umang)) 35%, var(--border))}
-.dc-challenge-card:active{transform:scale(.99)}
-.dc-icon{font-size:24px;flex-shrink:0;line-height:1}
-.dc-card-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-.dc-card-info{flex:1;min-width:0}
-.dc-card-name{font-size:13px;font-weight:800;letter-spacing:.01em;text-transform:uppercase;color:var(--text)}
-.dc-card-desc{font-size:12px;color:var(--text-muted);margin-top:2px}
-.dc-xp-badge{flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;background:var(--amber-tint);color:var(--amber);white-space:nowrap}
-.dc-done .dc-xp-badge{background:color-mix(in srgb,var(--active-accent,var(--umang)) 12%,var(--surface2));color:var(--active-accent,var(--umang))}
-.dc-progress-bar{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:8px 0 5px;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)}
-.dc-progress-fill{height:100%;border-radius:4px;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));box-shadow:0 0 7px color-mix(in srgb,var(--active-accent,var(--umang)) 60%,transparent);transition:width .5s cubic-bezier(.22,.8,.4,1)}
-.dc-progress-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:8px}
-.dc-progress-row b{color:var(--text);font-variant-numeric:tabular-nums;font-weight:700}
-.dc-complete-check{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;box-shadow:0 0 12px color-mix(in srgb,var(--active-accent,var(--umang)) 60%,transparent)}
-.dc-complete-time{font-size:11px;color:var(--active-accent,var(--umang));font-weight:700}
-.dc-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:transform .12s}
-.dc-btn:active{transform:scale(.94)}
-.dc-btn-primary{background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--active-accent,var(--umang)) 40%,transparent)}
-.dc-btn-outline{background:transparent;color:var(--active-accent,var(--umang));border:1.5px solid var(--active-accent,var(--umang))}
-.dc-streak-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-tint);padding:4px 10px;border-radius:20px}
-.dc-xp-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--purple);background:var(--purple-tint);padding:4px 10px;border-radius:20px}
-
-/* PERFECT DAY */
-.dc-perfect-banner{background:linear-gradient(135deg,color-mix(in srgb,var(--active-accent,var(--umang)) 15%,var(--surface)),var(--surface));border:1.5px solid color-mix(in srgb,var(--active-accent,var(--umang)) 40%,var(--border));border-radius:var(--radius);padding:20px;text-align:center;margin-bottom:16px}
-.dc-perfect-emoji{font-size:40px;margin-bottom:6px}
-.dc-perfect-title{font-size:18px;font-weight:800;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));-webkit-background-clip:text;background-clip:text;color:transparent}
-.dc-perfect-sub{font-size:12.5px;color:var(--text-muted);margin-top:4px}
-
-/* MANAGE CHALLENGES */
-.dc-manage-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
-.dc-manage-row:last-child{border-bottom:none}
-.dc-toggle{width:38px;height:22px;border-radius:11px;border:none;cursor:pointer;background:var(--surface2);border:1.5px solid var(--border);position:relative;flex-shrink:0;transition:background .2s}
-.dc-toggle.on{background:var(--active-accent,var(--umang));border-color:var(--active-accent,var(--umang))}
-.dc-toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
-.dc-toggle.on::after{transform:translateX(16px)}
-.dc-manage-info{flex:1;min-width:0}
-.dc-manage-name{font-size:12.5px;font-weight:700}
-.dc-manage-desc{font-size:11px;color:var(--text-muted);margin-top:1px}
-
-/* HOME CARD */
-.dc-home-pbar{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:8px 0 6px;box-shadow:inset 0 1px 2px rgba(0,0,0,.2)}
-.dc-home-pfill{height:100%;border-radius:4px;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));box-shadow:0 0 7px color-mix(in srgb,var(--active-accent,var(--umang)) 60%,transparent);transition:width .5s cubic-bezier(.22,.8,.4,1)}
-
-/* XP POPUP FLASH */
-@keyframes xpPop{0%{transform:translateY(0) scale(1);opacity:1}50%{transform:translateY(-28px) scale(1.15);opacity:1}100%{transform:translateY(-48px) scale(.9);opacity:0}}
-.xp-pop-label{position:fixed;font-size:18px;font-weight:800;color:var(--amber);pointer-events:none;z-index:999;text-shadow:0 2px 8px rgba(0,0,0,.35);animation:xpPop .8s ease forwards}
-
-/* ADD CHALLENGE FORM */
-.dc-form-label{font-size:10px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;display:block}
-.dc-form-input{width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:var(--surface2);color:var(--text);font-size:13px;font-family:inherit}
-.dc-form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
-
-/* XP LEVEL BAR */
-.dc-level-bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin:4px 0}
-.dc-level-fill{height:100%;border-radius:3px;background:linear-gradient(135deg,var(--purple),var(--purple-2));transition:width .5s cubic-bezier(.22,.8,.4,1)}
+.chl-top{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px}
+.chl-top h1{margin:0;font-size:26px;font-weight:900;letter-spacing:-.02em;color:var(--text)}
+.chl-top p{margin:2px 0 0;font-size:12px;color:var(--text-muted)}
+.chl-x{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:18px;line-height:1;cursor:pointer;flex:0 0 auto}
+.chl-x:active{transform:scale(.92)}
+.chl-scroll{flex:1 1 auto;overflow-y:auto;padding:6px 16px 120px;-webkit-overflow-scrolling:touch}
+.chl-stats{display:flex;gap:8px;margin:2px 0 6px}
+.chl-stat{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 6px;text-align:center}
+.chl-stat b{display:block;font-size:20px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums}
+.chl-stat span{font-size:9.5px;color:var(--text-faint);letter-spacing:.07em;text-transform:uppercase;font-weight:800}
+.chl-h{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin:20px 2px 9px;display:flex;justify-content:space-between;align-items:center}
+.chl-h em{font-style:normal;letter-spacing:0;text-transform:none;font-weight:600}
+.chl-card{--c1:#FF8A3D;--c2:#FF4D6D;position:relative;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:18px 16px 14px;margin-bottom:12px;overflow:hidden;animation:chlIn .35s ease both}
+.chl-card::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:linear-gradient(90deg,var(--c1),var(--c2))}
+.chl-card.done{border-color:color-mix(in srgb,var(--c1) 55%,var(--border));background:linear-gradient(160deg,color-mix(in srgb,var(--c1) 13%,var(--surface)),var(--surface))}
+.chl-head{display:flex;align-items:center;gap:12px}
+.chl-ring{position:relative;width:56px;height:56px;flex:0 0 56px}
+.chl-ring svg{width:56px;height:56px;transform:rotate(-90deg)}
+.chl-ring .trk{stroke:var(--surface2)}
+.chl-ring .fg{stroke:var(--c1);stroke-linecap:round;transition:stroke-dasharray .7s cubic-bezier(.22,.8,.4,1);filter:drop-shadow(0 0 4px color-mix(in srgb,var(--c1) 60%,transparent))}
+.chl-ring i{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:23px}
+.chl-card.done .chl-ring i{font-size:26px;font-weight:900;color:var(--c1)}
+.chl-name{font-size:16.5px;font-weight:800;color:var(--text);line-height:1.2}
+.chl-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
+.chl-day{margin-left:auto;flex:0 0 auto;font-size:11px;font-weight:800;padding:5px 10px;border-radius:20px;background:color-mix(in srgb,var(--c1) 16%,var(--surface2));color:var(--c1);white-space:nowrap}
+.chl-dots{display:flex;flex-wrap:wrap;gap:6px;margin:15px 0 4px}
+.chl-dot{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:18px;height:18px;flex:0 0 18px;border-radius:50%;border:2px solid var(--border);font-size:9px;font-weight:800;color:var(--text-faint);line-height:1}
+.chl-dots.fit{flex-wrap:nowrap;gap:4px}
+.chl-dots.fit .chl-dot{flex:1 1 0;width:auto;height:auto;min-width:0;max-width:22px;aspect-ratio:1/1;border-width:1.5px}
+.chl-dot.big{width:34px;height:34px;flex:0 0 34px;font-size:12px}
+.chl-dot.hit{background:linear-gradient(135deg,var(--c1),var(--c2));border-color:transparent;color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--c1) 40%,transparent)}
+.chl-dot.today{border-color:var(--c1);color:var(--c1);animation:chlPulse 1.8s ease-in-out infinite}
+.chl-dot.miss{border-color:transparent;background:color-mix(in srgb,var(--danger,#d33) 28%,var(--surface2));color:var(--danger,#d33)}
+.chl-dot.miss.cov{background:var(--amber-tint,var(--surface2));color:var(--amber)}
+.chl-dot.future{opacity:.55}
+.chl-meta{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--text-muted);margin:8px 0 0;flex-wrap:wrap}
+.chl-meta b{color:var(--text)}
+.chl-cue{margin:9px 0 0;font-size:12px;color:var(--text-muted);font-style:italic}
+.chl-bar{height:9px;border-radius:5px;background:var(--surface2);overflow:hidden;margin:12px 0 4px}
+.chl-bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--c1),var(--c2));transition:width .6s cubic-bezier(.22,.8,.4,1)}
+.chl-prog{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)}
+.chl-prog b{color:var(--text);font-variant-numeric:tabular-nums}
+.chl-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:13px;padding:14px;border:none;border-radius:14px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;background:linear-gradient(135deg,var(--c1),var(--c2));box-shadow:0 6px 18px color-mix(in srgb,var(--c1) 38%,transparent);transition:transform .12s}
+.chl-btn:active{transform:scale(.97)}
+.chl-btn.ghost{background:transparent;color:var(--c1);border:1.5px solid color-mix(in srgb,var(--c1) 55%,var(--border));box-shadow:none}
+.chl-donebar{margin-top:13px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800;color:var(--c1)}
+.chl-noanim .chl-card{animation:none}
+.chl-sheet.nf,.chl-sheet-bg.nf{animation:none;opacity:1}
+.chl-sheet.nf{transform:none}
+.chl-link.warn{color:var(--danger,#d33);font-weight:800}
+.chl-invite .x{background:none;color:var(--text-faint);padding:6px 8px;font-size:15px;margin-left:-6px}
+.chl-link{background:none;border:none;color:var(--text-faint);font-size:11.5px;text-decoration:underline;cursor:pointer;padding:4px 2px}
+.chl-foot{display:flex;justify-content:flex-end;margin-top:6px}
+.chl-duo{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-muted)}
+.chl-duo b{color:var(--text)}
+.chl-duo .chl-dots{margin:0;gap:3px;flex:1;min-width:0}
+.chl-duo .chl-dots.fit .chl-dot{max-width:12px}
+.chl-duo .tog{margin-left:auto;font-weight:800;color:var(--c1);white-space:nowrap}
+.chl-invite{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;border:1.5px dashed color-mix(in srgb,var(--c1) 60%,var(--border));background:color-mix(in srgb,var(--c1) 8%,var(--surface));margin-bottom:10px;--c1:#FF8A3D}
+.chl-invite .t{flex:1;min-width:0;font-size:13px;color:var(--text-muted)}
+.chl-invite .t b{display:block;color:var(--text);font-size:14px}
+.chl-invite button{border:none;border-radius:20px;padding:9px 16px;font-weight:800;font-size:13px;color:#fff;background:linear-gradient(135deg,var(--c1),var(--c2));cursor:pointer}
+.chl-hero{text-align:center;padding:22px 16px 20px;border-radius:22px;margin-bottom:6px;background:linear-gradient(150deg,color-mix(in srgb,var(--active-accent,var(--umang)) 20%,var(--surface)),var(--surface));border:1px solid color-mix(in srgb,var(--active-accent,var(--umang)) 35%,var(--border))}
+.chl-hero .e{font-size:46px;line-height:1;margin-bottom:8px}
+.chl-hero h2{margin:0 0 4px;font-size:19px;font-weight:900;color:var(--text)}
+.chl-hero p{margin:0;font-size:12.5px;color:var(--text-muted);line-height:1.5}
+.chl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chl-tpl{--c1:#FF8A3D;--c2:#FF4D6D;position:relative;text-align:left;padding:14px 13px 13px;border-radius:18px;border:1px solid var(--border);background:linear-gradient(160deg,color-mix(in srgb,var(--c1) 14%,var(--surface)),var(--surface));color:var(--text);cursor:pointer;font-family:inherit;transition:transform .12s}
+.chl-tpl:active{transform:scale(.96)}
+.chl-tpl .e{font-size:28px;line-height:1;display:block;margin-bottom:8px}
+.chl-tpl b{display:block;font-size:14px;font-weight:800}
+.chl-tpl span{display:block;font-size:11.5px;color:var(--text-muted);margin-top:3px;line-height:1.35}
+.chl-tpl em{display:inline-block;margin-top:8px;font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:12px;background:color-mix(in srgb,var(--c1) 18%,var(--surface2));color:var(--c1)}
+.chl-tpl.rec::after{content:"★ Start here";position:absolute;top:10px;right:10px;font-size:9.5px;font-weight:800;color:var(--c1)}
+.chl-shelf{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+.chl-trophy{--c1:#FF8A3D;--c2:#FF4D6D;flex:0 0 118px;text-align:center;padding:12px 8px;border-radius:16px;background:var(--surface);border:1px solid var(--border)}
+.chl-trophy .e{font-size:30px;line-height:1}
+.chl-trophy b{display:block;font-size:12px;margin:6px 0 2px;color:var(--text)}
+.chl-trophy span{font-size:10.5px;color:var(--text-muted)}
+.chl-trophy.lost{opacity:.6}
+.chl-trophy button{margin-top:7px;border:none;background:color-mix(in srgb,var(--c1) 16%,var(--surface2));color:var(--c1);font-weight:800;font-size:10.5px;padding:5px 9px;border-radius:12px;cursor:pointer}
+.chl-soft{margin-bottom:12px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--border);font-size:13px;color:var(--text-muted)}
+.chl-soft b{color:var(--text)}
+.chl-soft .row{display:flex;gap:8px;margin-top:10px}
+.chl-soft button{flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13px;cursor:pointer}
+.chl-soft button.p{border:none;color:#fff;background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)))}
+.chl-sheet-bg{position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.55);animation:gcFadeIn .2s ease forwards;opacity:0}
+.chl-sheet{--c1:#FF8A3D;--c2:#FF4D6D;position:absolute;left:0;right:0;bottom:0;z-index:6;max-height:90%;overflow-y:auto;background:var(--surface);border-radius:26px 26px 0 0;padding:10px 18px 26px;animation:chlUp .28s cubic-bezier(.2,.9,.3,1) both;box-shadow:0 -10px 40px rgba(0,0,0,.4)}
+.chl-grab{width:42px;height:5px;border-radius:3px;background:var(--border);margin:0 auto 14px}
+.chl-sh-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.chl-sh-head .e{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;background:linear-gradient(135deg,var(--c1),var(--c2))}
+.chl-sh-head b{font-size:19px;color:var(--text)}
+.chl-sh-head span{display:block;font-size:12.5px;color:var(--text-muted);margin-top:2px}
+.chl-lbl{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin:16px 0 7px}
+.chl-chips{display:flex;flex-wrap:wrap;gap:8px}
+.chl-chip{padding:9px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.chl-chip.on{border-color:var(--c1);background:color-mix(in srgb,var(--c1) 18%,var(--surface2));color:var(--c1)}
+.chl-in{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit}
+.chl-note{margin-top:14px;padding:11px 12px;border-radius:12px;background:var(--surface2);font-size:12.5px;color:var(--text-muted);line-height:1.5}
+.chl-note b{color:var(--text)}
+.chl-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;font-size:13.5px;color:var(--text)}
+.chl-row small{display:block;color:var(--text-muted);font-size:11.5px;margin-top:2px}
+.chl-sw{width:46px;height:27px;border-radius:14px;border:none;background:var(--surface2);box-shadow:inset 0 0 0 1.5px var(--border);position:relative;cursor:pointer;flex:0 0 auto;transition:background .2s}
+.chl-sw::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.chl-sw.on{background:var(--c1);box-shadow:none}
+.chl-sw.on::after{transform:translateX(19px)}
+.chl-go{margin-top:20px}
+/* Home card */
+.chl-home{padding:14px;cursor:pointer}
+.chl-hrow{--c1:#FF8A3D;--c2:#FF4D6D;display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid var(--border)}
+.chl-hrow:first-of-type{border-top:none;padding-top:2px}
+.chl-hic{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 38px;background:linear-gradient(135deg,var(--c1),var(--c2))}
+.chl-hrow.done .chl-hic{box-shadow:0 0 0 3px color-mix(in srgb,var(--c1) 30%,transparent)}
+.chl-hmid{flex:1;min-width:0}
+.chl-hmid b{display:block;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chl-hmid .chl-dots{margin:6px 0 0;gap:3px}
+.chl-hmid .chl-dots.fit .chl-dot{max-width:10px}
+.chl-hmid small{display:block;font-size:11px;color:var(--text-muted);margin-top:3px}
+.chl-hmini{flex:0 0 auto;border:none;border-radius:18px;padding:8px 13px;font-size:12.5px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--c1),var(--c2));cursor:pointer}
+.chl-hok{flex:0 0 auto;font-size:12px;font-weight:800;color:var(--c1);white-space:nowrap}
+.chl-hmore{font-size:11.5px;color:var(--text-muted);margin-top:6px}
+.chl-hempty{display:flex;align-items:center;gap:12px}
+.chl-hempty .e{font-size:34px}
+.chl-hempty b{display:block;font-size:14.5px;color:var(--text)}
+.chl-hempty span{font-size:12px;color:var(--text-muted)}
+@keyframes chlIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes chlUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes chlPulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c1) 50%,transparent)}50%{box-shadow:0 0 0 6px transparent}}
+@media (prefers-reduced-motion:reduce){.chl-card,.chl-sheet,.chl-dot.today{animation:none!important}.chl-ring .fg,.chl-bar i{transition:none}}
 
 body.fullscreen-timer-mode header,
 body.fullscreen-timer-mode .bottomnav,
@@ -2483,27 +2513,18 @@ function gcAudioStart(kind){
   }catch(e){ console.warn('Celebration audio failed:', e); return null; }
 }
 function playGrandCelebration(item, onClosed){
+  // v156: a background gesture only -- fireworks + confetti cannons + sound + haptics + the usual small toast line. No card, nothing to tap
+  // or dismiss (the layer ignores touches, so whatever you are doing carries on), and it removes itself when the show is over.
   const reduced = prefersReducedMotion();
   const root = document.createElement('div');
-  root.className = 'grand-celeb';
-  root.setAttribute('role','dialog'); root.setAttribute('aria-modal','true'); root.setAttribute('aria-label', item.title||'Celebration');
-  root.innerHTML = `<canvas class="gc-canvas"></canvas>
-    <div class="gc-card"><div class="gc-rays"></div>
-      <div class="gc-medal"><span class="gc-ring"></span><span class="gc-ring r2"></span><span class="gc-icon"></span></div>
-      <div class="gc-kicker"></div><div class="gc-title"></div><div class="gc-sub"></div><div class="gc-chips"></div>
-      <button class="gc-btn" type="button"></button></div>`;
-  // Text goes in with textContent (chapter/task names can contain HTML characters).
-  root.querySelector('.gc-icon').textContent = item.icon || '🏆';
-  root.querySelector('.gc-kicker').textContent = item.kicker || '';
-  root.querySelector('.gc-title').textContent = item.title || 'Victory!';
-  root.querySelector('.gc-sub').textContent = item.sub || '';
-  const chips = root.querySelector('.gc-chips');
-  (item.chips||[]).forEach(c=>{ const e = document.createElement('span'); e.className='gc-chip'; e.textContent = c; chips.appendChild(e); });
-  if(!(item.chips||[]).length) chips.remove();
-  const btn = root.querySelector('.gc-btn'); btn.textContent = item.button || 'Keep going 💪';
+  root.className = 'grand-celeb'; root.setAttribute('aria-hidden','true');
+  root.innerHTML = '<canvas class="gc-canvas"></canvas>';
   document.body.appendChild(root);
   try{ if(navigator.vibrate && !reduced) navigator.vibrate([70,40,70,40,70,60,260]); }catch(e){}
   const audio = gcAudioStart(item.sound || (item.kind==='planner' ? 'planner' : 'target'));
+  // The one-line message (screen readers get it too, like any milestone toast).
+  const head = String(item.title||'Victory!'); const msg = head.charAt(0) + head.slice(1).toLowerCase() + (item.sub ? ' ' + item.sub : '');
+  showMilestoneToast(msg);
 
   let raf = 0, closed = false, autoTimer = 0, stopLaunch = false;
   const cv = root.querySelector('.gc-canvas'); let ctx = null, W = 0, H = 0;
@@ -2540,7 +2561,7 @@ function playGrandCelebration(item, onClosed){
     raf = requestAnimationFrame(frame);
     if(!ctx) return;
     const el = now - started;
-    if(!stopLaunch && el > nextRocket){ rocket(); nextRocket += rnd(260,520); if(el > 5200) stopLaunch = true; }
+    if(!stopLaunch && el > nextRocket){ rocket(); nextRocket += rnd(260,520); if(el > 4200) stopLaunch = true; }
     ctx.clearRect(0,0,W,H);
     for(let i=parts.length-1;i>=0;i--){
       const p = parts[i];
@@ -2558,32 +2579,20 @@ function playGrandCelebration(item, onClosed){
     }
     ctx.globalAlpha = 1;
     if(parts.length > 700) parts.splice(0, parts.length-700);
-    if(stopLaunch && !parts.length){ cancelAnimationFrame(raf); raf = 0; }
+    if(stopLaunch && !parts.length){ close(); }       // show over -> tidy up
   }
   if(ctx){
     cannon(0, 1); cannon(W, -1);
     setTimeout(()=>{ if(!closed && ctx){ cannon(0,1); cannon(W,-1); } }, 1400);
     raf = requestAnimationFrame(frame);
   }
-  const prevFocus = document.activeElement;
   function close(){
     if(closed) return; closed = true;
     clearTimeout(autoTimer); cancelAnimationFrame(raf);
-    document.removeEventListener('keydown', onKey, true); window.removeEventListener('popstate', close);
-    if(audio) audio.stop();
     root.classList.add('out');
-    setTimeout(()=>{ root.remove(); try{ if(prevFocus && prevFocus.focus) prevFocus.focus(); }catch(e){} if(onClosed) onClosed(); }, reduced ? 20 : 460);
+    setTimeout(()=>{ if(audio) audio.stop(); root.remove(); if(onClosed) onClosed(); }, reduced ? 20 : 600);
   }
-  function onKey(e){
-    if(e.key==='Escape' || e.key==='Enter' || e.key===' '){ e.preventDefault(); e.stopPropagation(); close(); }
-    else if(e.key==='Tab'){ e.preventDefault(); try{ btn.focus({preventScroll:true}); }catch(err){} }   // keep keyboard focus inside the dialog
-  }
-  document.addEventListener('keydown', onKey, true);
-  window.addEventListener('popstate', close); // phone-back while it is showing just closes it (the page behind navigates as usual)
-  root.addEventListener('click', close);
-  btn.addEventListener('click', e=>{ e.stopPropagation(); close(); });
-  setTimeout(()=>{ try{ btn.focus({preventScroll:true}); }catch(e){} }, 1500);
-  autoTimer = setTimeout(close, reduced ? 4500 : 9000);
+  autoTimer = setTimeout(close, reduced ? 3200 : 8000);   // safety net (e.g. a hidden tab pauses the animation frames)
 }
 // Queue a grand celebration (plays next, ahead of any waiting small toasts; one of each kind at a time).
 function celebrateGrand(item){
@@ -3530,7 +3539,7 @@ function buildDefaultShared(){
   return { examDate:'2027-05-02', papers, logs, targets, chapters, lectures, mockScores, notes, tasks, questions:[], qStats:{}, mcqScenarios:{}, mcqSeeds:{}, chat,
     profileInfo, timerState, dailyTargetOverride, prefs, celebratedMilestones, pushSubscriptions, pushState, pushPrefs, habits, habitLog,
     money:{ __nativeSchema:true, settings:{}, invoices:[], transactions:[], deleted:{} }, adminAnnouncement:'', dailyQuote:{}, diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget,
-    milestoneTargets, dailyChallenges, dcState };
+    milestoneTargets, dailyChallenges, dcState, challenges:{ umang:{list:[]}, chetna:{list:[]} } };
 }
 // Umang and Chetna each have their own real Indirect Tax lecture schedule (different lecturers,
 // different numbering) — kept as two separate source lists rather than one shared default.
@@ -3562,7 +3571,7 @@ function freshDtLectures(profileId){
 }
 function buildDefaultLocal(){
   return { myProfile:null, palette:null, dark:true, skipIntro:false,
-    notifPrefs:{lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true, weekly:true},
+    notifPrefs:{lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true, weekly:true, challenges:true},
     celebratedMilestones:{}, allowedEmails:[], dismissedNotifs:{},
     bgTheme:'snow', lastArchiveSweepDate:null, lastTaskRolloverDate:null, pushedNotifDate:null, pushedNotifKeys:{} };
 }
@@ -3790,6 +3799,11 @@ function migrateShared(data){
   // Purely additive — never touches any existing key.
   if(!data.dailyChallenges) data.dailyChallenges = {};
   if(!data.dcState) data.dcState = {};
+  // v157: the rebuilt Challenges feature keeps its records here (old dailyChallenges/dcState above are left in place, no longer used).
+  if(!data.challenges) data.challenges = {};
+  PROFILES.forEach(p=>{
+    if(!data.challenges[p.id] || !Array.isArray(data.challenges[p.id].list)) data.challenges[p.id] = { list: [] };
+  });
   PROFILES.forEach(p=>{
     if(!data.dailyChallenges[p.id]) data.dailyChallenges[p.id] = { defs: [], log: {} };
     if(!data.dailyChallenges[p.id].defs) data.dailyChallenges[p.id].defs = [];
@@ -4022,7 +4036,8 @@ async function loadLocal(){
     const res = await storageGet('olympusLocal', false);
     if(res && res.value){
       const parsed = JSON.parse(res.value);
-      if(!parsed.notifPrefs) parsed.notifPrefs = {lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true, weekly:true};
+      if(!parsed.notifPrefs) parsed.notifPrefs = {lectures:true, revision:true, examCountdown:true, dailyTarget:true, countdownNag:true, targets:true, diary:true, weekly:true, challenges:true};
+      if(parsed.notifPrefs.challenges===undefined) parsed.notifPrefs.challenges = true;
       if(parsed.notifPrefs.countdownNag===undefined) parsed.notifPrefs.countdownNag = true;
       if(parsed.notifPrefs.targets===undefined) parsed.notifPrefs.targets = true;
       if(parsed.notifPrefs.diary===undefined) parsed.notifPrefs.diary = true;
@@ -10766,6 +10781,7 @@ function onPartnerTimerChanged(){
   const me = S.local && S.local.myProfile; if(!me) return;
   const info = otherLiveStatusInfo(otherProfileId(me));
   if(info.state==='studying' || info.state==='break') startTimerTick();
+  else postToSw({ type:'CLOSE_TAG', tag:'olympus-session-start-'+otherProfileId(me) }); // v160: their session ended -- its "started studying" notification is stale now
   if(S.view==='home' || S.view==='timer') renderApp();
 }
 // The shared file is one blob that each phone reads, then re-uploads whole. If the partner's phone reads it just BEFORE
@@ -10826,6 +10842,7 @@ function pushOwnHeartbeat(now){
 }
 document.addEventListener('visibilitychange', ()=>{
   if(!(S.appSession && S.local && S.local.myProfile)) return;
+  if(!document.hidden) postToSw({ type:'CLOSE_TAG', tag:'olympus-session-start-'+otherProfileId(S.local.myProfile) }); // v160: she is looking at the app now
   // Leaving: send one last "still going" stamp before the browser freezes the page. Returning: send a fresh one
   // and pull the partner's latest straight away.
   pushOwnHeartbeat(document.hidden);
@@ -10862,7 +10879,7 @@ function chatStatusInfo(otherId){
 const SINGLE_OWNER_SHARED_KEYS = ['logs','targets','chapters','lectures','mockScores','tasks',
   'profileInfo','dailyTargetOverride','prefs','celebratedMilestones','habits','habitLog',
   'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','dailyQuote','pushSubscriptions','pushPrefs',
-  'diaryMood','diaryReflections','dailyChallenges','dcState','frChaptersLegacy'];
+  'diaryMood','diaryReflections','dailyChallenges','dcState','frChaptersLegacy','challenges'];
 // v150: frChaptersLegacy (the pre-Ind AS-wise FR chapter list, kept as a backup per profile) is each person's own slice too.
 // v136: the Diary's reflections (and the mistakes log inside them) and the daily-challenge records are each person's own too, but were
 // never registered here, so a partner's save made from a stale copy could roll back a diary entry you had just written, and her diary
@@ -11383,6 +11400,7 @@ function applyPendingOpenFromUrl(){
   try{
     const params = new URLSearchParams(location.search);
     if(params.get('go') === 'stats'){ history.replaceState(null, '', location.pathname); openWeeklyReview(); return; }
+    if(params.get('go') === 'challenges'){ history.replaceState(null, '', location.pathname); if(!S.dcPopupOpen) openDailyChallengesPopup(); return; }
     if(params.get('open') !== 'chat') return;
     history.replaceState(null, '', location.pathname);
     openChatFromNotification();
@@ -12856,6 +12874,10 @@ function computeNotifications(profileId){
       out.push({id:'diary-yesterday', type:'warn', ic:'diary', title:"Yesterday's diary was never filled", text:'Close Day for it from the Diary tab whenever you get a moment.'});
     }
   }
+  if(prefs.challenges!==false && S.local && profileId===S.local.myProfile){
+    const cn = chlEveningNotification(profileId);
+    if(cn) out.push(cn);
+  }
   if(prefs.weekly!==false){
     const wn = weeklyReviewNotification(profileId);
     if(wn) out.push(wn);
@@ -12917,7 +12939,7 @@ function escalateNotifsToPush(notifs){
     if(S.local.pushedNotifKeys[n.key]) return;
     S.local.pushedNotifKeys[n.key] = true;
     changed = true;
-    fireLocalPushNotification(n.title, n.text, {tag:n.tag || ('olympus-notif-'+n.key), requireInteraction:true, data:{url:n.act?'./?go=stats':'./', go:n.act?'stats':undefined}});
+    fireLocalPushNotification(n.title, n.text, {tag:n.tag || ('olympus-notif-'+n.key), requireInteraction:true, data:{url:n.go?('./?go='+n.go):n.act?'./?go=stats':'./', go:n.go||(n.act?'stats':undefined)}});
   });
   if(changed) saveLocal();
 }
@@ -13026,7 +13048,15 @@ function timerStart(paperId, category, itemId, itemLabel, countdownTargetMs){
   updateTimerNotification(S.shared.timerState[me]);
   // v122: the push used to fire immediately, racing the Drive write -- the partner's phone buzzed, opened the app, read Drive
   // BEFORE the running state had landed and showed 'last session ended...'. Now it waits for the save (capped at 12s).
-  Promise.race([Promise.resolve(_startSave).catch(()=>{}), new Promise(r=>setTimeout(r,12000))]).then(()=>notifyPartnerSessionStarted(me));
+  Promise.race([Promise.resolve(_startSave).catch(()=>{}), new Promise(r=>setTimeout(r,12000))]).then(()=>notifyPartnerSessionStarted(me, now));
+  // v160: the running-timer notification only appears once the browser has been given permission -- and this never asks. Say so once, instead of
+  // leaving the person wondering why nothing shows in the notification shade.
+  try{
+    if('Notification' in window && Notification.permission==='default' && S.local && !S.local.timerNotifHint){
+      S.local.timerNotifHint = 1; saveLocal();
+      showToast('Tip: turn on notifications in Settings to see this timer in your notification shade.');
+    }
+  }catch(e){}
 }
 function timerPause(){
   const ts = myLiveStatus();
@@ -13330,6 +13360,10 @@ function timerTickBody(){
     if(nowMs - _lastLiveTargetCheck >= 5000){
       _lastLiveTargetCheck = nowMs;
       if(!celebStamped('target', me) && checkDailyTargetForPush(me, true)) checkMinHoursCelebration(me, true);
+      // v157: live crossing of a study challenge's goal; an open Challenges screen also shows its ring/bar moving (not while a form is open).
+      const _cc = chlSync(me);
+      if(S.dcPopupOpen){ if(!S._chSheet) renderDailyChallengesPopup(); }
+      else if(_cc && S.view==='home') renderApp();
     }
   }
   if(!anyActive) stopTimerTick();
@@ -14846,6 +14880,7 @@ function addLogEntry(profileId, entry){
   checkAchievementBadges(profileId);
   const _hitTarget = checkDailyTargetForPush(profileId);
   checkMinHoursCelebration(profileId, _hitTarget);
+  chlSyncSoon();   // v157: study-based challenges count the new log
 }
 function addLog(profileId){
   const date = document.getElementById('lg-date')?.value || todayStr();
@@ -18440,6 +18475,8 @@ function settingsSectionNotifications(){
     ${pushPrefToggleRow('sessionStarted', '⏱ Timer — partner started studying')}
     ${pushPrefToggleRow('nudge', '👋 Timer — partner nudged you')}
     ${pushPrefToggleRow('targetHit', '🎯 Partner hit their daily target')}
+    ${pushPrefToggleRow('challenge', '🏆 Partner starts or wins a challenge')}
+    ${pushPrefToggleRow('challengeReminder', '🏁 My challenges (morning kick-off + evening nudge)')}
     ${pushPrefToggleRow('newMessage', '💬 New chat message')}
     ${pushPrefToggleRow('habitReminder', '✅ Habit reminders (evening + time-linked)')}
     ${pushPrefToggleRow('diaryReminder', '📔 Diary reminder (morning if yesterday is open, 9 PM for today)')}
@@ -18453,6 +18490,7 @@ function settingsSectionNotifications(){
     ${notifToggleRow('dailyTarget', "🎯 Today's target reminder")}
     ${notifToggleRow('targets', '📅 Target deadline alerts')}
     ${notifToggleRow('diary', '📔 Diary not filled (today/yesterday)')}
+    ${notifToggleRow('challenges', '🏁 Challenges still open today (evening)')}
     ${notifToggleRow('weekly', '📊 Monday: review last week’s statistics')}
     ${notifToggleRow('examCountdown', '⏳ Countdown — exam milestone banners')}
     ${notifToggleRow('countdownNag', '⏳ Countdown — paused 5+ min nag')}
@@ -18579,7 +18617,7 @@ const HOME_KPIS = [
   {key:'timer',     label:'Study timer shortcut',      ownOnly:true},
   {key:'partner',   label:"Partner's live status",     ownOnly:true},
   {key:'countdown', label:"Exam countdown & today's target"},
-  {key:'habits',    label:'Daily Challenges',          ownOnly:true},
+  {key:'habits',    label:'Challenges',                ownOnly:true},
   {key:'targets',   label:'Targets needing attention'},
   {key:'features',  label:'Features shortcuts'},
   {key:'papers',    label:'Papers'},
@@ -18651,7 +18689,7 @@ function settingsSectionDisplay(){
     <div style="padding:10px 14px 14px"><button class="btn" style="width:100%" onclick="resetHomeLayout()">Reset Home to default</button></div>
   </div>
   <div class="card settings-group" style="margin-top:12px">
-    <div style="padding:12px 14px 0"><div class="settings-row-lbl" style="font-weight:700">Celebrations</div><div class="settings-row-sub">The victory screen when you hit your daily target or clear your planner. This setting is for this device only.</div></div>
+    <div style="padding:12px 14px 0"><div class="settings-row-lbl" style="font-weight:700">Celebrations</div><div class="settings-row-sub">Fireworks, confetti and sound over the app when you hit your daily target or clear your planner. The sound setting is for this device only.</div></div>
     <div style="padding:0 14px">
       <div class="settings-row"><div><div class="settings-row-lbl">Celebration sound</div><div class="settings-row-sub">Fanfare, cheer and fireworks</div></div>
         <div class="toggle ${celebSoundOn()?'on':''}" onclick="toggleCelebSound()" role="switch" aria-checked="${celebSoundOn()}" aria-label="Celebration sound"></div></div>
@@ -20384,8 +20422,18 @@ function updateTimerNotification(ts, forceStatic){
   postStaticTimerNotification(ts); // always shown immediately as the reliable baseline — see note below
   if(!forceStatic) syncMediaSessionTimer(ts); // enhancement only now: clears the static one itself once/if it actually confirms success (was previously gating the static notification on this succeeding *synchronously*, before its underlying play() promise had even settled — which is what let a pending/rejecting play() suppress the only notification for an indefinite stretch, see syncMediaSessionTimer())
 }
+// v160: the page only has a service-worker "controller" after the SW has claimed it -- not on the very first visit after an install/update and
+// not after a hard refresh. postMessage to navigator.serviceWorker.controller silently did nothing then, so the running-timer notification never
+// appeared for that whole page lifetime. The registration's active worker is always reachable, so use it when there is no controller.
+function postToSw(msg){
+  try{
+    if(!('serviceWorker' in navigator)) return;
+    if(navigator.serviceWorker.controller){ navigator.serviceWorker.controller.postMessage(msg); return; }
+    navigator.serviceWorker.ready.then(reg=>{ if(reg && reg.active) reg.active.postMessage(msg); }).catch(()=>{});
+  }catch(e){}
+}
 function postStaticTimerNotification(ts){
-  if(!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+  if(!('serviceWorker' in navigator)) return;
   let title, body;
   if(ts.status==='running'){
     title = ts.countdownTargetMs>0 ? 'Strict Countdown Active' : 'Session Active';
@@ -20396,15 +20444,14 @@ function postStaticTimerNotification(ts){
   } else {
     return; // idle — nothing to show; clearTimerNotification() is the explicit path for that
   }
-  navigator.serviceWorker.controller.postMessage({ type:'TIMER_NOTIFY', title, body });
+  postToSw({ type:'TIMER_NOTIFY', title, body });
 }
 // skipMediaSession: internal use only (see updateTimerNotification() above, which passes
 // true when it's already synced the media session itself — no reason to stop-then-
 // immediately-restart it on every single pause/resume).
 function clearTimerNotification(skipMediaSession){
   if(!skipMediaSession) stopMediaSessionTimer();
-  if(!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
-  navigator.serviceWorker.controller.postMessage({ type:'TIMER_NOTIFY_CLEAR' });
+  postToSw({ type:'TIMER_NOTIFY_CLEAR' });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -20515,6 +20562,7 @@ if('serviceWorker' in navigator){
       openChatFromNotification(); // tapped a chat notification
     } else if(d.type==='OPEN_GO'){
       if(d.go==='stats') openWeeklyReview(); // tapped the Monday review notification
+      else if(d.go==='challenges' && !S.dcPopupOpen && S.local && S.local.myProfile) openDailyChallengesPopup(); // tapped a challenge reminder
     } else if(d.type==='PUSH_RECEIVED'){
       const kind = d.payload && d.payload.data && d.payload.data.kind;
       // v128: a chat push used to call pollChatUpdates(), which does nothing unless the chat is the open screen -- so a message that
@@ -20802,12 +20850,24 @@ function nudgePartner(){
   const prof = profileById(me);
   sendPush(other, `👋 ${prof.nick} is nudging you!`, 'Tap to open Olympus.', {url:'./'}, {urgency:'high', ttl:3600});
 }
-function notifyPartnerSessionStarted(me){
+// v160: (1) the push waits for the Drive save (up to 12 s), so by then the session may already be stopped or replaced -- the partner used to get
+// "started studying" for a timer that no longer existed; it now goes out only if THIS session (same startTime) is still running. (2) Stopping and
+// restarting within 10 minutes used to buzz her again every time; one start push per 10 minutes. (3) The body says what is being studied, and the
+// push carries a tag so a newer one replaces the old notification instead of stacking (sw.js also drops it once she is in the app).
+const SESSION_START_PUSH_GAP_MS = 10*60*1000;
+function notifyPartnerSessionStarted(me, startedAt){
   if(me==='umang' && umangHasBlocked()) return; // his activity stays hidden from her, pushes included
+  const ts = S.shared.timerState && S.shared.timerState[me];
+  if(startedAt && !(ts && ts.startTime===startedAt && (ts.status==='running' || ts.status==='break'))) return; // already stopped or replaced
   const other = otherProfileId(me);
   if(!pushPrefEnabled(other, 'sessionStarted')) return;
+  const last = (S.local && S.local.lastStartPushAt) || 0;
+  if(Date.now() - last < SESSION_START_PUSH_GAP_MS) return;
+  if(S.local){ S.local.lastStartPushAt = Date.now(); saveLocal(); }
   const prof = profileById(me);
-  sendPush(other, `⏱ ${prof.nick} started studying`, 'Their timer is live now.', {url:'./'}, {urgency:'high', ttl:900});
+  const what = ts ? compactTimerSubject(ts) : '';
+  sendPush(other, `⏱ ${prof.nick} started studying`, what ? `${what} — timer is live now.` : 'Their timer is live now.',
+    {url:'./', kind:'session', tag:'olympus-session-start-'+me, from:me, ts:Date.now()}, {urgency:'high', ttl:900});
 }
 // Called from addLogEntry() — the single write-point for both timer-completed sessions and
 // manual Planner log entries, so this catches a target crossed either way. Dedupes per
@@ -20861,6 +20921,7 @@ function checkDailyTargetForPush(profileId, live){
 // Called after a task is completed, from any route (Planner tick, status menu, a lecture/chapter ticked elsewhere, Diary learning).
 function checkPlannerDayCelebration(profileId){
   if(!profileId || !S.local || profileId !== S.local.myProfile) return false;
+  chlSyncSoon();   // v157: a 'Clear the Plan' challenge may have just been met
   const today = todayStr();
   const tasks = manualTasksFor(profileId).filter(t=>t.date===today);
   if(!tasks.length || tasks.some(t=>!t.done)) return false;
@@ -20912,323 +20973,440 @@ function notifyPartnerNewMessage(me, text, mid){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DAILY CHALLENGES — personal daily habit & discipline system.
-// Architecture mirrors the Habits overlay (private per-profile, own full-screen
-// root, same history checkpoint pattern). Reads study hours from the existing
-// timer/log system — never creates a parallel study tracker.
+// CHALLENGES (v157 — rebuilt from scratch; replaces the old XP / levels / "perfect day" habit checklist).
+// A challenge is a short run (3 / 7 / 14 / 21 days) with a finish line and a trophy at the end. Study-based ones track themselves from the
+// logs, the daily target and the Planner (nothing to tick); the rest are a one-tap daily check-in. Rest days make one slip survivable (a
+// rigid "miss one day = back to zero" rule is what makes people quit), and the partner can run the same challenge and see each other's
+// progress. Data: S.shared.challenges[profileId].list (single-owner key). The old dailyChallenges / dcState records are left untouched.
 // ═══════════════════════════════════════════════════════════════════════════
-
-// ── Default challenge definitions (seeded once per profile on first open) ──
-const DC_DEFAULTS = [
-  {id:'dc-wake-up',  name:'Wake Up On Time',  icon:'🌅', desc:'Wake up before 6:30 AM',          type:'boolean',     xp:20, enabled:true,  targetValue:'06:30', unit:'time'},
-  {id:'dc-study',    name:'Deep Study',        icon:'📚', desc:'Study for 6 hours',                type:'study-hours', xp:50, enabled:true,  targetValue:6,       unit:'hours'},
-  {id:'dc-no-junk',  name:'Fast Food Detox',   icon:'🚫', desc:'No fast food today',               type:'boolean',     xp:40, enabled:true,  targetValue:null,    unit:''},
-  {id:'dc-exercise', name:'Exercise',           icon:'🏃', desc:'Exercise for 30 minutes',          type:'boolean',     xp:35, enabled:true,  targetValue:30,      unit:'min'},
-  {id:'dc-water',    name:'Hydration',          icon:'💧', desc:'Drink 8 glasses of water',         type:'boolean',     xp:10, enabled:true,  targetValue:8,       unit:'glasses'},
-  {id:'dc-read',     name:'Reading',            icon:'📖', desc:'Read for 20 minutes',              type:'boolean',     xp:20, enabled:false, targetValue:20,      unit:'min'},
-  {id:'dc-social',   name:'Limit Social Media', icon:'📱', desc:'Keep social media under 30 min',  type:'boolean',     xp:20, enabled:false, targetValue:null,    unit:''},
-  {id:'dc-sleep',    name:'Early Sleep',        icon:'😴', desc:'Sleep before 11 PM',              type:'boolean',     xp:20, enabled:false, targetValue:'23:00', unit:'time'},
-  {id:'dc-meditate', name:'Meditation',         icon:'🧘', desc:'Meditate for 10 minutes',         type:'boolean',     xp:20, enabled:false, targetValue:10,      unit:'min'},
+const CHL_MAX_ACTIVE = 3;
+const CHL_DURS = [3, 7, 14, 21];
+const CHL_TPLS = [
+  {id:'hours',    icon:'🔥', name:'Study Streak',   kind:'hours',    goal:6, goalOpts:[4,5,6,7,8], goalLbl:'Hours every day', blurb:'Study a set number of hours every day', days:7, c1:'#FF8A3D', c2:'#FF4D6D', open:true,  cueEx:'e.g. First session right after breakfast', rec:true},
+  {id:'target',   icon:'🎯', name:'Hit Your Target', kind:'target',  blurb:'Reach your daily study target, every day', days:7, c1:'#4D9BFF', c2:'#7C5CFF', open:true, cueEx:'e.g. Start by 8 AM, finish before dinner'},
+  {id:'plan',     icon:'✅', name:'Clear the Plan', kind:'plan',     blurb:'Finish every Planner task, every day', days:7, c1:'#22D3A0', c2:'#1FA2FF', open:true, cueEx:'e.g. Plan tomorrow at 9 PM tonight'},
+  {id:'sessions', icon:'⚡', name:'Deep Work',      kind:'sessions', goal:3, goalOpts:[2,3,4,5], goalLbl:'Study sessions a day', blurb:'Log several focused sessions daily', days:7, c1:'#FFC93C', c2:'#FF8A3D', open:true, cueEx:'e.g. Morning, afternoon and evening block'},
+  {id:'early',    icon:'🌅', name:'Early Bird',     kind:'manual',   blurb:'Up before 6:30 AM', days:7, c1:'#FFB86B', c2:'#FF6B9D', open:false, cueEx:'e.g. Alarm across the room, water first'},
+  {id:'move',     icon:'🏃', name:'Move Daily',     kind:'manual',   blurb:'30 minutes of exercise', days:7, c1:'#FF6B6B', c2:'#FF9F43', open:false, cueEx:'e.g. After the evening tea'},
+  {id:'clean',    icon:'🥗', name:'Clean Eating',   kind:'manual',   blurb:'No junk food today', days:7, c1:'#7BE495', c2:'#2FB67C', open:false, cueEx:'e.g. Pack lunch the night before'},
+  {id:'sleep',    icon:'😴', name:'Early Sleep',    kind:'manual',   blurb:'Lights out before 11 PM', days:7, c1:'#8C9BFF', c2:'#5A4FCF', open:false, cueEx:'e.g. Phone on charge at 10:30 PM'},
+  {id:'detox',    icon:'📵', name:'Phone Detox',    kind:'manual',   blurb:'Social media under 30 minutes', days:7, c1:'#5EE7DF', c2:'#9B8CE8', open:false, cueEx:'e.g. Apps locked during study hours'},
+  {id:'water',    icon:'💧', name:'Hydrate',        kind:'manual',   blurb:'8 glasses of water', days:7, c1:'#4FC3F7', c2:'#2979FF', open:false, cueEx:'e.g. A glass at every break'},
+  {id:'custom',   icon:'✨', name:'My Own',         kind:'manual',   blurb:'Make up your own daily habit', days:7, c1:'#B06CFF', c2:'#FF6BCB', open:false, cueEx:'e.g. After dinner', custom:true},
 ];
-const DC_XP_TIERS = { easy:10, medium:20, hard:35, major:50, perfect:100 };
-const DC_LEVEL_THRESHOLDS = [0,100,250,500,850,1300,1900,2700,3700,5000];
+const CHL_ICONS = ['🎯','📚','🧠','📝','🏋️','🧘','🎧','✍️','🌙','🍎'];
 
-// ── Accessor helpers ────────────────────────────────────────────────────────
-function dcDefs(profileId){
-  if(!S.shared.dailyChallenges) S.shared.dailyChallenges = {};
-  if(!S.shared.dailyChallenges[profileId]) S.shared.dailyChallenges[profileId] = {defs:[],log:{}};
-  const store = S.shared.dailyChallenges[profileId];
-  // Seed defaults exactly once — use a `seeded` flag, NOT a length check.
-  // A length check would re-seed if the user deliberately deleted all challenges.
-  if(!store.seeded){
-    store.defs   = DC_DEFAULTS.map(d=>Object.assign({}, d));
-    store.seeded = true;
-    saveShared();
+// ── data access ─────────────────────────────────────────────────────────────
+function chlList(p){
+  if(!S.shared.challenges) S.shared.challenges = {};
+  if(!S.shared.challenges[p]) S.shared.challenges[p] = {list:[]};
+  if(!Array.isArray(S.shared.challenges[p].list)) S.shared.challenges[p].list = [];
+  return S.shared.challenges[p].list;
+}
+function chlTpl(id){ return CHL_TPLS.find(t=>t.id===id) || CHL_TPLS[CHL_TPLS.length-1]; }
+function chlAddDays(ds, n){ const d = new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return localDateStr(d); }
+function chlRestFor(days, strict){ return strict ? 0 : (days>=21 ? 3 : days>=14 ? 2 : days>=7 ? 1 : 0); }
+function chlSameKind(a, b){ return a.tpl===b.tpl && (a.tpl!=='custom' || String(a.name).trim().toLowerCase()===String(b.name).trim().toLowerCase()); }
+function chlGoalText(ch){
+  if(ch.kind==='hours')    return `Study ${gcHM(Number(ch.goal)||0)} every day`;
+  if(ch.kind==='target')   return 'Reach your daily study target';
+  if(ch.kind==='plan')     return 'Finish every Planner task';
+  if(ch.kind==='sessions') return `${ch.goal}+ study sessions a day`;
+  return ch.blurb || 'Check in once a day';
+}
+
+// ── evaluation (pure — never writes) ────────────────────────────────────────
+// Per-day totals (hours, sessions, planner tasks) are bucketed ONCE per profile and reused by every challenge/day evaluated in the same
+// pass, instead of re-scanning every log for every day of every challenge on every render and every 5-second timer tick. The bucket is
+// dropped after the current task (microtask) and also whenever the number of logs / tasks / done tasks changes, so it can't go stale.
+let _chlMemo = null;
+function chlMemo(p){
+  const L = logsFor(p), T = manualTasksFor(p);
+  let done = 0; for(let i=0;i<T.length;i++) if(T[i].done) done++;
+  const sig = L.length + ':' + T.length + ':' + done;
+  if(!_chlMemo){ _chlMemo = {}; Promise.resolve().then(()=>{ _chlMemo = null; }); }
+  const m = _chlMemo[p];
+  if(m && m.sig === sig) return m;
+  const h = {}, n = {}, tk = {};
+  for(let i=0;i<L.length;i++){ const l = L[i]; const v = Number(l.hours); h[l.date] = (h[l.date]||0) + (Number.isFinite(v) ? v : 0); n[l.date] = (n[l.date]||0) + 1; }
+  for(let i=0;i<T.length;i++){ const t = T[i]; if(!t.date) continue; const o = tk[t.date] || (tk[t.date] = {n:0, d:0}); o.n++; if(t.done) o.d++; }
+  return (_chlMemo[p] = {sig, h, n, tk});
+}
+function chlAutoHit(p, ch, date){
+  const isToday = date === todayStr();
+  if(ch.kind==='hours' || ch.kind==='target'){
+    const h = isToday ? todayHoursLive(p) : (chlMemo(p).h[date] || 0);
+    const g = ch.kind==='hours' ? (Number(ch.goal)||0) : (isToday ? effectiveTodayTarget(p) : (S.shared.targets && S.shared.targets[p]) || 4);
+    return h >= g - 0.005;
   }
-  return store.defs;
+  if(ch.kind==='plan'){
+    const o = chlMemo(p).tk[date];
+    return !!o && o.n > 0 && o.d === o.n;
+  }
+  if(ch.kind==='sessions'){
+    const n = isToday ? liveSessionsOnDate(p, date) : (chlMemo(p).n[date] || 0);
+    return n >= (Number(ch.goal)||1);
+  }
+  return false;
 }
-function dcActiveDefs(profileId){ return dcDefs(profileId).filter(d=>d.enabled!==false); }
-function dcDayLog(profileId, dateStr){
-  if(!S.shared.dailyChallenges) S.shared.dailyChallenges = {};
-  if(!S.shared.dailyChallenges[profileId]) S.shared.dailyChallenges[profileId] = {defs:[],log:{}};
-  const store = S.shared.dailyChallenges[profileId];
-  if(!store.log[dateStr]) store.log[dateStr] = {states:{}, perfectDayAwarded:false, streakUpdated:false};
-  return store.log[dateStr];
+function chlEval(p, ch){
+  const today = todayStr(), n = ch.days;
+  const days = []; let hits = 0, misses = 0;
+  for(let i=0;i<n;i++){
+    const date = chlAddDays(ch.start, i);
+    const hit = date<=today && (!!(ch.res && ch.res[date]) || (ch.kind!=='manual' && chlAutoHit(p, ch, date)));
+    let state;
+    if(date > today) state = 'future';
+    else if(hit)     state = 'hit';
+    else if(date===today) state = 'today';
+    else state = 'miss';
+    if(state==='hit') hits++;
+    if(state==='miss') misses++;
+    days.push({date, state});
+  }
+  const rest = ch.rest|0, need = n - rest;
+  const dayNo = Math.max(1, Math.min(n, Math.round((new Date(today+'T00:00:00') - new Date(ch.start+'T00:00:00'))/864e5) + 1));
+  const lastDate = days[n-1].date;
+  const todayHit = days.some(d=>d.date===today && d.state==='hit');
+  let status = ch.status || 'active';
+  if(status==='active'){
+    if(misses > rest) status = 'ended';
+    else if(today > lastDate) status = hits >= need ? 'won' : 'ended';
+    else if(today === lastDate && todayHit && hits >= need) status = 'won';
+  }
+  return {days, hits, misses, rest, need, restLeft:Math.max(0, rest-misses), dayNo, status, todayHit};
 }
-// Safe read-only accessor — returns the log without creating it (for weekly summary etc.)
-function dcDayLogRO(profileId, dateStr){
-  return S.shared.dailyChallenges?.[profileId]?.log?.[dateStr] || null;
-}
-function dcGetState(profileId){
-  // FIX: always return the live object from S.shared so writes persist
-  if(!S.shared.dcState) S.shared.dcState = {};
-  if(!S.shared.dcState[profileId]) S.shared.dcState[profileId] = {xp:0, streakCount:0, lastStreakDate:null};
-  return S.shared.dcState[profileId];
-}
-function dcLevel(xp){
-  for(let i=DC_LEVEL_THRESHOLDS.length-1;i>=0;i--){ if(xp>=DC_LEVEL_THRESHOLDS[i]) return i+1; }
-  return 1;
-}
-function dcNextLevelXP(xp){
-  const lvl = dcLevel(xp);
-  return lvl < DC_LEVEL_THRESHOLDS.length ? DC_LEVEL_THRESHOLDS[lvl] : DC_LEVEL_THRESHOLDS[DC_LEVEL_THRESHOLDS.length-1];
-}
-function dcPrevLevelXP(xp){
-  const lvl = dcLevel(xp);
-  return DC_LEVEL_THRESHOLDS[Math.max(0, lvl-1)];
+// Today's progress for the ring / bar: {frac 0..1, label, hit}
+function chlToday(p, ch, ev){
+  const hit = ev.todayHit;
+  if(ch.kind==='hours' || ch.kind==='target'){
+    const h = todayHoursLive(p);
+    const g = ch.kind==='hours' ? (Number(ch.goal)||1) : effectiveTodayTarget(p);
+    return {frac:Math.min(1, h/g), hit, label:`${gcHM(h)} of ${gcHM(g)}`, left: h>=g ? '' : `${gcHM(g-h)} to go`};
+  }
+  if(ch.kind==='plan'){
+    const ts = manualTasksFor(p).filter(t=>t.date===todayStr()), d = ts.filter(t=>t.done).length;
+    return {frac: ts.length ? d/ts.length : 0, hit, label: ts.length ? `${d} of ${ts.length} tasks done` : 'No tasks planned yet', left: ts.length ? '' : 'Add tasks in Planner'};
+  }
+  if(ch.kind==='sessions'){
+    const n = liveSessionsOnDate(p, todayStr()), g = Number(ch.goal)||1;
+    return {frac:Math.min(1, n/g), hit, label:`${n} of ${g} sessions`, left: n>=g ? '' : `${g-n} more to go`};
+  }
+  return {frac: hit?1:0, hit, label: hit ? 'Done today' : 'Not done yet', left:''};
 }
 
-// ── Study-hours progress for a challenge ──
-function dcStudyProgress(profileId, dateStr, targetHours){
-  const done = hoursOnDate(profileId, dateStr);
-  const pct  = Math.min(100, Math.round((done / Math.max(0.01, targetHours)) * 100));
-  return { done, target: targetHours, pct };
-}
-
-// ── Central progress refresh — derives auto-progress from existing data ──
-// Called on every render so study-hours challenges stay live without a tap.
-function refreshDailyChallengeProgress(profileId){
-  const dateStr = todayStr();
-  const defs    = dcActiveDefs(profileId);
-  const log     = dcDayLog(profileId, dateStr);
-  if(!log) return;
-  let changed = false;
-  defs.forEach(def=>{
-    if(def.type === 'study-hours'){
-      const sp = dcStudyProgress(profileId, dateStr, def.targetValue || 6);
-      if(!log.states[def.id]) log.states[def.id] = {};
-      const st = log.states[def.id];
-      if(sp.pct >= 100 && !st.completed){
-        // Target hit — auto-complete
-        st.completed  = true;
-        st.completedAt = nowISO();
-        if(!st.xpAwarded){
-          st.xpAwarded = true;
-          _dcAwardXP(profileId, def.xp || 50);
-          changed = true;
-        }
-        changed = true;
-      } else if(sp.pct < 100 && st.completed && !st.manuallyCompleted){
-        // Hours dropped back below target (e.g. log deleted) — un-complete
-        if(st.xpAwarded){
-          _dcAwardXP(profileId, -(def.xp || 50));
-          st.xpAwarded = false;
-        }
-        st.completed   = false;
-        st.completedAt = null;
-        changed = true;
-      }
+// ── persistence of results + celebrations (own profile only) ────────────────
+function chlSync(p){
+  if(!p || !S.local || p !== S.local.myProfile) return false;
+  const today = todayStr(); let changed = false;
+  chlList(p).forEach(ch=>{
+    if(ch.status !== 'active') return;
+    const ev = chlEval(p, ch);
+    if(!ch.res) ch.res = {};
+    if(!ch.cel) ch.cel = {};
+    // Freeze finished days so later edits to old logs can't change a result already earned or missed.
+    ev.days.forEach(d=>{ if(d.state==='hit' && d.date<today && !ch.res[d.date]){ ch.res[d.date] = 1; changed = true; } });
+    if(ev.status === 'active'){
+      if(ev.todayHit && !ch.cel[today]){ ch.cel[today] = 1; changed = true; chlDayCelebrate(ch, ev); }
+    } else {
+      ch.status = ev.status; ch.endedOn = today; ch.hits = ev.hits; changed = true;
+      if(ev.status==='won') chlWinCelebrate(p, ch, ev);
     }
   });
-  if(changed){ _dcCheckPerfectDay(profileId, dateStr); saveShared(); }
+  if(changed) saveShared();
+  return changed;
 }
-
-// ── Award XP — clamps to 0 so it can never go negative ──
-function _dcAwardXP(profileId, amount){
-  const st = dcGetState(profileId);
-  st.xp = Math.max(0, (st.xp || 0) + amount);
+let _chlT = 0;
+function chlSyncSoon(){
+  clearTimeout(_chlT);
+  _chlT = setTimeout(()=>{
+    const me = S.local && S.local.myProfile; if(!me) return;
+    if(chlSync(me)){ if(S.dcPopupOpen) renderDailyChallengesPopup(); else renderApp(); }   // closing the overlay redraws the page behind it anyway
+  }, 250);
 }
-
-// ── Challenge streak ─────────────────────────────────────────────────────────
-// A day qualifies when ≥75% of active challenges are completed.
-// Called after every completion so the streak updates on the same render,
-// not only after a Perfect Day. Guarded by `streakUpdated` so it fires once
-// per qualifying day regardless of how many times a challenge is tapped.
-// IMPORTANT: non-qualifying days must NOT set streakUpdated — if they did,
-// a later completion on the same day that reaches 75% would be silently blocked.
-function _dcUpdateStreak(profileId, dateStr){
-  const st  = dcGetState(profileId); // live reference, never a detached copy
-  const log = dcDayLog(profileId, dateStr);
-  if(!log || log.streakUpdated) return; // already counted today — skip
-
-  const defs      = dcActiveDefs(profileId);
-  const completed = defs.filter(d=>log.states[d.id]?.completed).length;
-  const threshold = Math.ceil(defs.length * 0.75);
-  const qualifies = defs.length > 0 && completed >= threshold;
-
-  if(!qualifies) return; // not enough done yet — leave streakUpdated false so we can recheck
-
-  const yesterday = new Date(dateStr+'T00:00:00');
-  yesterday.setDate(yesterday.getDate()-1);
-  const yStr    = localDateStr(yesterday);
-  const prevLog = dcDayLogRO(profileId, yStr);
-  // Consecutive if yesterday was also a qualifying day OR lastStreakDate matches yesterday
-  const consecutive = (prevLog && prevLog.streakUpdated) || st.lastStreakDate === yStr;
-  st.streakCount    = consecutive ? (st.streakCount || 0) + 1 : 1;
-  st.lastStreakDate  = dateStr;
-  log.streakUpdated  = true; // mark only after qualifying — prevents double-counting
+function chlDayCelebrate(ch, ev){
+  let msg;
+  if(ev.dayNo===1)                              msg = `${ch.icon} ${ch.name}: day 1 done. The run has started!`;
+  else if(ev.dayNo===Math.ceil(ch.days/2))      msg = `${ch.icon} ${ch.name}: halfway there! Day ${ev.dayNo} of ${ch.days} done.`;
+  else if(ev.dayNo===ch.days-1)                 msg = `${ch.icon} ${ch.name}: day ${ev.dayNo} done. One more to go!`;
+  else                                          msg = `${ch.icon} ${ch.name}: day ${ev.dayNo} of ${ch.days} done.`;
+  celebrateMilestone(msg);
 }
-
-// ── Central completion function ─────────────────────────────────────────────
-function completeDailyChallenge(profileId, challengeId){
-  if(profileId !== S.local.myProfile){
-    showToast("You can only complete your own challenges."); return;
-  }
-  const dateStr = todayStr();
-  const defs    = dcDefs(profileId);
-  const def     = defs.find(d=>d.id===challengeId);
-  if(!def){ showToast('Challenge not found.'); return; }
-  if(def.type === 'study-hours'){
-    showToast('This challenge tracks automatically from your logged study hours.'); return;
-  }
-
-  const log = dcDayLog(profileId, dateStr);
-  if(!log) return;
-  if(!log.states[challengeId]) log.states[challengeId] = {};
-  const entry      = log.states[challengeId];
-  const alreadyDone = entry.completed;
-
-  if(alreadyDone){
-    // Undo — not allowed after Perfect Day is sealed
-    if(log.perfectDayAwarded){
-      showToast("Perfect Day is sealed — can't undo a completed challenge."); return;
+function chlWinCelebrate(p, ch, ev){
+  const chips = [`📅 ${ev.hits} of ${ch.days} days`];
+  if(ev.misses>0) chips.push(`🛡 ${ev.misses} rest day${ev.misses>1?'s':''} used`);
+  else chips.push('💎 Perfect run');
+  celebrateGrand({kind:'chl-'+ch.id, icon:'🏆', kicker:'Challenge won', title:'CHALLENGE WON!', sub:`${ch.name}: ${ev.hits} of ${ch.days} days. ${GC_LINES[Math.floor(Math.random()*GC_LINES.length)]}`, chips, sound:'target'});
+  if(ch.open){
+    const other = otherProfileId(p);
+    if(pushPrefEnabled(other, 'challenge')){
+      sendPush(other, `🏆 ${profileById(p).nick} won a challenge`, `${ch.name} — ${ev.hits} of ${ch.days} days.`, {url:'./'}, {urgency:'normal', ttl:21600});
     }
-    entry.completed  = false;
-    entry.completedAt = null;
-    entry.manuallyCompleted = false;
-    if(entry.xpAwarded){
-      _dcAwardXP(profileId, -(def.xp||20));
-      entry.xpAwarded = false;
-    }
-    saveShared();
-    renderDailyChallengesPopup();
-    renderApp();
-    return;
   }
+}
 
-  // Complete
-  entry.completed        = true;
-  entry.completedAt      = nowISO();
-  entry.manuallyCompleted = true;
-  if(!entry.xpAwarded){
-    entry.xpAwarded = true;
-    _dcAwardXP(profileId, def.xp || 20);
-    _dcShowXPFlash(def.xp || 20);
+// ── actions ─────────────────────────────────────────────────────────────────
+function chlRefresh(){ if(S.dcPopupOpen) renderDailyChallengesPopup(); else renderApp(); }
+function chlMark(id){
+  const me = S.local.myProfile; if(!me) return;
+  const ch = chlList(me).find(c=>c.id===id);
+  if(!ch || ch.status!=='active' || ch.kind!=='manual') return;
+  const today = todayStr(); if(!ch.res) ch.res = {};
+  if(ch.res[today]) delete ch.res[today];          // tapping again takes it back (only while the day is still open)
+  else { ch.res[today] = 1; try{ if(navigator.vibrate) navigator.vibrate(18); }catch(e){} }
+  if(!chlSync(me)) saveShared();                   // chlSync saves by itself when it changed something
+  chlRefresh();
+}
+let _chlQT = 0;
+function chlQuit(id){
+  const me = S.local.myProfile; const list = chlList(me);
+  const ch = list.find(c=>c.id===id); if(!ch) return;
+  if(S._chQuit !== id){                                     // first tap arms it, second tap (within 3.5 s) removes it
+    S._chQuit = id; clearTimeout(_chlQT);
+    _chlQT = setTimeout(()=>{ S._chQuit = null; if(S.dcPopupOpen && !S._chSheet) renderDailyChallengesPopup(); }, 3500);
+    renderDailyChallengesPopup(); return;
   }
-
-  // FIX: update streak on every completion, not just Perfect Day
-  _dcUpdateStreak(profileId, dateStr);
-  _dcCheckPerfectDay(profileId, dateStr);
-  saveShared();
+  clearTimeout(_chlQT); S._chQuit = null;
+  S.shared.challenges[me].list = list.filter(c=>c.id!==id);
+  saveShared(); chlRefresh(); showToast(`"${ch.name}" removed.`);
+}
+function chlDismiss(id){
+  const ch = chlList(S.local.myProfile).find(c=>c.id===id); if(!ch) return;
+  ch.seen = 1; saveShared(); chlRefresh();
+}
+function chlOpenSheet(tplId, pre){
+  const me = S.local.myProfile; if(!me) return;
+  if(chlList(me).filter(c=>c.status==='active').length >= CHL_MAX_ACTIVE){ showToast(`You already have ${CHL_MAX_ACTIVE} active challenges — finish or quit one first.`); return; }
+  const t = chlTpl(tplId); pre = pre || {};
+  S._chSheet = {tpl:t.id, goal: pre.goal!=null ? pre.goal : t.goal, days: pre.days || t.days || 7, strict: !!pre.strict,
+    cue: pre.cue || '', open: pre.open!=null ? !!pre.open : !!t.open, name: pre.name || '', icon: pre.icon || '🎯', retry: pre.retry || null, fresh: true};
+  S._chQuit = null;
   renderDailyChallengesPopup();
-  renderApp();
 }
-
-// ── Perfect Day check ──
-function _dcCheckPerfectDay(profileId, dateStr){
-  const log  = dcDayLog(profileId, dateStr);
-  if(!log || log.perfectDayAwarded) return;
-  const defs = dcActiveDefs(profileId);
-  if(defs.length === 0) return;
-  const allDone = defs.every(d=>log.states[d.id]?.completed);
-  if(!allDone) return;
-  log.perfectDayAwarded = true;
-  _dcAwardXP(profileId, DC_XP_TIERS.perfect);
-  _dcUpdateStreak(profileId, dateStr); // streak also updates on Perfect Day
-  saveShared();
-  celebrateMilestone('🏆 Perfect Day! Every challenge conquered. +100 XP');
-}
-
-// ── XP flash — FIX: use absolute position inside viewport, no conflicting transforms ──
-function _dcShowXPFlash(amount){
-  const el = document.createElement('div');
-  el.className  = 'xp-pop-label';
-  el.textContent = `+${amount} XP ⚡`;
-  el.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:9999;pointer-events:none;font-size:22px;font-weight:800;color:var(--amber);text-shadow:0 2px 10px rgba(0,0,0,.4)';
-  document.body.appendChild(el);
-  setTimeout(()=> el.remove(), 900);
-}
-
-// ── Today's aggregate progress ─────────────────────────────────────────────
-function dcTodayProgress(profileId){
-  const dateStr   = todayStr();
-  const defs      = dcActiveDefs(profileId);
-  const log       = dcDayLogRO(profileId, dateStr); // read-only — no side effects
-  const completed  = defs.filter(d=>log?.states?.[d.id]?.completed).length;
-  const total      = defs.length;
-  const pct        = total ? Math.round((completed/total)*100) : 0;
-  const perfectDay = !!(log?.perfectDayAwarded);
-  return { completed, total, pct, perfectDay, remaining: total - completed };
-}
-
-// ── Weekly summary ─────────────────────────────────────────────────────────
-function dcWeeklySummary(profileId){
-  let perfectDays=0, totalCompleted=0, totalPossible=0, xpEarned=0;
-  const today = new Date(todayStr()+'T00:00:00');
-  for(let i=0;i<7;i++){
-    const d   = new Date(today); d.setDate(d.getDate()-i);
-    const ds  = localDateStr(d);
-    const defs = dcActiveDefs(profileId);
-    const log  = dcDayLogRO(profileId, ds);
-    totalPossible += defs.length;
-    if(log){
-      const done = defs.filter(def=>log.states?.[def.id]?.completed).length;
-      totalCompleted += done;
-      if(log.perfectDayAwarded){ perfectDays++; xpEarned += DC_XP_TIERS.perfect; }
-      defs.forEach(def=>{ if(log.states?.[def.id]?.xpAwarded) xpEarned += (def.xp||20); });
-    }
+function chlSet(k, v){ if(!S._chSheet) return; S._chSheet[k] = v; renderDailyChallengesPopup(); }
+function chlCloseSheet(){ S._chSheet = null; renderDailyChallengesPopup(); }
+// What "again" means: after a WIN, step it up (longer run, or a higher daily goal once at 21 days); after a loss, the same run again.
+function chlNextStep(ch){
+  const t = chlTpl(ch.tpl); let days = ch.days, goal = ch.goal, up = false;
+  if(ch.status==='won'){
+    const i = CHL_DURS.indexOf(ch.days);
+    if(i>=0 && i<CHL_DURS.length-1){ days = CHL_DURS[i+1]; up = true; }
+    else if(t.goalOpts){ const gi = t.goalOpts.indexOf(Number(ch.goal)); if(gi>=0 && gi<t.goalOpts.length-1){ goal = t.goalOpts[gi+1]; up = true; } }
   }
-  const compPct = totalPossible ? Math.round((totalCompleted/totalPossible)*100) : 0;
-  return { perfectDays, totalCompleted, totalPossible, xpEarned, compPct };
+  return {days, goal, up};
+}
+function chlAgain(id){
+  const ch = chlList(S.local.myProfile).find(c=>c.id===id); if(!ch) return;
+  const n = chlNextStep(ch);
+  chlOpenSheet(ch.tpl, {goal:n.goal, days:n.days, strict:!!ch.strict, cue:ch.cue, open:ch.open, name:ch.name, icon:ch.icon, retry: ch.status==='ended' ? ch.id : null});
+}
+function chlStart(){
+  const me = S.local.myProfile, sh = S._chSheet; if(!me || !sh) return;
+  const t = chlTpl(sh.tpl);
+  if(chlList(me).filter(c=>c.status==='active').length >= CHL_MAX_ACTIVE){ showToast(`Max ${CHL_MAX_ACTIVE} active challenges.`); return; }
+  const name = t.custom ? String(sh.name||'').trim().slice(0,40) : t.name;
+  if(!name){ showToast('Give your challenge a name.'); return; }
+  const days = CHL_DURS.includes(sh.days) ? sh.days : 7;
+  if(chlList(me).some(c=>c.status==='active' && c.tpl===t.id && (!t.custom || String(c.name).trim().toLowerCase()===name.toLowerCase()))){ showToast(`"${name}" is already running.`); return; }
+  const ch = {id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), tpl:t.id, name, icon: t.custom ? (sh.icon||'🎯') : t.icon,
+    kind:t.kind, goal: t.goal!=null ? Number(sh.goal)||t.goal : null, blurb: t.custom ? '' : t.blurb, days, strict:!!sh.strict, rest:chlRestFor(days, sh.strict),
+    start:todayStr(), cue:String(sh.cue||'').trim().slice(0,80), open:!!sh.open, status:'active', res:{}, cel:{}, created:nowISO()};
+  chlList(me).push(ch);
+  if(sh.retry){ const old = chlList(me).find(c=>c.id===sh.retry); if(old) old.seen = 1; }
+  S._chSheet = null;
+  saveShared();
+  showToast(`${ch.icon} ${ch.name} started — day 1 is today!`);
+  chlSync(me);                                    // today may already count (e.g. hours already logged)
+  if(ch.open){
+    const other = otherProfileId(me);
+    if(pushPrefEnabled(other, 'challenge')) sendPush(other, `🔥 ${profileById(me).nick} started a challenge`, `${ch.name} — ${days} days. Join in?`, {url:'./'}, {urgency:'normal', ttl:43200});
+  }
+  chlRefresh();
 }
 
-// ── Motivational message — FIX: use exact remaining count, not threshold ──
-function dcMotivationLine(completed, total){
-  const remaining = total - completed;
-  if(total === 0)      return 'Set up your challenges below.';
-  if(remaining === 0)  return 'Day conquered. You showed up. 🏆';
-  if(remaining === 1)  return 'One challenge left — finish strong.';
-  if(completed === 0)  return 'Your day is still yours to win. 🔥';
-  if(completed >= Math.ceil(total / 2)) return "You're halfway there. Keep going.";
-  return `${remaining} challenges remaining.`;
+// ── partner (duo) ───────────────────────────────────────────────────────────
+function chlJoin(cid){
+  const o = otherProfileId(S.local.myProfile), c = chlList(o).find(x=>x.id===cid); if(!c) return;
+  chlOpenSheet(c.tpl, {goal:c.goal, days:c.days, strict:!!c.strict, open:true, name:c.name, icon:c.icon});
+}
+function chlPartnerMatch(me, ch){
+  const o = otherProfileId(me);
+  return chlList(o).find(c=>c.status==='active' && c.open && chlSameKind(c, ch)) || null;
+}
+function chlInvites(me){
+  const o = otherProfileId(me), mine = chlList(me).filter(c=>c.status==='active'), dec = (S.local && S.local.chlDecl) || {};
+  return chlList(o).filter(c=>c.status==='active' && c.open && !dec[c.id] && !mine.some(m=>chlSameKind(m, c)));
+}
+// v159: evening banner (+ device notification via escalateNotifsToPush) for challenges still open today; same wording the server's 9 PM reminder uses.
+// Fixed id per day (the title carries a count, so it must not be part of the key), shown from 5 PM through the 5 AM end of the study day.
+function chlEveningNotification(profileId){
+  const hour = new Date().getHours();
+  if(!(hour>=17 || hour<5)) return null;
+  const open = [];
+  chlList(profileId).forEach(ch=>{
+    if(ch.status!=='active') return;
+    const ev = chlEval(profileId, ch);
+    if(ev.status!=='active' || ev.todayHit) return;
+    open.push({ch, risk: ev.rest>0 && ev.misses===ev.rest});
+  });
+  if(!open.length) return null;
+  const risky = open.filter(o=>o.risk);
+  const title = open.length===1 ? `${open[0].ch.icon} ${open[0].ch.name} isn't done yet today` : `🏁 ${open.length} challenges still open today`;
+  let text = open.length===1 ? chlGoalText(open[0].ch)+'.' : open.map(o=>o.ch.name).join(', ')+'.';
+  if(risky.length) text += ` ⚠️ ${risky.length===1 ? risky[0].ch.name+' has' : 'Some have'} no rest days left — a miss today ends the run.`;
+  return {id:'chl-evening-'+todayStr(), tag:'olympus-chl-'+todayStr(), type:risky.length?'warn':'info', ic:'flag', title, text, act:'openDailyChallengesPopup()', go:'challenges'};
+}
+function chlDecline(cid){
+  if(!S.local.chlDecl) S.local.chlDecl = {};
+  S.local.chlDecl[cid] = 1; saveLocal(); chlRefresh();
+}
+
+// ── rendering ───────────────────────────────────────────────────────────────
+function chlDotsHtml(ev, ch, big){
+  let missSeen = 0;
+  return ev.days.map((d,i)=>{
+    let cls = d.state, txt = '';
+    if(d.state==='miss'){ missSeen++; if(missSeen <= ev.rest) cls += ' cov'; }
+    if(big){
+      txt = d.state==='hit' ? '✓' : d.state==='miss' ? (missSeen<=ev.rest ? '🛡' : '✕') : String(i+1);
+    }
+    return `<span class="chl-dot ${big?'big':''} ${cls}">${txt}</span>`;
+  }).join('');
+}
+function chlRingHtml(tdy, ch){
+  const C = 2*Math.PI*23, dash = Math.max(0, Math.min(1, tdy.frac))*C;
+  return `<div class="chl-ring"><svg viewBox="0 0 56 56"><circle class="trk" cx="28" cy="28" r="23" fill="none" stroke-width="5"/><circle class="fg" cx="28" cy="28" r="23" fill="none" stroke-width="5" stroke-dasharray="${dash.toFixed(1)} ${C.toFixed(1)}"/></svg><i>${tdy.hit ? '✓' : ch.icon}</i></div>`;
+}
+function chlCardHtml(me, ch){
+  const t = chlTpl(ch.tpl), ev = chlEval(me, ch), tdy = chlToday(me, ch, ev);
+  const style = `--c1:${t.c1};--c2:${t.c2}`;
+  const auto = ch.kind!=='manual';
+  const remaining = Math.max(0, ev.need - ev.hits);
+  let action = '';
+  if(auto){
+    action += `<div class="chl-bar"><i style="width:${Math.round(tdy.frac*100)}%"></i></div><div class="chl-prog"><b>${tdy.label}</b><span>${tdy.hit ? 'Done for today ✓' : (tdy.left||'')}</span></div>`;
+    if(!tdy.hit) action += ch.kind==='plan'
+      ? `<button class="chl-btn ghost" onclick="exitDailyChallengesPopup();switchView('planner')">Open Planner</button>`
+      : `<button class="chl-btn ghost" onclick="exitDailyChallengesPopup();switchView('timer')">⏱ Start studying</button>`;
+  } else if(tdy.hit){
+    action = `<div class="chl-donebar"><span>✓ Done today — see you tomorrow</span><button class="chl-link" onclick="chlMark('${ch.id}')">Undo</button></div>`;
+  } else {
+    action = `<button class="chl-btn" onclick="chlMark('${ch.id}')">✓ I did it today</button>`;
+  }
+  let duo = '';
+  const pc = ch.open ? chlPartnerMatch(me, ch) : null;
+  if(pc){
+    const o = otherProfileId(me), pe = chlEval(o, pc), nick = profileById(o).nick;
+    duo = `<div class="chl-duo"><span><b>${nick}</b> · day ${pe.dayNo}/${pc.days}</span><div class="chl-dots fit">${chlDotsHtml(pe, pc, false)}</div><span class="tog">${pe.todayHit && ev.todayHit ? '🤝 Both done' : pe.todayHit ? `${nick} ✓ today` : ''}</span></div>`;
+  }
+  return `<div class="chl-card ${ev.todayHit?'done':''}" style="${style}">
+    <div class="chl-head">${chlRingHtml(tdy, ch)}
+      <div style="min-width:0"><div class="chl-name">${escChat(ch.name)}</div><div class="chl-sub">${escChat(chlGoalText(ch))}</div></div>
+      <div class="chl-day">Day ${ev.dayNo}/${ch.days}</div></div>
+    <div class="chl-dots ${ch.days<=7?'':'fit'}">${chlDotsHtml(ev, ch, ch.days<=7)}</div>
+    <div class="chl-meta"><span>${ev.rest>0 ? `🛡 <b>${ev.restLeft}</b> of ${ev.rest} rest day${ev.rest>1?'s':''} left` : '⚡ Strict — no rest days'}</span><span>${remaining>0 ? `<b>${remaining}</b> more to win` : '<b>Win secured</b> 🏆'}</span></div>
+    ${ch.cue ? `<div class="chl-cue">🔗 ${escChat(ch.cue)}</div>` : ''}
+    ${action}${duo}
+    <div class="chl-foot"><button class="chl-link ${S._chQuit===ch.id?'warn':''}" onclick="chlQuit('${ch.id}')">${S._chQuit===ch.id ? 'Tap again to quit' : 'Quit'}</button></div>
+  </div>`;
+}
+function chlSheetHtml(){
+  const sh = S._chSheet; if(!sh) return '';
+  const t = chlTpl(sh.tpl), rest = chlRestFor(sh.days, sh.strict), need = sh.days - rest;
+  const nick = profileById(otherProfileId(S.local.myProfile)).nick;
+  const title = t.custom ? (sh.name.trim() || 'My own challenge') : t.name;
+  const icon  = t.custom ? sh.icon : t.icon;
+  const auto = t.kind!=='manual';
+  return `<div class="chl-sheet-bg ${sh.fresh?'':'nf'}" onclick="chlCloseSheet()"></div>
+  <div class="chl-sheet ${sh.fresh?'':'nf'}" style="--c1:${t.c1};--c2:${t.c2}" role="dialog" aria-modal="true" aria-label="Start ${escChat(title)}">
+    <div class="chl-grab"></div>
+    <div class="chl-sh-head"><div class="e">${icon}</div><div><b>${escChat(title)}</b><span>${t.custom ? 'A daily habit you check in on' : escChat(t.blurb)}</span></div></div>
+    ${t.custom ? `<div class="chl-lbl">Name</div><input class="chl-in" maxlength="40" placeholder="e.g. Solve 20 MCQs" value="${escChat(sh.name)}" oninput="S._chSheet.name=this.value">
+      <div class="chl-lbl">Icon</div><div class="chl-chips">${CHL_ICONS.map(e=>`<button class="chl-chip ${sh.icon===e?'on':''}" onclick="chlSet('icon','${e}')">${e}</button>`).join('')}</div>` : ''}
+    ${t.goalOpts ? `<div class="chl-lbl">${t.goalLbl}</div><div class="chl-chips">${t.goalOpts.map(g=>`<button class="chl-chip ${Number(sh.goal)===g?'on':''}" onclick="chlSet('goal',${g})">${g}${t.kind==='hours'?'h':''}</button>`).join('')}</div>` : ''}
+    <div class="chl-lbl">How long?</div>
+    <div class="chl-chips">${CHL_DURS.map(d=>`<button class="chl-chip ${sh.days===d?'on':''}" onclick="chlSet('days',${d})">${d} days</button>`).join('')}</div>
+    ${sh.days>=7 ? `<div class="chl-lbl">Style</div><div class="chl-chips"><button class="chl-chip ${!sh.strict?'on':''}" onclick="chlSet('strict',false)">🛡 Flexible</button><button class="chl-chip ${sh.strict?'on':''}" onclick="chlSet('strict',true)">⚡ Strict</button></div>` : ''}
+    <div class="chl-note">Win by hitting <b>${need} of ${sh.days} days</b>${rest>0 ? ` — <b>${rest} rest day${rest>1?'s':''}</b> are built in, so one slip won't end it.` : ' — every single day counts.'} ${auto ? 'It tracks itself from your study data.' : 'Tap once a day to check in.'}</div>
+    <div class="chl-lbl">When &amp; where will you do it? <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span></div>
+    <input class="chl-in" maxlength="80" placeholder="${escChat(t.cueEx)}" value="${escChat(sh.cue)}" oninput="S._chSheet.cue=this.value">
+    <div class="chl-row"><div>Let ${nick} see &amp; join<small>Shows this challenge and your progress to ${nick}</small></div><button class="chl-sw ${sh.open?'on':''}" role="switch" aria-checked="${!!sh.open}" aria-label="Let ${nick} see and join" onclick="chlSet('open',${!sh.open})"></button></div>
+    <button class="chl-btn chl-go" onclick="chlStart()">Start ${sh.days}-day challenge →</button>
+  </div>`;
+}
+function chlTplCardHtml(t){
+  return `<button class="chl-tpl ${t.rec?'rec':''}" style="--c1:${t.c1};--c2:${t.c2}" onclick="chlOpenSheet('${t.id}')"><span class="e">${t.icon}</span><b>${t.name}</b><span>${t.blurb}</span><em>${t.kind==='manual' ? 'Daily check-in' : 'Tracks itself'}</em></button>`;
+}
+function chlShelfHtml(shelf){
+  return `<div class="chl-shelf">${shelf.slice(0,12).map(c=>{
+    const t = chlTpl(c.tpl), won = c.status==='won';
+    return `<div class="chl-trophy ${won?'':'lost'}" style="--c1:${t.c1};--c2:${t.c2}"><div class="e">${won?'🏆':c.icon}</div><b>${escChat(c.name)}</b><span>${c.hits||0} of ${c.days} days${won?'':' · not finished'}</span><br><button onclick="chlAgain('${c.id}')">${won ? (chlNextStep(c).up ? '↑ Level up' : '↻ Again') : '↻ Retry'}</button></div>`;
+  }).join('')}</div>`;
+}
+
+function renderDailyChallengesPopup(){
+  const root = document.getElementById('daily-challenges-root'); if(!root) return;
+  const me = S.local.myProfile; if(!me){ root.innerHTML = ''; return; }
+  chlSync(me);
+  const prevScroll = (root.querySelector('.chl-scroll')||{}).scrollTop || 0;
+  const prevSheetScroll = (root.querySelector('.chl-sheet')||{}).scrollTop || 0;
+  root.classList.toggle('chl-noanim', !S._chAnim); S._chAnim = false;      // cards slide in only when the screen opens, not on every tap
+  const list = chlList(me);
+  const active = list.filter(c=>c.status==='active');
+  const pending = list.filter(c=>c.status==='ended' && !c.seen);
+  const shelf = list.filter(c=>c.status==='won' || (c.status==='ended' && c.seen)).sort((a,b)=>String(b.endedOn||'').localeCompare(String(a.endedOn||'')));
+  const wins = list.filter(c=>c.status==='won').length;
+  const daysHit = list.reduce((s,c)=> s + (c.status==='active' ? chlEval(me,c).hits : (c.hits||0)), 0);
+  const invites = chlInvites(me);
+  const owned = new Set(active.map(c=>c.tpl));
+  const tpls = CHL_TPLS.filter(t=> t.custom || !owned.has(t.id));
+  const full = active.length >= CHL_MAX_ACTIVE;
+  const study = tpls.filter(t=>t.kind!=='manual'), habits = tpls.filter(t=>t.kind==='manual');
+  const nick = profileById(otherProfileId(me)).nick;
+
+  root.innerHTML = `
+  <div class="chl-top"><div><h1>Challenges</h1><p>Short runs. Real finish lines. ${CHL_MAX_ACTIVE} at a time.</p></div><button class="chl-x" onclick="exitDailyChallengesPopup()" aria-label="Close">✕</button></div>
+  <div class="chl-scroll">
+    ${(wins||daysHit) ? `<div class="chl-stats"><div class="chl-stat"><b>${active.length}/${CHL_MAX_ACTIVE}</b><span>Active</span></div><div class="chl-stat"><b>🏆 ${wins}</b><span>Won</span></div><div class="chl-stat"><b>${daysHit}</b><span>Days hit</span></div></div>` : ''}
+    ${invites.map(c=>{ const t = chlTpl(c.tpl); return `<div class="chl-invite" style="--c1:${t.c1};--c2:${t.c2}"><div class="e" style="font-size:28px">${c.icon}</div><div class="t"><b>${nick} is on ${escChat(c.name)}</b>${c.days}-day challenge · tap Join to run it together</div><button onclick="chlJoin('${c.id}')">Join</button><button class="x" aria-label="Not now" onclick="chlDecline('${c.id}')">✕</button></div>`; }).join('')}
+    ${pending.map(c=>{ const ev = {hits:c.hits||0};
+      return `<div class="chl-soft"><b>${c.icon} ${escChat(c.name)}</b> — you got <b>${ev.hits} of ${c.days}</b> days. Not this time, but that's real progress.<div class="row"><button class="p" onclick="chlAgain('${c.id}')">↻ Try again</button><button onclick="chlDismiss('${c.id}')">Dismiss</button></div></div>`; }).join('')}
+    ${active.length ? `<div class="chl-h">Today <em>${new Date(todayStr()+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'})}</em></div>${active.map(c=>chlCardHtml(me,c)).join('')}`
+      : `<div class="chl-hero"><div class="e">🏁</div><h2>Pick a challenge. Finish the run.</h2><p>Study-based challenges track themselves from your hours, target and planner. Rest days keep one bad day from ending it. Win it to earn a trophy.</p></div>`}
+    ${full ? `<div class="chl-soft" style="margin-top:6px">You're at ${CHL_MAX_ACTIVE} active challenges. Finish or quit one to start another — focus beats a long list.</div>` : `
+      ${study.length ? `<div class="chl-h">Study challenges <em>track themselves</em></div><div class="chl-grid">${study.map(chlTplCardHtml).join('')}</div>` : ''}
+      ${habits.length ? `<div class="chl-h">Daily habits <em>tap to check in</em></div><div class="chl-grid">${habits.map(chlTplCardHtml).join('')}</div>` : ''}`}
+    ${shelf.length ? `<div class="chl-h">Trophy shelf</div>${chlShelfHtml(shelf)}` : ''}
+  </div>
+  ${chlSheetHtml()}`;
+  const sc = root.querySelector('.chl-scroll'); if(sc && prevScroll) sc.scrollTop = prevScroll;
+  const shEl = root.querySelector('.chl-sheet'); if(shEl && prevSheetScroll) shEl.scrollTop = prevSheetScroll;
+  if(S._chSheet) S._chSheet.fresh = false;                                   // the sheet slides up once; chip taps just update it in place
 }
 
 // ── HOME CARD ──────────────────────────────────────────────────────────────
-function homeDailyChallengesCard(profileId){
-  refreshDailyChallengeProgress(profileId);
-  const prog   = dcTodayProgress(profileId);
-  const st     = dcGetState(profileId);
-  const streak = st.streakCount || 0;
-  const xp     = st.xp || 0;
-
-  if(prog.total === 0) return '';
-
-  if(prog.perfectDay){
-    return `
-    <div class="section-title">Daily Challenges</div>
-    <div class="card dc-perfect-banner" style="cursor:pointer" onclick="openDailyChallengesPopup()">
-      <div class="dc-perfect-emoji">🏆</div>
-      <div class="dc-perfect-title">DAY CONQUERED</div>
-      <div style="font-size:15px;font-weight:800;margin:6px 0 2px;color:var(--text)">${prog.completed} / ${prog.total} COMPLETED · 100%</div>
-      <div class="dc-perfect-sub">+100 XP Perfect Day Bonus${streak>0?` · 🔥 ${streak} day streak`:''}</div>
-    </div>`;
+function homeDailyChallengesCard(p){
+  chlSync(p);
+  const active = chlList(p).filter(c=>c.status==='active');
+  const invites = chlInvites(p);
+  if(!active.length){
+    const t = chlTpl('hours'), nick = profileById(otherProfileId(p)).nick;
+    return `<div class="section-title">Challenges</div>
+    <div class="card chl-home" onclick="openDailyChallengesPopup()"><div class="chl-hempty"><div class="e">🏁</div><div><b>${invites.length ? `${nick} started a challenge — join in!` : 'Start a 7-day challenge'}</b><span>${invites.length ? escChat(invites[0].name) + ' · tap to join' : 'Study Streak, Clear the Plan, Early Bird… it tracks itself.'}</span></div></div></div>`;
   }
-
-  return `
-  <div class="section-title">Daily Challenges</div>
-  <div class="card" style="cursor:pointer;padding-bottom:14px" onclick="openDailyChallengesPopup()">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:7px">
-        <span style="font-size:18px">🔥</span>
-        <div>
-          <div style="font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text)">Daily Challenges</div>
-          ${streak>0?`<div style="font-size:10.5px;color:var(--amber);font-weight:700">🔥 ${streak} day streak</div>`:'<div style="font-size:10.5px;color:var(--text-faint)">Start your streak today</div>'}
-        </div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:13px;font-weight:800;color:var(--text)">${prog.completed}<span style="color:var(--text-faint);font-weight:600"> / ${prog.total}</span></div>
-        <div style="font-size:10px;color:var(--text-faint)">+${xp} XP total</div>
-      </div>
-    </div>
-    <div class="dc-home-pbar"><div class="dc-home-pfill" style="width:${prog.pct}%"></div></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted)">
-      <span>${dcMotivationLine(prog.completed, prog.total)}</span>
-      <span style="font-weight:700;color:var(--active-accent,var(--umang))">${prog.pct}% →</span>
-    </div>
-  </div>`;
+  const rows = active.slice(0,3).map(ch=>{
+    const t = chlTpl(ch.tpl), ev = chlEval(p, ch), tdy = chlToday(p, ch, ev);
+    let right;
+    if(ev.todayHit) right = `<span class="chl-hok">✓ Done</span>`;
+    else if(ch.kind==='manual') right = `<button class="chl-hmini" onclick="event.stopPropagation();chlMark('${ch.id}')">✓ Done</button>`;
+    else right = `<span class="chl-hok">${Math.round(tdy.frac*100)}%</span>`;
+    return `<div class="chl-hrow ${ev.todayHit?'done':''}" style="--c1:${t.c1};--c2:${t.c2}"><div class="chl-hic">${ch.icon}</div><div class="chl-hmid"><b>${escChat(ch.name)}</b><div class="chl-dots fit">${chlDotsHtml(ev, ch, false)}</div><small>Day ${ev.dayNo} of ${ch.days} · ${ev.need-ev.hits>0 ? `${ev.need-ev.hits} more to win` : 'win secured 🏆'}</small></div>${right}</div>`;
+  }).join('');
+  return `<div class="section-title">Challenges</div>
+  <div class="card chl-home" onclick="openDailyChallengesPopup()">${rows}${active.length>3 ? `<div class="chl-hmore">+${active.length-3} more</div>` : ''}${invites.length ? `<div class="chl-hmore">🤝 ${profileById(otherProfileId(p)).nick} started ${escChat(invites[0].name)} — tap to join</div>` : ''}</div>`;
 }
 
-// ── POPUP OPEN/CLOSE (mirrors habits popup pattern exactly) ─────────────────
+// ── open / close (full-screen overlay; the phone's back button closes it) ───
 let _dcHistoryActive = false;
 function openDailyChallengesPopup(){
   if(!_dcHistoryActive){
@@ -21236,476 +21414,22 @@ function openDailyChallengesPopup(){
     _dcHistoryActive = true;
     window.addEventListener('popstate', _onDCBackButton);
   }
-  S.dcPopupOpen   = true;
-  S._dcAddMode    = false;
-  S._dcEditId     = null;
+  S.dcPopupOpen = true; S._chSheet = null; S._chQuit = null; S._chAnim = true;
+  document.addEventListener('keydown', _onDCKey);
   document.body.classList.add('daily-challenges-mode');
-  refreshDailyChallengeProgress(S.local.myProfile);
   renderDailyChallengesPopup();
 }
-function _onDCBackButton(){ closeDailyChallengesPopup(); }
+function _onDCBackButton(){ if(S._chSheet){ S._chSheet = null; try{ history.pushState({olympusDC:true},'',location.href); }catch(e){} renderDailyChallengesPopup(); return; } closeDailyChallengesPopup(); }
+function _onDCKey(e){ if(e.key==='Escape'){ if(S._chSheet) chlCloseSheet(); else exitDailyChallengesPopup(); } }
 function closeDailyChallengesPopup(){
-  if(_dcHistoryActive){
-    window.removeEventListener('popstate', _onDCBackButton);
-    _dcHistoryActive = false;
-  }
-  S.dcPopupOpen = false;
+  if(_dcHistoryActive){ window.removeEventListener('popstate', _onDCBackButton); _dcHistoryActive = false; }
+  S.dcPopupOpen = false; S._chSheet = null; S._chQuit = null; clearTimeout(_chlQT);
+  document.removeEventListener('keydown', _onDCKey);
   document.body.classList.remove('daily-challenges-mode');
-  const el = document.getElementById('daily-challenges-root');
-  if(el) el.innerHTML = '';
+  const el = document.getElementById('daily-challenges-root'); if(el) el.innerHTML = '';
   renderApp();
 }
-function exitDailyChallengesPopup(){
-  if(_dcHistoryActive) history.back(); else closeDailyChallengesPopup();
-}
-
-// ── MAIN RENDER ──────────────────────────────────────────────────────────────
-function renderDailyChallengesPopup(){
-  const root = document.getElementById('daily-challenges-root');
-  if(!root) return;
-  const profileId = S.local.myProfile;
-  refreshDailyChallengeProgress(profileId);
-
-  if(S._dcAddMode || S._dcEditId){
-    root.innerHTML = _dcFormHtml(profileId, S._dcEditId); return;
-  }
-
-  const dateStr = todayStr();
-  const d       = new Date(dateStr+'T00:00:00');
-  const dateLine = d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
-  const prog    = dcTodayProgress(profileId);
-  const st      = dcGetState(profileId);
-  const streak  = st.streakCount || 0;
-  const xp      = st.xp || 0;
-  const level   = dcLevel(xp);
-  const prevXP  = dcPrevLevelXP(xp);
-  const nextXP  = dcNextLevelXP(xp);
-  const maxLevel = DC_LEVEL_THRESHOLDS.length; // 10
-  const atMax   = level >= maxLevel;
-  const lvlPct  = atMax ? 100 : (nextXP > prevXP ? Math.min(100, Math.round(((xp-prevXP)/(nextXP-prevXP))*100)) : 100);
-  const lvlSub  = atMax ? 'Max Level reached 🏆' : `${nextXP-xp} XP to Level ${level+1}`;
-  const defs    = dcActiveDefs(profileId);
-  const log     = dcDayLog(profileId, dateStr);
-
-  const QUOTES = [
-    '"Win today. Build tomorrow."',
-    '"Small disciplines compound into big results."',
-    '"Every day is a chance to raise the bar."',
-    '"Consistency beats intensity."',
-    '"The most important rep is the one you almost skipped."',
-  ];
-  const quote = QUOTES[d.getDate() % QUOTES.length];
-
-  root.innerHTML = `
-  <div class="stats-exit-bar">
-    <button onclick="exitDailyChallengesPopup()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
-      Back
-    </button>
-    <div style="flex:1;font-size:13px;font-weight:800;text-align:center;color:var(--text)">Daily Challenges</div>
-    <button onclick="S._dcAddMode=true;S._dcEditId=null;renderDailyChallengesPopup()" title="Add Challenge" aria-label="Add Challenge" style="font-size:22px;line-height:1;font-weight:700;color:var(--active-accent,var(--umang));background:none;border:none;cursor:pointer;padding:8px 12px">+</button>
-  </div>
-  <div class="dc-scroll">
-
-    <!-- HEADER -->
-    <div style="text-align:center;padding:8px 0 18px">
-      <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px">${dateLine}</div>
-      <div style="font-style:italic;font-size:13px;color:var(--text-faint);margin-bottom:14px">${quote}</div>
-      <div style="display:flex;justify-content:center;gap:10px;margin-bottom:16px">
-        <div class="dc-streak-chip">🔥 ${streak} Day Streak</div>
-        <div class="dc-xp-chip">⚡ ${xp} XP</div>
-      </div>
-
-      <!-- XP LEVEL BAR -->
-      <div class="card" style="padding:12px 16px;margin-bottom:12px;text-align:left">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-size:12px;font-weight:800;color:var(--purple)">⚡ LEVEL ${level}</div>
-          <div style="font-size:11px;color:var(--text-muted)"><b style="color:var(--text)">${xp}</b> / ${nextXP} XP</div>
-        </div>
-        <div class="dc-level-bar"><div class="dc-level-fill" style="width:${lvlPct}%"></div></div>
-        <div style="font-size:10px;color:var(--text-faint);margin-top:4px">${lvlSub}</div>
-      </div>
-
-      <!-- TODAY'S PROGRESS -->
-      <div class="card" style="padding:16px;margin-bottom:4px;text-align:left">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px">Today's Progress</div>
-        <div style="font-size:28px;font-weight:800;color:var(--text);line-height:1">${prog.completed} <span style="font-size:16px;color:var(--text-faint);font-weight:600">/ ${prog.total} Completed</span></div>
-        <div class="dc-progress-bar" style="margin:10px 0 4px"><div class="dc-progress-fill" style="width:${prog.pct}%"></div></div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
-          <span>${dcMotivationLine(prog.completed, prog.total)}</span>
-          <span style="font-weight:800;color:var(--active-accent,var(--umang))">${prog.pct}%</span>
-        </div>
-      </div>
-    </div>
-
-    ${prog.perfectDay ? `
-    <div class="dc-perfect-banner" style="margin-bottom:20px">
-      <div class="dc-perfect-emoji">🏆</div>
-      <div class="dc-perfect-title">PERFECT DAY</div>
-      <div style="font-size:14px;font-weight:800;color:var(--text);margin:6px 0 2px">${prog.completed} / ${prog.total} COMPLETED</div>
-      <div class="dc-perfect-sub">+100 XP BONUS · Challenge streak extended 🔥</div>
-    </div>` : ''}
-
-    <!-- CHALLENGES LIST -->
-    <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin-bottom:2px">Today's Challenges</div>
-    ${defs.length ? `<div style="font-size:10.5px;color:var(--text-faint);margin-bottom:10px">Long-press a challenge to edit it</div>` : ''}
-    ${defs.length === 0
-      ? `<div class="card" style="text-align:center;padding:28px 16px;color:var(--text-faint);font-size:13px">
-           No active challenges.<br>
-           <button class="dc-btn dc-btn-primary" style="margin-top:14px" onclick="S._dcAddMode=true;S._dcEditId=null;renderDailyChallengesPopup()">+ Set Up Challenges</button>
-         </div>`
-      : defs.map(def=>_dcChallengeCardHtml(profileId, def, log, dateStr)).join('')}
-
-    <!-- WEEKLY SUMMARY -->
-    ${_dcWeeklySummaryHtml(profileId)}
-
-  </div>`;
-}
-
-// ── Individual challenge card ────────────────────────────────────────────────
-function _dcChallengeCardHtml(profileId, def, log, dateStr){
-  const entry     = log?.states?.[def.id] || {};
-  const completed = entry.completed || false;
-  const xpAmt     = def.xp || 20;
-
-  let progressBlock = '';
-  let actionBlock   = '';
-
-  if(def.type === 'study-hours'){
-    const sp    = dcStudyProgress(profileId, dateStr, def.targetValue || 6);
-    const doneH = sp.done.toFixed(1);
-    const tgtH  = sp.target;
-    const remH  = Math.max(0, tgtH - sp.done).toFixed(1);
-    if(completed){
-      progressBlock = `<div class="dc-complete-time">✓ ${doneH}h logged — Target met!</div>`;
-    } else {
-      progressBlock = `
-        <div class="dc-progress-row" style="margin-bottom:4px"><b>${doneH}h</b>&nbsp;/ ${tgtH}h<span style="margin-left:auto">${remH}h remaining</span></div>
-        <div class="dc-progress-bar"><div class="dc-progress-fill" style="width:${sp.pct}%"></div></div>`;
-      // FIX: close the overlay before switching to timer so it doesn't cover the view
-      actionBlock = `<button class="dc-btn dc-btn-outline" style="margin-top:10px" onclick="exitDailyChallengesPopup();switchView('timer')">⏱ Start Timer</button>`;
-    }
-  } else {
-    if(completed){
-      const at = entry.completedAt
-        ? ' at ' + new Date(entry.completedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})
-        : '';
-      progressBlock = `<div class="dc-complete-time">✓ Completed${at}</div>`;
-      if(!log?.perfectDayAwarded){
-        actionBlock = `<button class="dc-btn dc-btn-outline" style="margin-top:8px;font-size:11px;opacity:.65" onclick="completeDailyChallenge('${profileId}','${def.id}')">Undo</button>`;
-      }
-    } else {
-      actionBlock = `<button class="dc-btn dc-btn-primary" style="margin-top:10px" onclick="completeDailyChallenge('${profileId}','${def.id}')">✓ Mark Complete</button>`;
-    }
-  }
-
-  return `
-  <div class="dc-challenge-card ${completed?'dc-done':''}"
-    onpointerdown="dcCardPressStart(event,'${def.id}')" onpointerup="dcCardPressEnd(event)" onpointermove="dcCardPressMove(event)" onpointercancel="dcCardPressEnd(event)">
-    <div class="dc-card-head">
-      <div class="dc-icon">${def.icon||'⭐'}</div>
-      <div class="dc-card-info">
-        <div class="dc-card-name">${escChat(def.name)}</div>
-        <div class="dc-card-desc">${escChat(def.desc)}</div>
-      </div>
-      ${completed
-        ? `<div class="dc-complete-check">✓</div>`
-        : `<div class="dc-xp-badge">+${xpAmt} XP</div>`}
-    </div>
-    ${progressBlock}
-    ${actionBlock}
-    ${completed
-      ? `<div style="margin-top:6px"><span class="dc-xp-badge" style="display:inline-flex">+${xpAmt} XP earned</span></div>`
-      : ''}
-  </div>`;
-}
-
-// ── Long-press a challenge card to jump straight into editing it (pointer events cover
-// touch + mouse, same 450ms/vibrate convention as chatPressStart's long-press-to-open-sheet
-// gesture elsewhere in this file — kept as its own small state machine rather than reusing
-// chatPressStart's, since that one also drives swipe-to-reply, which doesn't apply here). ──
-let _dcPressTimer=null, _dcPressId=null, _dcPressStartX=0, _dcPressStartY=0, _dcPressMoved=false;
-function dcCardPressStart(ev, id){
-  if(ev.pointerType==='mouse' && ev.button!==0) return;
-  if(ev.target.closest('.dc-btn')) return; // don't hijack taps on Mark Complete / Undo / Start Timer
-  _dcPressId = id; _dcPressStartX = ev.clientX; _dcPressStartY = ev.clientY; _dcPressMoved = false;
-  clearTimeout(_dcPressTimer);
-  _dcPressTimer = setTimeout(()=>{
-    _dcPressTimer = null;
-    if(!_dcPressMoved && _dcPressId){
-      if(navigator.vibrate) navigator.vibrate(12);
-      S._dcEditId = _dcPressId; S._dcAddMode = false;
-      renderDailyChallengesPopup();
-    }
-  }, 450);
-}
-function dcCardPressMove(ev){
-  if(_dcPressId==null) return;
-  const dx = ev.clientX - _dcPressStartX, dy = ev.clientY - _dcPressStartY;
-  if(Math.abs(dx) > 10 || Math.abs(dy) > 10){ _dcPressMoved = true; clearTimeout(_dcPressTimer); _dcPressTimer = null; }
-}
-function dcCardPressEnd(ev){
-  if(_dcPressTimer){ clearTimeout(_dcPressTimer); _dcPressTimer = null; }
-  _dcPressId = null; _dcPressMoved = false;
-}
-
-// ── Weekly summary block ─────────────────────────────────────────────────────
-function _dcWeeklySummaryHtml(profileId){
-  const ws = dcWeeklySummary(profileId);
-  const st = dcGetState(profileId);
-  return `
-  <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin:20px 0 10px">This Week</div>
-  <div class="card" style="margin-bottom:24px">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div style="text-align:center;padding:10px 8px;background:var(--surface2);border-radius:10px">
-        <div style="font-size:20px;font-weight:800;color:var(--text)">${ws.perfectDays}<span style="font-size:13px;color:var(--text-faint)"> / 7</span></div>
-        <div style="font-size:10px;color:var(--text-faint);margin-top:3px">Perfect Days</div>
-      </div>
-      <div style="text-align:center;padding:10px 8px;background:var(--surface2);border-radius:10px">
-        <div style="font-size:20px;font-weight:800;color:var(--text)">${ws.totalCompleted}<span style="font-size:13px;color:var(--text-faint)"> / ${ws.totalPossible}</span></div>
-        <div style="font-size:10px;color:var(--text-faint);margin-top:3px">Challenges</div>
-      </div>
-      <div style="text-align:center;padding:10px 8px;background:var(--surface2);border-radius:10px">
-        <div style="font-size:20px;font-weight:800;color:var(--purple)">+${ws.xpEarned}</div>
-        <div style="font-size:10px;color:var(--text-faint);margin-top:3px">XP Earned</div>
-      </div>
-      <div style="text-align:center;padding:10px 8px;background:var(--surface2);border-radius:10px">
-        <div style="font-size:20px;font-weight:800;color:var(--amber)">🔥 ${st.streakCount||0}</div>
-        <div style="font-size:10px;color:var(--text-faint);margin-top:3px">Day Streak</div>
-      </div>
-    </div>
-    ${ws.totalPossible > 0 ? `
-    <div style="margin-top:12px">
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:4px">
-        <span>Weekly completion</span><span><b>${ws.compPct}%</b></span>
-      </div>
-      <div class="dc-progress-bar"><div class="dc-progress-fill" style="width:${ws.compPct}%"></div></div>
-    </div>` : ''}
-  </div>`;
-}
-
-// ── Toggle-enabled / delete — now surfaced from inside the Edit form itself (see
-// _dcFormHtml's "Active" toggle and "Delete Challenge" button) rather than a separate
-// Manage screen; the old dedicated My-Challenges list view was removed since long-press
-// (dcCardPressStart) + the top "+" button now cover add/edit, and this replaces the
-// browse/enable/delete list entirely. ──────────────────────────────────────────────────
-function dcToggleEnabled(profileId, challengeId){
-  const def = dcDefs(profileId).find(d=>d.id===challengeId);
-  if(!def) return;
-  def.enabled = !(def.enabled !== false);
-  saveShared();
-  renderDailyChallengesPopup();
-  renderApp();
-}
-function dcDeleteChallenge(profileId, challengeId){
-  const store = S.shared.dailyChallenges?.[profileId];
-  if(!store) return;
-  const def = store.defs.find(d=>d.id===challengeId);
-  if(!def) return;
-  if(!confirm(`Remove "${def.name}"?\n\nYou can recreate it anytime with the + button.`)) return;
-  store.defs = store.defs.filter(d=>d.id!==challengeId);
-  saveShared();
-  // Reset out of the edit form (this is normally called from inside it, via long-press) —
-  // otherwise renderDailyChallengesPopup() would try to redraw a form for an id that no
-  // longer exists in defs, silently falling back to a blank "New Challenge" form instead of
-  // returning to the list.
-  S._dcAddMode = false; S._dcEditId = null;
-  renderDailyChallengesPopup();
-  renderApp();
-  showToast(`"${def.name}" removed.`);
-}
-
-// ── ADD / EDIT FORM ─────────────────────────────────────────────────────────
-// FIX: dcFormTypeChanged and dcFormUnitChanged are defined at global scope here
-// (not inside a <script> in innerHTML, which browsers don't execute).
-function dcFormTypeChanged(){
-  const type    = document.getElementById('dc-form-type')?.value;
-  const unitRow = document.getElementById('dc-form-unit-row');
-  const wrap    = document.getElementById('dc-target-wrap');
-  if(!type || !wrap) return;
-  if(type === 'study-hours'){
-    if(unitRow) unitRow.style.display = 'none';
-    wrap.style.display = '';
-    wrap.innerHTML = `<div class="dc-form-row">
-      <label class="dc-form-label">Target Hours</label>
-      <input class="dc-form-input" id="dc-form-target" type="number" min="0.5" max="24" step="0.5" value="6" style="max-width:120px">
-    </div>`;
-  } else {
-    if(unitRow) unitRow.style.display = '';
-    dcFormUnitChanged();
-  }
-}
-function dcFormUnitChanged(){
-  const unit = document.getElementById('dc-form-unit')?.value || '';
-  const wrap = document.getElementById('dc-target-wrap');
-  if(!wrap) return;
-  if(unit === 'time'){
-    wrap.style.display = '';
-    wrap.innerHTML = `<div class="dc-form-row">
-      <label class="dc-form-label">Target Time (complete before)</label>
-      <input class="dc-form-input" id="dc-form-target" type="time" value="06:30" style="max-width:160px">
-    </div>`;
-  } else if(unit === 'min'){
-    wrap.style.display = '';
-    wrap.innerHTML = `<div class="dc-form-row">
-      <label class="dc-form-label">Duration (minutes)</label>
-      <input class="dc-form-input" id="dc-form-target" type="number" min="1" max="300" step="1" value="30" style="max-width:120px">
-    </div>`;
-  } else if(unit === 'glasses'){
-    wrap.style.display = '';
-    wrap.innerHTML = `<div class="dc-form-row">
-      <label class="dc-form-label">Target count</label>
-      <input class="dc-form-input" id="dc-form-target" type="number" min="1" max="50" step="1" value="8" style="max-width:120px">
-    </div>`;
-  } else {
-    wrap.style.display = 'none';
-  }
-}
-
-function _dcTargetFieldHtml(e){
-  const t = e.type || 'boolean';
-  const u = e.unit || '';
-  if(t === 'study-hours'){
-    return `<div class="dc-form-row" id="dc-target-wrap">
-      <label class="dc-form-label">Target Hours</label>
-      <input class="dc-form-input" id="dc-form-target" type="number" min="0.5" max="24" step="0.5"
-        value="${e.targetValue||6}" style="max-width:120px">
-    </div>`;
-  }
-  if(u === 'time'){
-    return `<div class="dc-form-row" id="dc-target-wrap">
-      <label class="dc-form-label">Target Time (complete before)</label>
-      <input class="dc-form-input" id="dc-form-target" type="time" value="${e.targetValue||'06:30'}" style="max-width:160px">
-    </div>`;
-  }
-  if(u === 'min'){
-    return `<div class="dc-form-row" id="dc-target-wrap">
-      <label class="dc-form-label">Duration (minutes)</label>
-      <input class="dc-form-input" id="dc-form-target" type="number" min="1" max="300" step="1"
-        value="${e.targetValue||30}" style="max-width:120px">
-    </div>`;
-  }
-  if(u === 'glasses'){
-    return `<div class="dc-form-row" id="dc-target-wrap">
-      <label class="dc-form-label">Target count</label>
-      <input class="dc-form-input" id="dc-form-target" type="number" min="1" max="50" step="1"
-        value="${e.targetValue||8}" style="max-width:120px">
-    </div>`;
-  }
-  return `<div id="dc-target-wrap" style="display:none"><input id="dc-form-target" value="${e.targetValue||''}"></div>`;
-}
-
-function _dcFormHtml(profileId, editId){
-  const defs     = dcDefs(profileId);
-  const existing = editId ? defs.find(d=>d.id===editId) : null;
-  const e        = existing || {name:'',icon:'⭐',desc:'',xp:20,enabled:true,type:'boolean',targetValue:'',unit:''};
-  const title    = existing ? 'Edit Challenge' : 'New Challenge';
-  const XP_OPTIONS   = [10,20,35,50];
-  const TYPE_OPTIONS = [
-    {v:'boolean',     l:'Manual (tap to complete)'},
-    {v:'study-hours', l:'Study Hours (auto from timer)'},
-  ];
-  const UNIT_OPTIONS = [
-    {v:'',        l:'None'},
-    {v:'time',    l:'Time of day (HH:MM)'},
-    {v:'min',     l:'Duration in minutes'},
-    {v:'glasses', l:'Count (glasses, reps…)'},
-  ];
-  const isStudy = e.type === 'study-hours';
-  return `
-  <div class="stats-exit-bar">
-    <button onclick="S._dcAddMode=false;S._dcEditId=null;renderDailyChallengesPopup()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
-      Back
-    </button>
-    <div style="flex:1;font-size:13px;font-weight:800;text-align:center">${title}</div>
-    <div style="width:60px"></div>
-  </div>
-  <div class="dc-scroll">
-    ${existing ? `
-    <div class="dc-form-row" style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:6px">
-      <label class="dc-form-label" style="margin:0">Active</label>
-      <button class="dc-toggle ${e.enabled!==false?'on':''}" onclick="dcToggleEnabled('${profileId}','${editId}')"></button>
-    </div>` : ''}
-    <div class="dc-form-row">
-      <label class="dc-form-label">Challenge Name</label>
-      <input class="dc-form-input" id="dc-form-name" placeholder="e.g. Morning Run" value="${escChat(e.name||'')}">
-    </div>
-    <div class="dc-form-row">
-      <label class="dc-form-label">Icon (emoji)</label>
-      <input class="dc-form-input" id="dc-form-icon" placeholder="🏃" value="${e.icon||'⭐'}" style="font-size:20px;max-width:80px">
-    </div>
-    <div class="dc-form-row">
-      <label class="dc-form-label">Description</label>
-      <input class="dc-form-input" id="dc-form-desc" placeholder="e.g. Run for 30 minutes" value="${escChat(e.desc||'')}">
-    </div>
-    <div class="dc-form-row">
-      <label class="dc-form-label">Type</label>
-      <select class="dc-form-input" id="dc-form-type" onchange="dcFormTypeChanged()">
-        ${TYPE_OPTIONS.map(t=>`<option value="${t.v}" ${e.type===t.v?'selected':''}>${t.l}</option>`).join('')}
-      </select>
-    </div>
-    <div class="dc-form-row" id="dc-form-unit-row" style="${isStudy?'display:none':''}">
-      <label class="dc-form-label">Target type <span style="font-weight:400;color:var(--text-faint)">(optional)</span></label>
-      <select class="dc-form-input" id="dc-form-unit" onchange="dcFormUnitChanged()" style="max-width:240px">
-        ${UNIT_OPTIONS.map(u=>`<option value="${u.v}" ${(e.unit||'')===(u.v)?'selected':''}>${u.l}</option>`).join('')}
-      </select>
-    </div>
-    ${_dcTargetFieldHtml(e)}
-    <div class="dc-form-row">
-      <label class="dc-form-label">XP Reward</label>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
-        ${XP_OPTIONS.map(v=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;cursor:pointer">
-          <input type="radio" name="dc-xp" value="${v}" ${(e.xp||20)===v?'checked':''}> +${v} XP
-        </label>`).join('')}
-      </div>
-    </div>
-    <button class="btn btn-accent" style="width:100%;margin-top:16px" onclick="dcSaveForm('${profileId}','${editId||''}')">
-      ${editId ? '✓ Save Changes' : '+ Add Challenge'}
-    </button>
-    ${existing ? `<button class="dc-btn dc-btn-outline" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger)" onclick="dcDeleteChallenge('${profileId}','${editId}')">Delete Challenge</button>` : ''}
-  </div>`;
-}
-
-function dcSaveForm(profileId, editId){
-  const name  = document.getElementById('dc-form-name')?.value.trim();
-  const icon  = document.getElementById('dc-form-icon')?.value.trim() || '⭐';
-  const desc  = document.getElementById('dc-form-desc')?.value.trim();
-  const type  = document.getElementById('dc-form-type')?.value || 'boolean';
-  const unit  = (type === 'study-hours') ? 'hours' : (document.getElementById('dc-form-unit')?.value || '');
-  const tgtEl = document.getElementById('dc-form-target');
-  const tgtWrap = document.getElementById('dc-target-wrap');
-  let targetValue = null;
-  if(tgtEl && tgtWrap && tgtWrap.style.display !== 'none'){
-    targetValue = tgtEl.type === 'number' ? (parseFloat(tgtEl.value)||null) : (tgtEl.value||null);
-  }
-  const xpEl = document.querySelector('input[name="dc-xp"]:checked');
-  const xp   = xpEl ? parseInt(xpEl.value) : 20;
-  if(!name){ showToast('Enter a challenge name.'); return; }
-
-  // Auto-generate description if left blank
-  let finalDesc = desc;
-  if(!finalDesc){
-    if(unit==='time' && targetValue)         finalDesc = `Complete before ${targetValue}`;
-    else if(unit==='min' && targetValue)     finalDesc = `${name} for ${targetValue} minutes`;
-    else if(unit==='glasses' && targetValue) finalDesc = `${targetValue} glasses`;
-    else if(type==='study-hours' && targetValue) finalDesc = `Study for ${targetValue} hours`;
-    else finalDesc = name;
-  }
-
-  const defs = dcDefs(profileId);
-  if(editId){
-    const def = defs.find(d=>d.id===editId);
-    if(def) Object.assign(def, {name, icon, desc:finalDesc, type, unit, targetValue, xp});
-  } else {
-    defs.push({id:'dc-custom-'+Date.now().toString(36), name, icon, desc:finalDesc, type, unit, targetValue, xp, enabled:true});
-  }
-  saveShared();
-  S._dcAddMode = false; S._dcEditId = null;
-  renderDailyChallengesPopup();
-  renderApp();
-  showToast(editId ? 'Challenge updated.' : 'Challenge added!');
-}
+function exitDailyChallengesPopup(){ if(_dcHistoryActive) history.back(); else closeDailyChallengesPopup(); }
 
 init();
 </script>

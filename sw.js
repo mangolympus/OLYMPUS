@@ -256,9 +256,21 @@
 //        Also api/send-push.js now requires a signed-in session.
 // v155 — grand celebration (fireworks, confetti cannons, medal, haptics) for reaching the daily target and for clearing the day's Planner.
 //        index.html only.
-// v156 — celebration polish: synthesized fanfare/cheer/firework sound (per-device toggle + previews in Settings → Display), target is
-//        celebrated live the moment a running session crosses it, streak chip, focus kept in the dialog, phone-back closes it. index.html only.
-const CACHE_VERSION = 'olympus-v156';
+// v156 — celebration polish: no card any more, just fireworks/confetti/sound/haptics over the app (touches pass through) plus the small toast line;
+//        synthesized fanfare/cheer/firework sound (per-device toggle + previews in Settings → Display); the target is celebrated live the moment a
+//        running session crosses it. index.html only.
+// v157 — Challenges rebuilt from scratch: 3/7/14/21-day runs with a finish line and trophy; study-based ones track themselves (hours, daily target,
+//        planner, sessions), the rest are a one-tap check-in; built-in rest days; run the same challenge as the partner and see each other's progress;
+//        fireworks + sound on a win. XP/levels/'perfect day' removed (old records stay untouched in the data). index.html only.
+// v158 — Challenges audit: past-day figures bucketed once (no repeated log scans per render/tick), no more card/sheet re-animation on every tap,
+//        two-step Quit instead of a browser confirm popup, 'Try again' clears the old card, level-up steps up goal at 21 days, no duplicate
+//        challenges, decline a partner invite, Esc closes, open screen's ring/bar update live while the timer runs. index.html only.
+// v159 — Challenge notifications: morning kick-off push + evening nudge (server crons), in-app evening banner/device notification, Settings switches,
+//        tapping one opens Challenges (?go=challenges / OPEN_GO). index.html only (api/check-morning.js + api/check-reminders.js also changed).
+// v160 — timer-start notifications: own running-timer notification now also works when the page has no SW controller (first visit / hard refresh)
+//        and is shown via waitUntil; partner's "started studying" push only for a session still running, throttled, says what is studied, replaces
+//        instead of stacking, is skipped while the app is visible and is cleared when the session ends. index.html + sw.js.
+const CACHE_VERSION = 'olympus-v160';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
@@ -332,7 +344,9 @@ self.addEventListener('message', (event) => {
     if (event.data.inChat) event.waitUntil(clearChatNotifications()); // she is looking at the chat: the notification has done its job
   } else if (event.data && event.data.type === 'TIMER_NOTIFY') {
     const { title, body } = event.data;
-    self.registration.showNotification(title, {
+    // v160: without waitUntil the browser is free to shut this worker down before showNotification() has actually run -- one reason the
+    // running-timer notification sometimes just didn't appear.
+    event.waitUntil(self.registration.showNotification(title, {
       body,
       tag: 'olympus-active-timer',
       silent: true,
@@ -343,11 +357,13 @@ self.addEventListener('message', (event) => {
         { action: 'pause', title: 'Pause' },
         { action: 'stop', title: 'End' },
       ],
-    });
+    }));
   } else if (event.data && event.data.type === 'TIMER_NOTIFY_CLEAR') {
-    self.registration.getNotifications({ tag: 'olympus-active-timer' }).then((notifs) => {
+    event.waitUntil(self.registration.getNotifications({ tag: 'olympus-active-timer' }).then((notifs) => {
       notifs.forEach((n) => n.close());
-    });
+    }));
+  } else if (event.data && event.data.type === 'CLOSE_TAG' && typeof event.data.tag === 'string' && event.data.tag.startsWith('olympus-session-start-')) {
+    event.waitUntil(self.registration.getNotifications({ tag: event.data.tag }).then((notifs) => { notifs.forEach((n) => n.close()); }));
   }
 });
 
@@ -419,6 +435,9 @@ self.addEventListener('push', (event) => {
     // Wake every open window so it fetches the new message right now instead of at its next poll.
     wins.forEach((client) => client.postMessage({ type: 'PUSH_RECEIVED', payload }));
     const now = Date.now();
+    // v160: "X started studying" -- if the app is open and visible the person is already looking at the live timer (the PUSH_RECEIVED message above
+    // refreshes it), so a notification on top would only be noise.
+    if (data.kind === 'session' && wins.some((c) => c.visibilityState === 'visible')) return;
     if (isChat) {
       // Chat open and visible (reported within the last 75 s) -> the message is already appearing on screen, no notification.
       const watching = wins.some((c) => {
@@ -438,6 +457,7 @@ self.addEventListener('push', (event) => {
     if (!isChat) {
       if (payload.tag || data.tag) options.tag = payload.tag || data.tag;
       if (data.kind === 'reminder' || data.kind === 'weekly') { options.requireInteraction = true; options.renotify = !!options.tag; }
+      if (data.kind === 'session') options.renotify = !!options.tag; // a newer start replaces the old one and buzzes again
     }
     if (isChat) {
       const mid = data.mid || data.ts || now;
