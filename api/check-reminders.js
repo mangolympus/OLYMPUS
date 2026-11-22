@@ -130,6 +130,44 @@ function habitsIncompleteReasons(data, profileId, todayStr) {
     body: undone.slice(0, 3).map((h) => h.name).join(', ') + (undone.length > 3 ? '…' : ''),
   }];
 }
+
+// v159: Challenges (the rebuilt feature in index.html). A trimmed port of chlEval() -- only what a reminder needs. Only ACTIVE challenges that are
+// still winnable are returned; one that already lost (too many missed days) or ran out is left for the app to close out on its next open.
+// hitOn(d) must say whether the profile met the challenge on study day d; todayHit uses the same rule as the app.
+function challengeSnapshot(data, profileId, todayStr, hoursFn, targetToday) {
+  const list = (data.challenges && data.challenges[profileId] && data.challenges[profileId].list) || [];
+  const logs = (data.logs && data.logs[profileId]) || [];
+  const tasks = (data.tasks && data.tasks[profileId]) || [];
+  const baseTarget = Number((data.targets && data.targets[profileId]) || 4);
+  const addDays = (ds, n) => { const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const hitOn = (ch, d) => {
+    if (ch.res && ch.res[d]) return true;
+    if (ch.kind === 'hours') return hoursFn(d) >= Number(ch.goal || 0) - 0.005;
+    if (ch.kind === 'target') return hoursFn(d) >= (d === todayStr ? targetToday : baseTarget) - 0.005;
+    if (ch.kind === 'plan') { const ts = tasks.filter((t) => t.date === d); return ts.length > 0 && ts.every((t) => t.done); }
+    if (ch.kind === 'sessions') return logs.filter((l) => l.date === d).length >= Number(ch.goal || 1);
+    return false; // 'manual' counts only what was ticked (ch.res)
+  };
+  const goalText = (ch) => ch.kind === 'hours' ? `Study ${ch.goal}h` : ch.kind === 'target' ? 'Reach your daily target'
+    : ch.kind === 'plan' ? 'Finish every planner task' : ch.kind === 'sessions' ? `Log ${ch.goal}+ study sessions` : (ch.blurb || ch.name);
+  const out = [];
+  list.forEach((ch) => {
+    if (!ch || ch.status !== 'active' || !ch.start || !(ch.days > 0)) return;
+    let hits = 0, misses = 0, todayHit = false;
+    for (let i = 0; i < ch.days; i++) {
+      const d = addDays(ch.start, i);
+      if (d > todayStr) break;
+      const h = hitOn(ch, d);
+      if (d === todayStr) { todayHit = h; if (h) hits++; } else if (h) hits++; else misses++;
+    }
+    const rest = ch.rest | 0;
+    if (misses > rest || todayStr > addDays(ch.start, ch.days - 1) || todayStr < ch.start) return;
+    const dayNo = Math.round((new Date(todayStr + 'T00:00:00Z') - new Date(ch.start + 'T00:00:00Z')) / 864e5) + 1;
+    out.push({ name: String(ch.name || 'Challenge'), icon: ch.icon || '🏁', goalText: goalText(ch), days: ch.days, dayNo, hits, need: ch.days - rest, todayHit,
+      atRisk: !todayHit && rest > 0 && misses === rest });
+  });
+  return out;
+}
 // Builds the full list of reasons a profile should be reminded today — same conditions as
 // computeNotifications() client-side, so a device that never opens the PWA still gets
 // pushed the same things an open tab would show as in-app banners.
@@ -179,6 +217,18 @@ function buildReminderReasons(data, profileId, todayIST) {
   const todayRefl = data.diaryReflections && data.diaryReflections[profileId] && data.diaryReflections[profileId][todayIST];
   if (!diaryPrefOff && !(todayRefl && todayRefl.closedAt) && hoursOnDate(data, profileId, todayIST) > 0) {
     reasons.push({ title: "Today's diary isn't filled yet", body: 'Close Day from the Diary tab before you sleep.' });
+  }
+  // v159: challenges still open today (evening nudge). Honours the challengeReminder switch (a pushPrefs entry, so it syncs to Drive).
+  const chlPrefOff = data.pushPrefs && data.pushPrefs[profileId] && data.pushPrefs[profileId].challengeReminder === false;
+  if (!chlPrefOff) {
+    const open = challengeSnapshot(data, profileId, todayIST, (d) => hoursOnDate(data, profileId, d), target).filter((c) => !c.todayHit);
+    if (open.length) {
+      const risky = open.filter((c) => c.atRisk);
+      const warn = risky.length ? ` ⚠️ ${risky.length === 1 ? risky[0].name + ' has' : 'Some have'} no rest days left — a miss today ends the run.` : '';
+      reasons.push(open.length === 1
+        ? { title: `${open[0].icon} ${open[0].name} isn't done yet today`, body: `${open[0].goalText}.${warn}` }
+        : { title: `🏁 ${open.length} challenges still open today`, body: open.map((c) => c.name).join(', ') + '.' + warn });
+    }
   }
   const habitPrefOff = data.pushPrefs && data.pushPrefs[profileId] && data.pushPrefs[profileId].habitReminder === false;
   if (!habitPrefOff) reasons.push(...habitsIncompleteReasons(data, profileId, todayIST));

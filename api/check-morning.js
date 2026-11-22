@@ -52,6 +52,58 @@ function hoursOn(data, profileId, day) {
 }
 function fmtH(h) { return (Math.round(h * 10) / 10).toString().replace(/\.0$/, '') + 'h'; }
 
+
+// v159: Challenges (the rebuilt feature in index.html). A trimmed port of chlEval() -- only what a reminder needs. Only ACTIVE challenges that are
+// still winnable are returned; one that already lost (too many missed days) or ran out is left for the app to close out on its next open.
+// hitOn(d) must say whether the profile met the challenge on study day d; todayHit uses the same rule as the app.
+function challengeSnapshot(data, profileId, todayStr, hoursFn, targetToday) {
+  const list = (data.challenges && data.challenges[profileId] && data.challenges[profileId].list) || [];
+  const logs = (data.logs && data.logs[profileId]) || [];
+  const tasks = (data.tasks && data.tasks[profileId]) || [];
+  const baseTarget = Number((data.targets && data.targets[profileId]) || 4);
+  const addDays = (ds, n) => { const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const hitOn = (ch, d) => {
+    if (ch.res && ch.res[d]) return true;
+    if (ch.kind === 'hours') return hoursFn(d) >= Number(ch.goal || 0) - 0.005;
+    if (ch.kind === 'target') return hoursFn(d) >= (d === todayStr ? targetToday : baseTarget) - 0.005;
+    if (ch.kind === 'plan') { const ts = tasks.filter((t) => t.date === d); return ts.length > 0 && ts.every((t) => t.done); }
+    if (ch.kind === 'sessions') return logs.filter((l) => l.date === d).length >= Number(ch.goal || 1);
+    return false; // 'manual' counts only what was ticked (ch.res)
+  };
+  const goalText = (ch) => ch.kind === 'hours' ? `Study ${ch.goal}h` : ch.kind === 'target' ? 'Reach your daily target'
+    : ch.kind === 'plan' ? 'Finish every planner task' : ch.kind === 'sessions' ? `Log ${ch.goal}+ study sessions` : (ch.blurb || ch.name);
+  const out = [];
+  list.forEach((ch) => {
+    if (!ch || ch.status !== 'active' || !ch.start || !(ch.days > 0)) return;
+    let hits = 0, misses = 0, todayHit = false;
+    for (let i = 0; i < ch.days; i++) {
+      const d = addDays(ch.start, i);
+      if (d > todayStr) break;
+      const h = hitOn(ch, d);
+      if (d === todayStr) { todayHit = h; if (h) hits++; } else if (h) hits++; else misses++;
+    }
+    const rest = ch.rest | 0;
+    if (misses > rest || todayStr > addDays(ch.start, ch.days - 1) || todayStr < ch.start) return;
+    const dayNo = Math.round((new Date(todayStr + 'T00:00:00Z') - new Date(ch.start + 'T00:00:00Z')) / 864e5) + 1;
+    out.push({ name: String(ch.name || 'Challenge'), icon: ch.icon || '🏁', goalText: goalText(ch), days: ch.days, dayNo, hits, need: ch.days - rest, todayHit,
+      atRisk: !todayHit && rest > 0 && misses === rest });
+  });
+  return out;
+}
+
+function buildChallengeMorning(items) {
+  if (!items.length) return null;
+  const left = (c) => Math.max(0, c.need - c.hits);
+  if (items.length === 1) {
+    const c = items[0];
+    const lead = c.dayNo === 1 ? 'starts today' : `day ${c.dayNo} of ${c.days}`;
+    let body = `Today: ${c.goalText.charAt(0).toLowerCase() + c.goalText.slice(1)}. ${left(c) > 0 ? left(c) + ' more to win.' : 'Win secured — finish strong!'}`;
+    if (c.atRisk) body += ' ⚠️ No rest days left — a miss today ends the run.';
+    return { title: `${c.icon} ${c.name} · ${lead}`, body };
+  }
+  return { title: `🏁 ${items.length} challenges today`, body: items.map((c) => `• ${c.icon} ${c.name} — day ${c.dayNo}/${c.days}${c.atRisk ? ' ⚠️' : ''}`).join('\n') };
+}
+
 // Monday is `today`; the review covers last Monday..Sunday against the week before it.
 function weekStats(data, profileId, mondayStr) {
   const target = Number((data.targets && data.targets[profileId]) || 4);
@@ -172,6 +224,15 @@ export default async function handler(req, res) {
           else result.skipped.push({ profileId, kind: 'weekly', reason: 'no data to review' });
         }
       }
+      // v159: challenge kick-off -- one push a morning when the profile has a challenge still running (pref: challengeReminder).
+      if (pp.challengeReminder !== false) {
+        const sentOn = state.challengeMorningSent && state.challengeMorningSent[profileId];
+        if (sentOn !== t.studyDay) {
+          const target = Number((data.targets && data.targets[profileId]) || 4);
+          const msg = buildChallengeMorning(challengeSnapshot(data, profileId, t.studyDay, (d) => hoursOn(data, profileId, d), target));
+          if (msg) await send(profileId, 'challenge', 'am', msg.title, msg.body, { go: 'challenges', url: './?go=challenges' });
+        }
+      }
       // Yesterday's diary still open (it blocks the timer from v138 on). Not for someone with no history at all.
       if (pp.diaryReminder !== false) {
         const hasHistory = ((data.logs && data.logs[profileId]) || []).some((l) => l.date < t.studyDay);
@@ -194,9 +255,11 @@ export default async function handler(req, res) {
       if (!target.pushState) target.pushState = { targetHitDate: {} };
       if (!target.pushState.weeklyReviewSent) target.pushState.weeklyReviewSent = {};
       if (!target.pushState.diaryMorningSent) target.pushState.diaryMorningSent = {};
+      if (!target.pushState.challengeMorningSent) target.pushState.challengeMorningSent = {};
       stamps.forEach(({ profileId, kind }) => {
         if (kind === 'weekly') target.pushState.weeklyReviewSent[profileId] = t.studyDay;
         else if (kind === 'diary') target.pushState.diaryMorningSent[profileId] = t.studyDay;
+        else if (kind === 'challenge') target.pushState.challengeMorningSent[profileId] = t.studyDay;
       });
       // An expired subscription is left for the owner's own device to repair (see reconcilePushSubscription() in index.html).
       await uploadData(accessToken, fileId, target);
