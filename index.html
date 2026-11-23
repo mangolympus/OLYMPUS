@@ -1216,7 +1216,7 @@ body.daily-challenges-mode #daily-challenges-root{display:flex}
 .chl-link.warn{color:var(--danger,#d33);font-weight:800}
 .chl-invite .x{background:none;color:var(--text-faint);padding:6px 8px;font-size:15px;margin-left:-6px}
 .chl-link{background:none;border:none;color:var(--text-faint);font-size:11.5px;text-decoration:underline;cursor:pointer;padding:4px 2px}
-.chl-foot{display:flex;justify-content:flex-end;margin-top:6px}
+.chl-foot{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
 .chl-duo{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-muted)}
 .chl-duo b{color:var(--text)}
 .chl-duo .chl-dots{margin:0;gap:3px;flex:1;min-width:0}
@@ -1266,6 +1266,17 @@ body.daily-challenges-mode #daily-challenges-root{display:flex}
 .chl-note b{color:var(--text)}
 .chl-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;font-size:13.5px;color:var(--text)}
 .chl-row small{display:block;color:var(--text-muted);font-size:11.5px;margin-top:2px}
+/* v161: long-press to edit rules */
+.chl-tpl,.chl-card{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.chl-tpl.lp,.chl-card.lp{box-shadow:0 0 0 2px var(--c1),0 6px 22px color-mix(in srgb,var(--c1) 35%,transparent);filter:brightness(1.1);transition:box-shadow .3s,filter .3s}
+.chl-hint{margin:14px 2px 2px;font-size:11.5px;color:var(--text-faint);text-align:center}
+.chl-step{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);border-radius:14px;background:var(--surface2);padding:6px}
+.chl-step b{flex:1;text-align:center;font-size:16px;font-weight:800;color:var(--text)}
+.chl-step button{width:44px;height:40px;border-radius:10px;border:0;background:var(--surface);color:var(--c1);font-size:22px;font-weight:800;cursor:pointer;font-family:inherit}
+.chl-step button:active{transform:scale(.92)}
+.chl-step button:disabled{opacity:.3}
+.chl-adv{display:block;width:100%;margin-top:14px;padding:11px;border-radius:12px;border:1px dashed var(--border);background:transparent;color:var(--text-muted);font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer}
+.chl-sm{display:block;margin-top:5px;font-size:11.5px;color:var(--text-muted);line-height:1.4}
 .chl-sw{width:46px;height:27px;border-radius:14px;border:none;background:var(--surface2);box-shadow:inset 0 0 0 1.5px var(--border);position:relative;cursor:pointer;flex:0 0 auto;transition:background .2s}
 .chl-sw::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .chl-sw.on{background:var(--c1);box-shadow:none}
@@ -21007,6 +21018,13 @@ function chlTpl(id){ return CHL_TPLS.find(t=>t.id===id) || CHL_TPLS[CHL_TPLS.len
 function chlAddDays(ds, n){ const d = new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return localDateStr(d); }
 function chlRestFor(days, strict){ return strict ? 0 : (days>=21 ? 3 : days>=14 ? 2 : days>=7 ? 1 : 0); }
 function chlSameKind(a, b){ return a.tpl===b.tpl && (a.tpl!=='custom' || String(a.name).trim().toLowerCase()===String(b.name).trim().toLowerCase()); }
+// v161: a goal changed mid-run applies from the day it was changed -- days already finished keep the goal they were played under
+// (ch.g0 = goal before the first edit, ch.gh = [{from,goal}] edits in order).
+function chlGoalAt(ch, date){
+  let g = ch.g0 != null ? ch.g0 : ch.goal;
+  if(ch.gh) for(let i=0;i<ch.gh.length;i++) if(date >= ch.gh[i].from) g = ch.gh[i].goal;
+  return Number(g);
+}
 function chlGoalText(ch){
   if(ch.kind==='hours')    return `Study ${gcHM(Number(ch.goal)||0)} every day`;
   if(ch.kind==='target')   return 'Reach your daily study target';
@@ -21036,7 +21054,7 @@ function chlAutoHit(p, ch, date){
   const isToday = date === todayStr();
   if(ch.kind==='hours' || ch.kind==='target'){
     const h = isToday ? todayHoursLive(p) : (chlMemo(p).h[date] || 0);
-    const g = ch.kind==='hours' ? (Number(ch.goal)||0) : (isToday ? effectiveTodayTarget(p) : (S.shared.targets && S.shared.targets[p]) || 4);
+    const g = ch.kind==='hours' ? (chlGoalAt(ch, date)||0) : (isToday ? effectiveTodayTarget(p) : (S.shared.targets && S.shared.targets[p]) || 4);
     return h >= g - 0.005;
   }
   if(ch.kind==='plan'){
@@ -21045,7 +21063,7 @@ function chlAutoHit(p, ch, date){
   }
   if(ch.kind==='sessions'){
     const n = isToday ? liveSessionsOnDate(p, date) : (chlMemo(p).n[date] || 0);
-    return n >= (Number(ch.goal)||1);
+    return n >= (chlGoalAt(ch, date)||1);
   }
   return false;
 }
@@ -21178,19 +21196,105 @@ function chlOpenSheet(tplId, pre){
   const me = S.local.myProfile; if(!me) return;
   if(chlList(me).filter(c=>c.status==='active').length >= CHL_MAX_ACTIVE){ showToast(`You already have ${CHL_MAX_ACTIVE} active challenges — finish or quit one first.`); return; }
   const t = chlTpl(tplId); pre = pre || {};
-  S._chSheet = {tpl:t.id, goal: pre.goal!=null ? pre.goal : t.goal, days: pre.days || t.days || 7, strict: !!pre.strict,
+  S._chSheet = {tpl:t.id, goal: pre.goal!=null ? pre.goal : t.goal, days: pre.days || t.days || 7, strict: !!pre.strict, rest: pre.rest!=null ? pre.rest : null,
+    blurb: pre.blurb || '', adv: !!pre.adv, edit: null, minRest: 0, minDays: CHL_MINDAYS,
     cue: pre.cue || '', open: pre.open!=null ? !!pre.open : !!t.open, name: pre.name || '', icon: pre.icon || '🎯', retry: pre.retry || null, fresh: true};
   S._chQuit = null;
   renderDailyChallengesPopup();
 }
-function chlSet(k, v){ if(!S._chSheet) return; S._chSheet[k] = v; renderDailyChallengesPopup(); }
+function chlSet(k, v){ if(!S._chSheet) return; S._chSheet[k] = v; if(k==='strict') S._chSheet.rest = null; renderDailyChallengesPopup(); }
+// v161 -- editable rules. Goal / length / rest days / the rule text can be changed before starting (hold a template card, or "Customize rules")
+// and while a challenge is running (hold its card). Running challenges can only get longer, can't drop rest days below the ones already used.
+const CHL_MINDAYS = 3, CHL_MAXDAYS = 30;
+function chlEffRest(sh){ let r = sh.rest!=null ? sh.rest : chlRestFor(sh.days, sh.strict); r = Math.min(r, sh.days-1); if(sh.minRest) r = Math.max(r, sh.minRest); return Math.max(0, r); }
+function chlStep(k, dir){
+  const sh = S._chSheet; if(!sh) return; const t = chlTpl(sh.tpl);
+  if(k==='goal'){
+    const hrs = t.kind==='hours', st = hrs ? 0.5 : 1, lo = hrs ? 0.5 : 1, hi = hrs ? 16 : 10;
+    sh.goal = Math.max(lo, Math.min(hi, Math.round(((Number(sh.goal)||t.goal) + dir*st)*2)/2));
+  } else if(k==='days'){
+    sh.days = Math.max(sh.minDays||CHL_MINDAYS, Math.min(CHL_MAXDAYS, (Number(sh.days)||7) + dir));
+    if(sh.rest!=null) sh.rest = Math.min(sh.rest, sh.days-1);
+  }
+  renderDailyChallengesPopup();
+}
+function chlEditOpen(id){
+  const me = S.local.myProfile; if(!me) return;
+  chlSync(me);                                                   // freezes finished days first, so editing can't rewrite them
+  const ch = chlList(me).find(c=>c.id===id); if(!ch || ch.status!=='active'){ chlRefresh(); return; }
+  const ev = chlEval(me, ch), t = chlTpl(ch.tpl);
+  S._chSheet = {tpl:t.id, goal:ch.goal, days:ch.days, strict:!!ch.strict, rest:ch.rest|0, blurb: ch.blurb || '', adv:true, edit:ch.id,
+    minRest:ev.misses, minDays:ch.days, cue:ch.cue||'', open:!!ch.open, name:ch.name, icon:ch.icon, retry:null, fresh:true};
+  S._chQuit = null;
+  renderDailyChallengesPopup();
+}
+function chlSaveEdit(){
+  const me = S.local.myProfile, sh = S._chSheet; if(!me || !sh || !sh.edit) return;
+  const ch = chlList(me).find(c=>c.id===sh.edit); if(!ch || ch.status!=='active'){ chlCloseSheet(); return; }
+  const t = chlTpl(ch.tpl);
+  const name = t.custom ? String(sh.name||'').trim().slice(0,40) : ch.name;
+  if(!name){ showToast('Give your challenge a name.'); return; }
+  if(t.custom && chlList(me).some(c=>c.id!==ch.id && c.status==='active' && c.tpl===t.id && String(c.name).trim().toLowerCase()===name.toLowerCase())){ showToast(`"${name}" is already running.`); return; }
+  const today = todayStr();
+  if(t.goalOpts){
+    const g = Number(sh.goal);
+    if(g > 0 && g !== Number(ch.goal)){
+      if(ch.g0 == null) ch.g0 = ch.goal;
+      ch.gh = (ch.gh||[]).filter(e=>e.from !== today); ch.gh.push({from:today, goal:g}); ch.goal = g;
+    }
+  }
+  const days = Math.max(ch.days, Math.min(CHL_MAXDAYS, Math.floor(Number(sh.days)||ch.days)));
+  const rule = String(sh.blurb||'').trim().slice(0,60);
+  sh.days = days;
+  const rest = chlEffRest(sh);
+  ch.days = days; ch.rest = rest; ch.strict = rest===0 && chlRestFor(days,false)>0;
+  ch.name = name; if(t.custom) ch.icon = sh.icon || ch.icon;
+  ch.blurb = t.custom ? rule : (rule || t.blurb);
+  ch.cue = String(sh.cue||'').trim().slice(0,80); ch.open = !!sh.open;
+  S._chSheet = null;
+  saveShared();
+  chlSync(me);                                                   // the new rules may already count today (or end the run)
+  showToast(`${ch.icon} ${ch.name}: rules updated.`);
+  chlRefresh();
+}
+// Long-press (≈½ s) on a challenge card opens its rules. The click that follows the press is swallowed so it can't also check in / start / close.
+let _chlLpBlock = false;
+function chlBindLongPress(root){
+  if(!root || root._lp) return; root._lp = 1;
+  let timer = 0, vis = 0, sx = 0, sy = 0, el = null;
+  const clear = ()=>{ clearTimeout(timer); clearTimeout(vis); timer = vis = 0; if(el){ el.classList.remove('lp'); el = null; } };
+  root.addEventListener('pointerdown', e=>{
+    if(S._chSheet || (e.pointerType==='mouse' && e.button!==0)) return;
+    const c = e.target.closest && e.target.closest('[data-lp-tpl],[data-lp-ch]'); if(!c || !root.contains(c)) return;
+    if(c.dataset.lpCh && e.target.closest('button,a,input')) return;   // a slow press on "I did it today" / Quit must not open the editor
+    clear(); sx = e.clientX; sy = e.clientY; el = c;
+    vis = setTimeout(()=>{ if(el) el.classList.add('lp'); }, 140);
+    timer = setTimeout(()=>{
+      timer = 0; const tid = c.dataset.lpTpl, cid = c.dataset.lpCh; clear();
+      try{ if(navigator.vibrate) navigator.vibrate(24); }catch(_){}
+      // The sheet is drawn while the finger is still down, so the pressed element is gone by the time the finger lifts -- on a phone the pointerup /
+      // click may never reach the document. So the click-swallow doesn't wait for a pointerup: it ends at the NEXT touch (whose pointerdown always
+      // comes after the lift's click), with a 20 s safety net.
+      _chlLpBlock = true;
+      const unblock = ()=>{ _chlLpBlock = false; document.removeEventListener('pointerdown', unblock, true); };
+      document.addEventListener('pointerdown', unblock, {capture:true});
+      setTimeout(unblock, 20000);
+      if(cid) chlEditOpen(cid); else if(tid) chlOpenSheet(tid, {adv:true});
+    }, 500);
+  }, {passive:true});
+  root.addEventListener('pointermove', e=>{ if(timer && Math.hypot(e.clientX-sx, e.clientY-sy) > 10) clear(); }, {passive:true});
+  ['pointerup','pointercancel'].forEach(ev=>root.addEventListener(ev, clear, {passive:true}));
+  root.addEventListener('scroll', clear, {capture:true, passive:true});
+  root.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('[data-lp-tpl],[data-lp-ch]') && !e.target.closest('input,textarea')) e.preventDefault(); });
+  root.addEventListener('click', e=>{ if(_chlLpBlock){ e.preventDefault(); e.stopPropagation(); } }, true);
+}
 function chlCloseSheet(){ S._chSheet = null; renderDailyChallengesPopup(); }
 // What "again" means: after a WIN, step it up (longer run, or a higher daily goal once at 21 days); after a loss, the same run again.
 function chlNextStep(ch){
   const t = chlTpl(ch.tpl); let days = ch.days, goal = ch.goal, up = false;
   if(ch.status==='won'){
-    const i = CHL_DURS.indexOf(ch.days);
-    if(i>=0 && i<CHL_DURS.length-1){ days = CHL_DURS[i+1]; up = true; }
+    const nx = CHL_DURS.find(d=>d>ch.days);
+    if(nx){ days = nx; up = true; }
     else if(t.goalOpts){ const gi = t.goalOpts.indexOf(Number(ch.goal)); if(gi>=0 && gi<t.goalOpts.length-1){ goal = t.goalOpts[gi+1]; up = true; } }
   }
   return {days, goal, up};
@@ -21198,7 +21302,14 @@ function chlNextStep(ch){
 function chlAgain(id){
   const ch = chlList(S.local.myProfile).find(c=>c.id===id); if(!ch) return;
   const n = chlNextStep(ch);
-  chlOpenSheet(ch.tpl, {goal:n.goal, days:n.days, strict:!!ch.strict, cue:ch.cue, open:ch.open, name:ch.name, icon:ch.icon, retry: ch.status==='ended' ? ch.id : null});
+  chlOpenSheet(ch.tpl, Object.assign(chlPreFrom(ch, n.days, n.goal), {cue:ch.cue, open:ch.open, retry: ch.status==='ended' ? ch.id : null}));
+}
+// Carries a challenge's own rules (custom rule text / rest days / goal / length) into a new sheet, opening the rules section if any are non-standard.
+function chlPreFrom(ch, days, goal){
+  const t = chlTpl(ch.tpl), std = chlRestFor(ch.days, ch.strict), oddRest = (ch.rest|0) !== std;   // "custom" = differs from the default of the run it came from
+  const oddText = !!ch.blurb && ch.blurb !== t.blurb && !t.custom;
+  const oddGoal = !!t.goalOpts && !t.goalOpts.includes(Number(goal));
+  return {goal, days, strict:!!ch.strict, name:ch.name, icon:ch.icon, blurb:ch.blurb||'', rest: oddRest ? Math.min(ch.rest|0, days-1) : null, adv: oddRest || oddText || oddGoal || !CHL_DURS.includes(days)};
 }
 function chlStart(){
   const me = S.local.myProfile, sh = S._chSheet; if(!me || !sh) return;
@@ -21206,10 +21317,12 @@ function chlStart(){
   if(chlList(me).filter(c=>c.status==='active').length >= CHL_MAX_ACTIVE){ showToast(`Max ${CHL_MAX_ACTIVE} active challenges.`); return; }
   const name = t.custom ? String(sh.name||'').trim().slice(0,40) : t.name;
   if(!name){ showToast('Give your challenge a name.'); return; }
-  const days = CHL_DURS.includes(sh.days) ? sh.days : 7;
+  const days = Number.isInteger(sh.days) && sh.days>=CHL_MINDAYS && sh.days<=CHL_MAXDAYS ? sh.days : 7;
+  const rest = chlEffRest(Object.assign({}, sh, {days, minRest:0}));
+  const rule = String(sh.blurb||'').trim().slice(0,60);
   if(chlList(me).some(c=>c.status==='active' && c.tpl===t.id && (!t.custom || String(c.name).trim().toLowerCase()===name.toLowerCase()))){ showToast(`"${name}" is already running.`); return; }
   const ch = {id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), tpl:t.id, name, icon: t.custom ? (sh.icon||'🎯') : t.icon,
-    kind:t.kind, goal: t.goal!=null ? Number(sh.goal)||t.goal : null, blurb: t.custom ? '' : t.blurb, days, strict:!!sh.strict, rest:chlRestFor(days, sh.strict),
+    kind:t.kind, goal: t.goal!=null ? Number(sh.goal)||t.goal : null, blurb: t.custom ? rule : (rule || t.blurb), days, strict: rest===0 && chlRestFor(days,false)>0, rest,
     start:todayStr(), cue:String(sh.cue||'').trim().slice(0,80), open:!!sh.open, status:'active', res:{}, cel:{}, created:nowISO()};
   chlList(me).push(ch);
   if(sh.retry){ const old = chlList(me).find(c=>c.id===sh.retry); if(old) old.seen = 1; }
@@ -21227,7 +21340,7 @@ function chlStart(){
 // ── partner (duo) ───────────────────────────────────────────────────────────
 function chlJoin(cid){
   const o = otherProfileId(S.local.myProfile), c = chlList(o).find(x=>x.id===cid); if(!c) return;
-  chlOpenSheet(c.tpl, {goal:c.goal, days:c.days, strict:!!c.strict, open:true, name:c.name, icon:c.icon});
+  chlOpenSheet(c.tpl, Object.assign(chlPreFrom(c, c.days, c.goal), {open:true}));
 }
 function chlPartnerMatch(me, ch){
   const o = otherProfileId(me);
@@ -21299,7 +21412,7 @@ function chlCardHtml(me, ch){
     const o = otherProfileId(me), pe = chlEval(o, pc), nick = profileById(o).nick;
     duo = `<div class="chl-duo"><span><b>${nick}</b> · day ${pe.dayNo}/${pc.days}</span><div class="chl-dots fit">${chlDotsHtml(pe, pc, false)}</div><span class="tog">${pe.todayHit && ev.todayHit ? '🤝 Both done' : pe.todayHit ? `${nick} ✓ today` : ''}</span></div>`;
   }
-  return `<div class="chl-card ${ev.todayHit?'done':''}" style="${style}">
+  return `<div class="chl-card ${ev.todayHit?'done':''}" data-lp-ch="${ch.id}" style="${style}">
     <div class="chl-head">${chlRingHtml(tdy, ch)}
       <div style="min-width:0"><div class="chl-name">${escChat(ch.name)}</div><div class="chl-sub">${escChat(chlGoalText(ch))}</div></div>
       <div class="chl-day">Day ${ev.dayNo}/${ch.days}</div></div>
@@ -21307,35 +21420,51 @@ function chlCardHtml(me, ch){
     <div class="chl-meta"><span>${ev.rest>0 ? `🛡 <b>${ev.restLeft}</b> of ${ev.rest} rest day${ev.rest>1?'s':''} left` : '⚡ Strict — no rest days'}</span><span>${remaining>0 ? `<b>${remaining}</b> more to win` : '<b>Win secured</b> 🏆'}</span></div>
     ${ch.cue ? `<div class="chl-cue">🔗 ${escChat(ch.cue)}</div>` : ''}
     ${action}${duo}
-    <div class="chl-foot"><button class="chl-link ${S._chQuit===ch.id?'warn':''}" onclick="chlQuit('${ch.id}')">${S._chQuit===ch.id ? 'Tap again to quit' : 'Quit'}</button></div>
+    <div class="chl-foot"><button class="chl-link" onclick="chlEditOpen('${ch.id}')">✎ Edit rules</button><button class="chl-link ${S._chQuit===ch.id?'warn':''}" onclick="chlQuit('${ch.id}')">${S._chQuit===ch.id ? 'Tap again to quit' : 'Quit'}</button></div>
   </div>`;
 }
 function chlSheetHtml(){
   const sh = S._chSheet; if(!sh) return '';
-  const t = chlTpl(sh.tpl), rest = chlRestFor(sh.days, sh.strict), need = sh.days - rest;
+  const t = chlTpl(sh.tpl), rest = chlEffRest(sh), need = sh.days - rest, edit = !!sh.edit, adv = !!sh.adv;
   const nick = profileById(otherProfileId(S.local.myProfile)).nick;
   const title = t.custom ? (sh.name.trim() || 'My own challenge') : t.name;
   const icon  = t.custom ? sh.icon : t.icon;
   const auto = t.kind!=='manual';
+  const g = Number(sh.goal)||t.goal;
+  const goalCtl = !t.goalOpts ? '' : (adv
+    ? `<div class="chl-lbl">${t.goalLbl}</div><div class="chl-step"><button onclick="chlStep('goal',-1)" aria-label="Less">−</button><b>${t.kind==='hours' ? gcHM(g) : g+' sessions'}</b><button onclick="chlStep('goal',1)" aria-label="More">+</button></div>${edit ? '<span class="chl-sm">A new goal counts from today — days already finished keep the goal they were played under.</span>' : ''}`
+    : `<div class="chl-lbl">${t.goalLbl}</div><div class="chl-chips">${t.goalOpts.map(o=>`<button class="chl-chip ${g===o?'on':''}" onclick="chlSet('goal',${o})">${o}${t.kind==='hours'?'h':''}</button>`).join('')}</div>`);
+  const daysCtl = adv
+    ? `<div class="chl-lbl">${edit ? 'Length' : 'How long?'}</div><div class="chl-step"><button onclick="chlStep('days',-1)" aria-label="Shorter" ${sh.days<=(sh.minDays||CHL_MINDAYS)?'disabled':''}>−</button><b>${sh.days} days</b><button onclick="chlStep('days',1)" aria-label="Longer" ${sh.days>=CHL_MAXDAYS?'disabled':''}>+</button></div>${edit ? '<span class="chl-sm">A running challenge can be made longer, not shorter.</span>' : ''}`
+    : `<div class="chl-lbl">How long?</div><div class="chl-chips">${CHL_DURS.map(d=>`<button class="chl-chip ${sh.days===d?'on':''}" onclick="chlSet('days',${d})">${d} days</button>`).join('')}</div>`;
+  const restOpts = [0,1,2,3].filter(r=> r<=sh.days-1 && r>=(sh.minRest||0));
+  const styleCtl = adv
+    ? `<div class="chl-lbl">Rest days</div><div class="chl-chips">${restOpts.map(r=>`<button class="chl-chip ${rest===r?'on':''}" onclick="S._chSheet.rest=${r};S._chSheet.strict=${r===0};renderDailyChallengesPopup()">${r===0?'⚡ None':'🛡 '+r}</button>`).join('')}</div><span class="chl-sm">Days you can miss and still win.${edit && sh.minRest ? ` ${sh.minRest} already used, so ${sh.minRest===1?'that is':'those are'} the minimum.` : ''}</span>`
+    : (sh.days>=7 ? `<div class="chl-lbl">Style</div><div class="chl-chips"><button class="chl-chip ${!sh.strict?'on':''}" onclick="chlSet('strict',false)">🛡 Flexible</button><button class="chl-chip ${sh.strict?'on':''}" onclick="chlSet('strict',true)">⚡ Strict</button></div>` : '');
+  const ruleCtl = (adv && (t.kind==='manual' || t.custom))
+    ? `<div class="chl-lbl">Your rule${t.custom ? ' <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span>' : ''}</div><input class="chl-in" maxlength="60" placeholder="${escChat(t.custom ? 'e.g. 20 MCQs before lunch' : t.blurb)}" value="${escChat(sh.blurb)}" oninput="S._chSheet.blurb=this.value">`
+    : '';
+  const sub = edit ? 'Edit the rules of this challenge' : (t.custom ? 'A daily habit you check in on' : escChat(sh.blurb || t.blurb));
   return `<div class="chl-sheet-bg ${sh.fresh?'':'nf'}" onclick="chlCloseSheet()"></div>
-  <div class="chl-sheet ${sh.fresh?'':'nf'}" style="--c1:${t.c1};--c2:${t.c2}" role="dialog" aria-modal="true" aria-label="Start ${escChat(title)}">
+  <div class="chl-sheet ${sh.fresh?'':'nf'}" style="--c1:${t.c1};--c2:${t.c2}" role="dialog" aria-modal="true" aria-label="${edit?'Edit':'Start'} ${escChat(title)}">
     <div class="chl-grab"></div>
-    <div class="chl-sh-head"><div class="e">${icon}</div><div><b>${escChat(title)}</b><span>${t.custom ? 'A daily habit you check in on' : escChat(t.blurb)}</span></div></div>
+    <div class="chl-sh-head"><div class="e">${icon}</div><div><b>${escChat(title)}</b><span>${sub}</span></div></div>
     ${t.custom ? `<div class="chl-lbl">Name</div><input class="chl-in" maxlength="40" placeholder="e.g. Solve 20 MCQs" value="${escChat(sh.name)}" oninput="S._chSheet.name=this.value">
       <div class="chl-lbl">Icon</div><div class="chl-chips">${CHL_ICONS.map(e=>`<button class="chl-chip ${sh.icon===e?'on':''}" onclick="chlSet('icon','${e}')">${e}</button>`).join('')}</div>` : ''}
-    ${t.goalOpts ? `<div class="chl-lbl">${t.goalLbl}</div><div class="chl-chips">${t.goalOpts.map(g=>`<button class="chl-chip ${Number(sh.goal)===g?'on':''}" onclick="chlSet('goal',${g})">${g}${t.kind==='hours'?'h':''}</button>`).join('')}</div>` : ''}
-    <div class="chl-lbl">How long?</div>
-    <div class="chl-chips">${CHL_DURS.map(d=>`<button class="chl-chip ${sh.days===d?'on':''}" onclick="chlSet('days',${d})">${d} days</button>`).join('')}</div>
-    ${sh.days>=7 ? `<div class="chl-lbl">Style</div><div class="chl-chips"><button class="chl-chip ${!sh.strict?'on':''}" onclick="chlSet('strict',false)">🛡 Flexible</button><button class="chl-chip ${sh.strict?'on':''}" onclick="chlSet('strict',true)">⚡ Strict</button></div>` : ''}
+    ${ruleCtl}
+    ${goalCtl}
+    ${daysCtl}
+    ${styleCtl}
     <div class="chl-note">Win by hitting <b>${need} of ${sh.days} days</b>${rest>0 ? ` — <b>${rest} rest day${rest>1?'s':''}</b> are built in, so one slip won't end it.` : ' — every single day counts.'} ${auto ? 'It tracks itself from your study data.' : 'Tap once a day to check in.'}</div>
     <div class="chl-lbl">When &amp; where will you do it? <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span></div>
     <input class="chl-in" maxlength="80" placeholder="${escChat(t.cueEx)}" value="${escChat(sh.cue)}" oninput="S._chSheet.cue=this.value">
     <div class="chl-row"><div>Let ${nick} see &amp; join<small>Shows this challenge and your progress to ${nick}</small></div><button class="chl-sw ${sh.open?'on':''}" role="switch" aria-checked="${!!sh.open}" aria-label="Let ${nick} see and join" onclick="chlSet('open',${!sh.open})"></button></div>
-    <button class="chl-btn chl-go" onclick="chlStart()">Start ${sh.days}-day challenge →</button>
+    ${!adv ? `<button class="chl-adv" onclick="chlSet('adv',true)">⚙ Customize rules</button>` : ''}
+    ${edit ? `<button class="chl-btn chl-go" onclick="chlSaveEdit()">Save rules</button>` : `<button class="chl-btn chl-go" onclick="chlStart()">Start ${sh.days}-day challenge →</button>`}
   </div>`;
 }
 function chlTplCardHtml(t){
-  return `<button class="chl-tpl ${t.rec?'rec':''}" style="--c1:${t.c1};--c2:${t.c2}" onclick="chlOpenSheet('${t.id}')"><span class="e">${t.icon}</span><b>${t.name}</b><span>${t.blurb}</span><em>${t.kind==='manual' ? 'Daily check-in' : 'Tracks itself'}</em></button>`;
+  return `<button class="chl-tpl ${t.rec?'rec':''}" data-lp-tpl="${t.id}" style="--c1:${t.c1};--c2:${t.c2}" onclick="chlOpenSheet('${t.id}')"><span class="e">${t.icon}</span><b>${t.name}</b><span>${t.blurb}</span><em>${t.kind==='manual' ? 'Daily check-in' : 'Tracks itself'}</em></button>`;
 }
 function chlShelfHtml(shelf){
   return `<div class="chl-shelf">${shelf.slice(0,12).map(c=>{
@@ -21373,6 +21502,7 @@ function renderDailyChallengesPopup(){
       return `<div class="chl-soft"><b>${c.icon} ${escChat(c.name)}</b> — you got <b>${ev.hits} of ${c.days}</b> days. Not this time, but that's real progress.<div class="row"><button class="p" onclick="chlAgain('${c.id}')">↻ Try again</button><button onclick="chlDismiss('${c.id}')">Dismiss</button></div></div>`; }).join('')}
     ${active.length ? `<div class="chl-h">Today <em>${new Date(todayStr()+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'})}</em></div>${active.map(c=>chlCardHtml(me,c)).join('')}`
       : `<div class="chl-hero"><div class="e">🏁</div><h2>Pick a challenge. Finish the run.</h2><p>Study-based challenges track themselves from your hours, target and planner. Rest days keep one bad day from ending it. Win it to earn a trophy.</p></div>`}
+    <div class="chl-hint">💡 Hold any challenge to edit its rules</div>
     ${full ? `<div class="chl-soft" style="margin-top:6px">You're at ${CHL_MAX_ACTIVE} active challenges. Finish or quit one to start another — focus beats a long list.</div>` : `
       ${study.length ? `<div class="chl-h">Study challenges <em>track themselves</em></div><div class="chl-grid">${study.map(chlTplCardHtml).join('')}</div>` : ''}
       ${habits.length ? `<div class="chl-h">Daily habits <em>tap to check in</em></div><div class="chl-grid">${habits.map(chlTplCardHtml).join('')}</div>` : ''}`}
@@ -21415,6 +21545,7 @@ function openDailyChallengesPopup(){
     window.addEventListener('popstate', _onDCBackButton);
   }
   S.dcPopupOpen = true; S._chSheet = null; S._chQuit = null; S._chAnim = true;
+  chlBindLongPress(document.getElementById('daily-challenges-root'));
   document.addEventListener('keydown', _onDCKey);
   document.body.classList.add('daily-challenges-mode');
   renderDailyChallengesPopup();
