@@ -267,6 +267,11 @@
 //        challenges, decline a partner invite, Esc closes, open screen's ring/bar update live while the timer runs. index.html only.
 // v159 — Challenge notifications: morning kick-off push + evening nudge (server crons), in-app evening banner/device notification, Settings switches,
 //        tapping one opens Challenges (?go=challenges / OPEN_GO). index.html only (api/check-morning.js + api/check-reminders.js also changed).
+// v167 — snow engine stops while the opaque full-screen timer is up (no hours of invisible animation / battery drain) and resumes when it closes. index.html + sw.js.
+// v166 — snow polish: tap puffs, tilt leans the wind, tumbling crystals + glints, wind-smeared dust, northern glow (toggle), celebration gust, calmer while the study timer runs,
+//        low-battery mode. index.html + sw.js.
+// v165 — snow background rebuilt from scratch: 4 depth layers (dust / flakes / crystal flakes / soft bokeh), wind + gusts, swipe & scroll interaction, fog, self-throttling;
+//        Settings: snowfall intensity + wind-follows-you toggle. index.html + sw.js.
 // v164 — audit: Early Bird started after its window no longer begins with a lapsed day 1; Challenges live refresh can't freeze after a mid-press redraw and stops itself
 //        when the screen closes; SW messaging fallback can't pile up when no worker is registered; wake stepper locked once today lapsed. index.html + sw.js.
 // v163 — Early Bird is time-locked (check in before your wake-up time, 9:00 AM by default, +10 min buffer, then the day lapses); study challenges and the Challenges
@@ -277,7 +282,7 @@
 // v160 — timer-start notifications: own running-timer notification now also works when the page has no SW controller (first visit / hard refresh)
 //        and is shown via waitUntil; partner's "started studying" push only for a session still running, throttled, says what is studied, replaces
 //        instead of stacking, is skipped while the app is visible and is cleared when the session ends. index.html + sw.js.
-const CACHE_VERSION = 'olympus-v164';
+const CACHE_VERSION = 'olympus-v167';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the

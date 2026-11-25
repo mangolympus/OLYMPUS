@@ -2418,6 +2418,7 @@ const _celebQ = [];
 let _celebBusy = false, _celebLastText = '', _celebLastAt = 0;
 function celebrateMilestone(text){
   text = String(text||'').trim(); if(!text) return;
+  try{ snowBurst(); }catch(e){}
   if(_celebQ.includes(text)) return;
   if(text===_celebLastText && Date.now()-_celebLastAt < 8000) return;
   _celebQ.push(text);
@@ -2525,6 +2526,7 @@ function gcAudioStart(kind){
   }catch(e){ console.warn('Celebration audio failed:', e); return null; }
 }
 function playGrandCelebration(item, onClosed){
+  try{ snowBurst(); }catch(e){}
   // v156: a background gesture only -- fireworks + confetti cannons + sound + haptics + the usual small toast line. No card, nothing to tap
   // or dismiss (the layer ignores touches, so whatever you are doing carries on), and it removes itself when the show is over.
   const reduced = prefersReducedMotion();
@@ -2657,15 +2659,13 @@ const BG_THEMES = {
   snow: {
     label:'Snow', emoji:'❄️',
     bgCss:'linear-gradient(180deg, rgba(20,32,58,.22), rgba(8,10,18,0) 60%)',
-    particleCount:80, colors:['#EAF3FF','#FFFFFF','#CFE3FF'],
-    sizeRange:[1.4,4], speedRange:[16,48], glow:3.3, alphaRange:[0.4,0.95], blend:'source-over', trail:0, drift:'down', wobble:true,
+    engine:'snow',   // v165: drawn by the dedicated snow engine (see SNOW v165 below), not the shared particle engine
   },
   // Same snow for Day mode (white flakes vanish on a light page): soft blue flakes instead.
   snowday: {
     label:'Snow (day)', emoji:'❄️',
     bgCss:'',
-    particleCount:70, colors:['#5E8FD0','#7FA6DC','#4A78BA'],
-    sizeRange:[1.4,4], speedRange:[16,48], glow:3.0, alphaRange:[0.25,0.6], blend:'source-over', trail:0, drift:'down', wobble:true,
+    engine:'snow',
   },
   dark: {
     label:'Dark', emoji:'🌌',
@@ -2711,6 +2711,7 @@ function makeBgParticle(theme, cw, ch, initial){
 let _bgSlow = 1;
 let _bgCanvas=null, _bgCtx=null, _bgParticles=[], _bgSprites={}, _bgThemeKey='off', _bgRafId=null, _bgLastTs=0, _bgDpr=1;
 function teardownBgCanvas(){
+  if(typeof snowDestroy==='function') snowDestroy();
   if(_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId=null; }
   _bgParticles = [];
   _rageFlames = []; _rageEmbers = [];
@@ -2919,6 +2920,393 @@ function drawRageStaticFrame(){
   _bgCtx.globalAlpha = 1;
 }
 
+// ═══════════════════════════════════════════════════════════
+// SNOW v165 — rebuilt from scratch (replaces the single-layer glow-dot version). Its own engine, used for the Snow (night) and Snow (day) themes;
+// the other themes keep the shared engine above.
+//  • Four depth layers — far dust, mid flakes, near crystal flakes (real 6-arm snowflake glyphs that turn as they fall), and a few big, very soft
+//    out-of-focus "bokeh" flakes in front — each with its own size, speed, sway, opacity and parallax depth, so the scene has real depth.
+//  • A continuous wind field: a slow drifting breeze + random gusts that sweep across the screen (deeper flakes move more) + a little vertical shear.
+//    Flakes have inertia, so a gust builds up and fades instead of jerking them sideways.
+//  • Alive to the person: dragging a finger/mouse across the screen throws a gust the way you swiped, and scrolling any list shifts the layers at
+//    different rates (parallax). Both can be switched off in Settings.
+//  • Soft fog drifting low on the screen, gentle twinkle, flakes fade in as they enter instead of popping.
+//  • Quality: sprites are pre-rendered once (no per-frame gradients/blur), drawn with whole-frame transforms (no save/restore), capped at 60 fps on
+//    90/120 Hz screens, sized from the canvas's real CSS size (not window.inner*), rescaled — not reset — on resize/rotate, scaled to the screen
+//    area and to the chosen intensity, and self-throttling: if a phone can't keep up, the flake count drops smoothly and creeps back when it can.
+//  • Respect: tab hidden = loop stopped; "reduce motion" = slow, calm fall (no gusts, no parallax, no spinning) — still falling, as chosen in v142.
+// ═══════════════════════════════════════════════════════════
+const SNOW_LEVELS = { gentle:0.55, normal:1, heavy:1.8 };
+const SNOW_PALETTES = {
+  night: { dots:['#FFFFFF','#EAF3FF','#CFE3FF'], glyph:'#F6FAFF', glyphGlow:'200,222,255', bokeh:'214,230,255', fog:'150,185,235', fogA:0.075, alphaMul:1,   bokehMul:1, aurora:['70,205,190','140,112,255'], auroraA:0.055, spark:'255,255,255' },
+  day:   { dots:['#5E8FD0','#7FA6DC','#4A78BA'], glyph:'#4B7DC2', glyphGlow:'110,150,215', bokeh:'120,160,220', fog:'120,160,215', fogA:0.05,  alphaMul:0.62, bokehMul:0.8, aurora:null, auroraA:0, spark:'120,160,225' },
+};
+const SNOW_LAYERS = [
+  { id:'far',   base:50, size:[1.1,2.2],  speed:[9,20],  alpha:[0.22,0.50], sway:[3,8],   depth:0.22, glow:3.0, kind:'dot'   },
+  { id:'mid',   base:34, size:[1.9,3.5],  speed:[20,38], alpha:[0.40,0.75], sway:[7,15],  depth:0.55, glow:3.2, kind:'dot'   },
+  { id:'near',  base:11, size:[11,21],    speed:[36,62], alpha:[0.62,0.95], sway:[12,24], depth:1.00, glow:1,   kind:'flake' },
+  { id:'bokeh', base:3,  size:[22,42],    speed:[52,88], alpha:[0.05,0.11], sway:[10,20], depth:1.35, glow:1,   kind:'bokeh' },
+];
+let _snow = null;            // live state (null when another theme is showing)
+let _snowRaf = 0;
+const _snowScrollPrev = new WeakMap();
+
+function snowOpts(){
+  const o = (S.local && S.local.snow) || {};
+  return { level: SNOW_LEVELS[o.level] ? o.level : 'normal', interact: o.interact !== false, aurora: o.aurora !== false };
+}
+function snowRand(a, b){ return a + Math.random()*(b-a); }
+
+// ── sprites (built once per palette) ──
+function snowMakeDot(hex){
+  const [r,g,b] = hexToRgb(hex), N = 64, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(N/2,N/2,0,N/2,N/2,N/2);
+  gr.addColorStop(0,`rgba(${r},${g},${b},1)`); gr.addColorStop(0.22,`rgba(${r},${g},${b},.82)`);
+  gr.addColorStop(0.55,`rgba(${r},${g},${b},.22)`); gr.addColorStop(1,`rgba(${r},${g},${b},0)`);
+  x.fillStyle = gr; x.fillRect(0,0,N,N); return c;
+}
+// A six-armed crystal: main arms, two pairs of side branches, a small hex core and a faint halo. v = 0..2 changes arm length/branching so no two sizes look cloned.
+function snowMakeGlyph(color, glowRgb, v){
+  const N = 128, R = N/2, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d');
+  const halo = x.createRadialGradient(R,R,0,R,R,R);
+  halo.addColorStop(0,`rgba(${glowRgb},.34)`); halo.addColorStop(0.45,`rgba(${glowRgb},.10)`); halo.addColorStop(1,`rgba(${glowRgb},0)`);
+  x.fillStyle = halo; x.fillRect(0,0,N,N);
+  x.translate(R,R); x.strokeStyle = color; x.fillStyle = color; x.lineCap = 'round';
+  const arm = R*[0.74,0.68,0.78][v], w = [6.4,5.4,5.9][v];
+  for(let i=0;i<6;i++){
+    x.save(); x.rotate(i*Math.PI/3);
+    x.lineWidth = w; x.beginPath(); x.moveTo(0,0); x.lineTo(0,-arm); x.stroke();
+    const br = v===1 ? [[0.40,0.30],[0.66,0.20]] : v===2 ? [[0.34,0.34],[0.58,0.26],[0.80,0.14]] : [[0.46,0.32],[0.70,0.22]];
+    br.forEach(([at,len])=>{
+      const by = -arm*at, bl = arm*len;
+      x.lineWidth = w*0.72; x.beginPath();
+      x.moveTo(0,by); x.lineTo(bl*0.85, by-bl*0.62); x.moveTo(0,by); x.lineTo(-bl*0.85, by-bl*0.62); x.stroke();
+    });
+    x.restore();
+  }
+  x.beginPath(); for(let i=0;i<6;i++){ const a = i*Math.PI/3; x.lineTo(Math.cos(a)*R*0.13, Math.sin(a)*R*0.13); } x.closePath(); x.fill();
+  return c;
+}
+function snowMakeBokeh(rgb){
+  const N = 128, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(N/2,N/2,0,N/2,N/2,N/2);
+  gr.addColorStop(0,`rgba(${rgb},.40)`); gr.addColorStop(0.72,`rgba(${rgb},.55)`); gr.addColorStop(0.9,`rgba(${rgb},.80)`); gr.addColorStop(1,`rgba(${rgb},0)`);
+  x.fillStyle = gr; x.fillRect(0,0,N,N); return c;
+}
+// a four-point glint (long thin cross + soft core) for the occasional sparkle on a crystal flake
+function snowMakeSpark(rgb){
+  const N = 64, R = N/2, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d');
+  const core = x.createRadialGradient(R,R,0,R,R,R*0.5);
+  core.addColorStop(0,`rgba(${rgb},.95)`); core.addColorStop(1,`rgba(${rgb},0)`);
+  x.fillStyle = core; x.fillRect(0,0,N,N);
+  x.translate(R,R);
+  for(let i=0;i<2;i++){
+    const g = x.createLinearGradient(-R,0,R,0);
+    g.addColorStop(0,`rgba(${rgb},0)`); g.addColorStop(0.5,`rgba(${rgb},.9)`); g.addColorStop(1,`rgba(${rgb},0)`);
+    x.fillStyle = g; x.fillRect(-R, -1.1, N, 2.2); x.rotate(Math.PI/2);
+  }
+  return c;
+}
+function snowMakeFog(rgb){
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(N/2,N/2,0,N/2,N/2,N/2);
+  gr.addColorStop(0,`rgba(${rgb},.9)`); gr.addColorStop(0.5,`rgba(${rgb},.35)`); gr.addColorStop(1,`rgba(${rgb},0)`);
+  x.fillStyle = gr; x.fillRect(0,0,N,N); return c;
+}
+
+function snowSpawn(L, p, w, h, initial){
+  p.size  = snowRand(L.size[0], L.size[1]);
+  p.speed = snowRand(L.speed[0], L.speed[1]);
+  p.alpha = snowRand(L.alpha[0], L.alpha[1]) * (L.kind==='bokeh' ? _snow.pal.bokehMul : _snow.pal.alphaMul);
+  p.sway  = snowRand(L.sway[0], L.sway[1]);
+  p.swayF = snowRand(0.5, 1.5);
+  p.phase = snowRand(0, 6.283);
+  p.x = snowRand(-0.05*w, 1.05*w);
+  const m = p.size*L.glow;
+  p.y = initial ? snowRand(-m, h+m) : -m - snowRand(0, 0.12*h);
+  p.vx = 0; p.vy2 = 0;
+  p.tilt = snowRand(0, 6.283); p.tiltV = snowRand(0.5, 1.6);        // tumbling: the crystal turns edge-on now and then
+  p.sparkT = snowRand(1, 7); p.sparkU = 1;                          // next glint in sparkT seconds; sparkU 0→1 is a glint in progress
+  p.rot = snowRand(0, 6.283);
+  p.rotV = snowRand(0.25, 1.0) * (Math.random()<0.5 ? -1 : 1);
+  p.spr = L.kind==='dot' ? Math.floor(Math.random()*_snow.dots.length) : Math.floor(Math.random()*3);
+  return p;
+}
+function snowBuild(){
+  const s = _snow, w = s.w, h = s.h;
+  const area = Math.max(0.8, Math.min(2.0, (w*h)/(390*844)));
+  const lvl = SNOW_LEVELS[snowOpts().level];
+  s.layers = SNOW_LAYERS.map(L=>{
+    const n = L.kind==='bokeh' ? Math.max(2, Math.round(L.base*Math.min(1.6, lvl)))
+                               : Math.round(L.base*lvl*area*(L.kind==='flake' ? 1 : 1));
+    const list = []; for(let i=0;i<n;i++) list.push(snowSpawn(L, {}, w, h, true));
+    return { cfg:L, list };
+  });
+  s.fog = [0,1,2].map(i=>({ x:snowRand(0,w), y:h*(0.62+i*0.18), k:snowRand(0.7,1.0), r:0, ph:snowRand(0,6.28), v:snowRand(3,8)*(i%2?-1:1) }));
+}
+function snowResize(){
+  const s = _snow; if(!s || !_bgCanvas || !_bgCtx) return;
+  const w = _bgCanvas.clientWidth || window.innerWidth, h = _bgCanvas.clientHeight || window.innerHeight;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if(w===s.w && h===s.h && dpr===s.dpr) return;
+  const rx = s.w ? w/s.w : 1, ry = s.h ? h/s.h : 1, rescale = !!s.w;
+  s.w = w; s.h = h; s.dpr = dpr;
+  _bgCanvas.width = Math.round(w*dpr); _bgCanvas.height = Math.round(h*dpr);
+  if(rescale && s.layers){
+    // keep the scene: stretch positions to the new size instead of re-rolling every flake
+    s.layers.forEach(l=>l.list.forEach(p=>{ p.x *= rx; p.y *= ry; }));
+    s.fog.forEach(f=>{ f.x *= rx; f.y *= ry; });
+    // a big change in screen area (rotation, desktop window) wants a different flake count
+    const areaNow = Math.max(0.8, Math.min(2.0, (w*h)/(390*844)));
+    if(Math.abs(areaNow - s.area) > 0.25){ s.area = areaNow; snowBuild(); }
+  }
+}
+function snowInit(mode){
+  snowStop();
+  const pal = SNOW_PALETTES[mode==='day' ? 'day' : 'night'];
+  _snow = { mode, pal, w:0, h:0, dpr:1, area:1, t:0, wind:{ gustT:snowRand(4,9), gustDir:1, gustAmp:0, gustU:1, gustDur:1, base:0 }, impulse:0, scrollPending:0,
+            quality:1, costEma:2, dtEma:16, lastEval:0, lastDraw:0, calm:prefersReducedMotion(), interact:snowOpts().interact, aurora:snowOpts().aurora,
+            tilt:0, focus:1, focusT:0, puffs:0, frame:0 };
+  _snow.dots   = pal.dots.map(snowMakeDot);
+  _snow.glyphs = [0,1,2].map(v=>snowMakeGlyph(pal.glyph, pal.glyphGlow, v));
+  _snow.bokeh  = snowMakeBokeh(pal.bokeh);
+  _snow.fogSpr = snowMakeFog(pal.fog);
+  _snow.sparkSpr = snowMakeSpark(pal.spark);
+  _snow.auroraSpr = pal.aurora ? pal.aurora.map(snowMakeFog) : null;
+  snowResize(); _snow.area = Math.max(0.8, Math.min(2.0, (_snow.w*_snow.h)/(390*844)));
+  snowBuild();
+  snowBindInput(); snowWatchBattery(); snowWatchCover();
+}
+function snowStop(){
+  if(_snowRaf){ cancelAnimationFrame(_snowRaf); _snowRaf = 0; }
+}
+function snowDestroy(){ snowStop(); _snow = null; }
+
+// ── input: swipe = gust, scroll = parallax (passive listeners, bound once) ──
+let _snowInputBound = false, _snowPtr = null;
+function snowBindInput(){
+  if(_snowInputBound) return; _snowInputBound = true;
+  // Touch uses touch events, not pointer events: the browser cancels a touch pointer as soon as it decides the gesture is a pan, which would stop the
+  // swipe being felt exactly when it starts. The wind follows the finger's horizontal speed, smoothed so it builds and eases rather than jumping.
+  const feed = (x, t)=>{
+    const s = _snow; if(!s || !s.interact || s.calm){ _snowPtr = null; return; }
+    const prev = _snowPtr; _snowPtr = { x, t };
+    if(!prev) return;
+    const dt = Math.max(8, t - prev.t), v = (x - prev.x)/dt*1000;                      // px/s
+    const target = Math.max(-120, Math.min(120, v*0.22));
+    s.impulse += (target - s.impulse)*0.3;
+  };
+  window.addEventListener('touchstart', e=>{ const t = e.touches[0]; _snowPtr = t ? { x:t.clientX, t:e.timeStamp } : null; }, {passive:true, capture:true});    // capture: other swipe handlers may stop propagation
+  window.addEventListener('touchmove',  e=>{ const t = e.touches[0]; if(t) feed(t.clientX, e.timeStamp); }, {passive:true, capture:true});
+  window.addEventListener('pointermove', e=>{ if(e.pointerType==='mouse' && e.buttons) feed(e.clientX, e.timeStamp); else if(e.pointerType==='mouse') _snowPtr = null; }, {passive:true});
+  // a tap puffs the flakes around it outward (a little swirl) -- from any tap, including on buttons; they are behind the page, so nothing is blocked
+  window.addEventListener('pointerdown', e=>{ if(e.isPrimary !== false) snowPuff(e.clientX, e.clientY); }, {passive:true, capture:true});
+  // tilting the phone leans the wind that way (works where the browser gives sensor data freely, e.g. Android; we never show a permission prompt)
+  try{
+    if(typeof DeviceOrientationEvent !== 'undefined'){      // where a permission is required (iOS) the events just never arrive, so binding is harmless
+      window.addEventListener('deviceorientation', e=>{
+        const s = _snow; if(!s || !s.interact || s.calm || e.gamma==null || e.beta==null) return;
+        const ang = (screen.orientation && screen.orientation.angle) || 0;
+        const g = ang===0 ? e.gamma : ang===180 ? -e.gamma : ang===90 ? e.beta : -e.beta;
+        const target = Math.max(-45, Math.min(45, g*0.9));
+        s.tilt += (target - s.tilt)*0.15;
+      }, {passive:true});
+    }
+  }catch(_){}
+  const endPtr = ()=>{ _snowPtr = null; };
+  ['touchend','touchcancel','pointerup','pointercancel'].forEach(ev=>window.addEventListener(ev, endPtr, {passive:true, capture:true}));
+  document.addEventListener('scroll', e=>{
+    const s = _snow; if(!s || !s.interact || s.calm) return;
+    const t = e.target, el = (t===document || !t) ? document.scrollingElement : t;
+    if(!el || el.scrollTop===undefined) return;
+    const y = el.scrollTop, prev = _snowScrollPrev.get(el);
+    _snowScrollPrev.set(el, y);
+    if(prev===undefined) return;
+    s.scrollPending = Math.max(-600, Math.min(600, s.scrollPending + (y - prev)));
+  }, {capture:true, passive:true});
+}
+
+// ── frame ──
+// Once per frame: advance the gust timer and compute the frame's shared wind terms. Then snowWind() just samples them (cheap) for every flake.
+function snowWindStep(s, t, dt){
+  const g = s.wind;
+  if(!s.calm){
+    g.gustT -= dt;
+    if(g.gustT <= 0){ g.gustDir = Math.random()<0.5 ? -1 : 1; g.gustAmp = snowRand(34, 85); g.gustDur = snowRand(3, 6.5); g.gustU = 0; g.gustT = g.gustDur + snowRand(7, 20); }
+    if(g.gustU < 1) g.gustU = Math.min(1, g.gustU + dt/g.gustDur);
+  }
+  const env = (g.gustU>=1 || s.calm) ? 0 : Math.pow(Math.sin(Math.PI*g.gustU), 2);
+  const breeze = Math.sin(t*0.11)*9 + Math.sin(t*0.037+1.3)*13;
+  g.base = (s.calm ? breeze*0.4 : breeze) + g.gustDir*g.gustAmp*env*s.focus + s.impulse + s.tilt;
+}
+function snowWind(s, t, yNorm){ return s.wind.base + (s.calm ? 0 : Math.sin(t*0.31 + yNorm*3.2)*3.5); }
+function snowFrame(ts){
+  _snowRaf = requestAnimationFrame(snowFrame);
+  const s = _snow, ctx = _bgCtx; if(!s || !ctx) return;
+  if(ts - s.lastDraw < (_snowLowBatt ? 32 : 13)) return;                         // ~60 fps cap on 90/120/144 Hz screens (13 ms leaves room for 60 Hz timestamp jitter)
+  const t0 = performance.now();
+  let dt = s.lastDraw ? Math.min(0.05, (ts - s.lastDraw)/1000) : 0.016; s.lastDraw = ts;
+  s.dtEma += (dt*1000 - s.dtEma)*0.08;
+  // focus: while the person's own study timer is running the snow settles a little (-15 % speed, softer gusts); it eases back afterwards
+  if(++s.frame % 30 === 1){
+    const me = S.local && S.local.myProfile, ts_ = me && S.shared && S.shared.timerState && S.shared.timerState[me];
+    s.focusT = (ts_ && ts_.status==='running') ? 1 : 0;
+  }
+  s.focus += ((s.focusT ? 0.5 : 1) - s.focus)*Math.min(1, dt*1.2);
+  const slow = (s.calm ? 0.5 : 1) * (1 - 0.15*(1 - s.focus)*2); dt *= slow;
+  s.t += dt; const t = s.t, w = s.w, h = s.h, dpr = s.dpr;
+
+  s.impulse *= Math.exp(-dt/1.1);                          // swipe gusts die away in about a second
+  snowWindStep(s, t, dt);
+  const scr = s.scrollPending; s.scrollPending = 0;
+
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  // northern glow (Night only): two huge, very faint colour washes drifting slowly across the top of the screen
+  if(s.aurora && s.auroraSpr){
+    ctx.globalCompositeOperation = 'lighter';
+    for(let i=0;i<s.auroraSpr.length;i++){
+      const ph = t*(0.05 + i*0.03) + i*2.1, ax = w*(0.5 + 0.35*Math.sin(ph)), ay = h*(0.07 + 0.05*Math.sin(ph*1.3 + i));
+      ctx.globalAlpha = s.pal.auroraA*(0.65 + 0.35*Math.sin(ph*1.7 + 1));
+      ctx.drawImage(s.auroraSpr[i], ax - w*0.75, ay - h*0.13, w*1.5, h*0.26);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  // fog
+  ctx.globalAlpha = 1;
+  for(let i=0;i<s.fog.length;i++){
+    const f = s.fog[i]; f.r = Math.max(w,300)*f.k; f.ph += dt*0.18; f.x += (f.v + s.wind.base*0.05)*dt;
+    if(f.x < -f.r*0.5) f.x = w + f.r*0.5; else if(f.x > w + f.r*0.5) f.x = -f.r*0.5;
+    ctx.globalAlpha = s.pal.fogA*(0.7 + 0.3*Math.sin(f.ph));
+    ctx.drawImage(s.fogSpr, f.x - f.r, f.y - f.r*0.55, f.r*2, f.r*1.1);
+  }
+  const q = s.quality;
+  for(let li=0; li<s.layers.length; li++){
+    const L = s.layers[li], cfg = L.cfg, list = L.list, d = cfg.depth;
+    const qq = _snowLowBatt ? Math.min(q, 0.5) : q;
+    const n = cfg.kind==='bokeh' ? (qq>0.6 ? list.length : Math.ceil(list.length*0.5)) : Math.max(1, Math.floor(list.length*qq));
+    const spr = cfg.kind==='dot' ? s.dots : cfg.kind==='flake' ? s.glyphs : null;
+    const inertia = 1 - Math.exp(-dt*(1.1 + d*1.4));
+    for(let i=0;i<n;i++){
+      const p = list[i];
+      p.phase += dt*p.swayF*(cfg.kind==='dot' ? 2.2 : 1.6);
+      const wind = snowWind(s, t, p.y/h) * d;           // deeper layers feel the wind more
+      const target = wind + Math.sin(p.phase)*p.sway;
+      p.vx += (target - p.vx)*inertia;
+      p.x += p.vx*dt;
+      p.y += (p.speed*(1 + 0.10*Math.sin(p.phase*0.6)) + p.vy2)*dt - (s.calm ? 0 : scr*d*0.14);
+      if(p.vy2 !== 0){ p.vy2 *= Math.exp(-dt*2.4); if(Math.abs(p.vy2) < 0.5) p.vy2 = 0; }
+      if(cfg.kind==='flake' && !s.calm){ p.rot += (p.rotV + p.vx*0.006)*dt; p.tilt += p.tiltV*dt; }
+      const m = p.size*cfg.glow;
+      if(p.y > h + m){ snowSpawn(cfg, p, w, h, false); }
+      else if(p.y < -m*3){ p.y += h + m*4; p.x = snowRand(0, w); }          // scrolled upward past the top: re-enter at the bottom
+      if(p.x < -m*2) p.x = w + m; else if(p.x > w + m*2) p.x = -m;
+      // fade in over the first 60 px, soft twinkle
+      let a = p.alpha*(cfg.kind==='bokeh' ? 1 : (0.84 + 0.16*Math.sin(p.phase*1.7 + p.speed)));
+      const edge = (p.y + m)/60; if(edge < 1) a *= Math.max(0, edge);
+      if(a <= 0.01) continue;
+      ctx.globalAlpha = a;
+      if(cfg.kind==='dot'){
+        const sz = p.size*cfg.glow, k = 1 + Math.min(0.9, Math.abs(p.vx)/110);      // in a strong gust the dots smear sideways like blown snow
+        ctx.drawImage(spr[p.spr], p.x - sz*k/2, p.y - sz/2, sz*k, sz);
+      } else if(cfg.kind==='flake'){
+        if(s.calm){ const sz = p.size; ctx.drawImage(spr[p.spr], p.x - sz/2, p.y - sz/2, sz, sz); }
+        else {
+          const cs = Math.cos(p.rot)*dpr, sn = Math.sin(p.rot)*dpr, sx = 0.55 + 0.45*Math.abs(Math.cos(p.tilt));   // turns edge-on as it tumbles
+          ctx.setTransform(cs*sx, sn*sx, -sn, cs, p.x*dpr, p.y*dpr);
+          ctx.drawImage(spr[p.spr], -p.size/2, -p.size/2, p.size, p.size);
+          ctx.setTransform(dpr,0,0,dpr,0,0);
+          // occasional glint: a short four-point flash as the crystal catches the light
+          if(p.sparkU < 1){
+            p.sparkU = Math.min(1, p.sparkU + dt/0.55);
+            ctx.globalAlpha = Math.sin(Math.PI*p.sparkU)*(0.9*s.pal.alphaMul);
+            const ss = p.size*(1.1 + 0.9*Math.sin(Math.PI*p.sparkU)), rr = p.rot*0.5;
+            ctx.setTransform(Math.cos(rr)*dpr, Math.sin(rr)*dpr, -Math.sin(rr)*dpr, Math.cos(rr)*dpr, p.x*dpr, p.y*dpr);
+            ctx.drawImage(s.sparkSpr, -ss, -ss, ss*2, ss*2);
+            ctx.setTransform(dpr,0,0,dpr,0,0);
+          } else if((p.sparkT -= dt) <= 0){ p.sparkU = 0; p.sparkT = snowRand(3, 9); }
+        }
+      } else {
+        ctx.drawImage(s.bokeh, p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // self-throttle: judged over 1.5 s windows from how long a frame takes to draw and how often frames actually arrive
+  const cost = performance.now() - t0; s.costEma += (cost - s.costEma)*0.1;
+  if(ts - s.lastEval > 1500){
+    if(s.lastEval){
+      if(s.costEma > 6.5 || s.dtEma > (_snowLowBatt ? 48 : 30)) s.quality = Math.max(0.4, s.quality - 0.15);
+      else if(s.costEma < 2.6 && s.dtEma < (_snowLowBatt ? 40 : 20) && s.quality < 1) s.quality = Math.min(1, s.quality + 0.05);
+    }
+    s.lastEval = ts;
+  }
+}
+// The full-screen timer is an opaque black layer over everything -- animating snow underneath it for hours would burn battery for nothing. The loop is
+// stopped while it is up (watched through the body class) and picks up again, gently, when it closes.
+const snowCovered = ()=> document.body.classList.contains('fullscreen-timer-mode');
+let _snowCoverMO = null;
+function snowWatchCover(){
+  if(_snowCoverMO || !('MutationObserver' in window)) return;
+  _snowCoverMO = new MutationObserver(()=>{
+    if(snowCovered()) snowStop();
+    else if(snowIsActive() && !document.hidden) snowStart();
+  });
+  _snowCoverMO.observe(document.body, {attributes:true, attributeFilter:['class']});
+}
+function snowStart(){
+  if(_snowRaf || !_snow || snowCovered()) return;
+  _snow.lastDraw = 0;
+  _snowRaf = requestAnimationFrame(snowFrame);
+}
+// Tap swirl: flakes within ~150 px get pushed away from the point (nearer layers harder) and bounce back off it as the push fades.
+function snowPuff(x, y){
+  const s = _snow; if(!s || !s.interact || s.calm) return;
+  const R = 150;
+  for(let li=0; li<s.layers.length; li++){
+    const L = s.layers[li], d = L.cfg.depth;
+    for(let i=0;i<L.list.length;i++){
+      const p = L.list[i], dx = p.x - x, dy = p.y - y, dist = Math.hypot(dx, dy);
+      if(dist > R || dist < 0.5) continue;
+      const f = (1 - dist/R), k = f*f*(40 + 70*d);
+      p.vx += dx/dist*k; p.vy2 += dy/dist*k*0.7;
+    }
+  }
+}
+// Called when something worth celebrating happens: one big gust across the screen and a ripple of glints on the crystals.
+function snowBurst(){
+  const s = _snow; if(!s || s.calm) return;
+  const g = s.wind; g.gustDir = Math.random()<0.5 ? -1 : 1; g.gustAmp = 125; g.gustDur = 2.8; g.gustU = 0; g.gustT = g.gustDur + 8;
+  s.layers.forEach(l=>{ if(l.cfg.kind==='flake') l.list.forEach(p=>{ p.sparkT = snowRand(0, 0.9); }); });
+}
+// Low battery (under 20 % and not charging): half the flakes and 30 fps, restored automatically when charging / recharged.
+let _snowBatt = null, _snowLowBatt = false;
+function snowWatchBattery(){
+  if(_snowBatt !== null || !navigator.getBattery) return; _snowBatt = false;
+  navigator.getBattery().then(b=>{
+    _snowBatt = b;
+    const upd = ()=>{ _snowLowBatt = !b.charging && b.level < 0.2; };
+    upd(); b.addEventListener('levelchange', upd); b.addEventListener('chargingchange', upd);
+  }).catch(()=>{});
+}
+function snowIsActive(){ return _bgThemeKey==='snow' || _bgThemeKey==='snowday'; }
+let _snowRO = null;
+function snowObserveSize(){
+  if(_snowRO || !_bgCanvas || !('ResizeObserver' in window)) return;
+  let tm = 0;
+  _snowRO = new ResizeObserver(()=>{ clearTimeout(tm); tm = setTimeout(()=>{ if(snowIsActive()) snowResize(); }, 120); });
+  _snowRO.observe(_bgCanvas);
+}
+function setSnowOption(key, val){
+  if(!S.local) return;
+  S.local.snow = Object.assign({}, S.local.snow || {}, {[key]: val});
+  saveLocal();
+  applyBgTheme();
+  renderApp();
+}
+
 function startBgLoop(){
   if(_bgRafId) return; // idempotent — same convention as startTimerTick()
   _bgLastTs = performance.now();
@@ -2959,6 +3347,16 @@ function applyBgTheme(){
   _bgCanvas.style.zIndex = '';
   _bgCanvas.style.background = themeCfg.bgCss;
   if(!_bgCtx) _bgCtx = _bgCanvas.getContext('2d');
+  if(themeCfg.engine==='snow'){
+    // v165: dedicated snow engine. Fade the canvas in so switching Day/Night or changing intensity eases in instead of popping.
+    snowObserveSize();
+    snowInit(_bgThemeKey==='snowday' ? 'day' : 'night');
+    _bgCanvas.style.transition = 'none'; _bgCanvas.style.opacity = '0'; void _bgCanvas.offsetWidth;
+    _bgCanvas.style.transition = 'opacity .9s ease'; _bgCanvas.style.opacity = '1';
+    if(!document.hidden) snowStart();
+    return;
+  }
+  _bgCanvas.style.opacity = ''; _bgCanvas.style.transition = '';
   resizeBgCanvas();
   if(_bgThemeKey==='rage'){
     initRageParticles();
@@ -2987,6 +3385,9 @@ function setBgTheme(key){
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){
     if(_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId=null; }
+    snowStop();
+  } else if(snowIsActive()){
+    if(_snow){ _snow.calm = prefersReducedMotion(); snowResize(); snowStart(); }      // a rotation / resize while hidden is picked up here
   } else if(_bgThemeKey!=='off' && (!prefersReducedMotion() || BG_THEME_LOCKED)){
     startBgLoop();
   }
@@ -2994,7 +3395,7 @@ document.addEventListener('visibilitychange', ()=>{
 let _bgResizeTimer = null;
 window.addEventListener('resize', ()=>{
   clearTimeout(_bgResizeTimer);
-  _bgResizeTimer = setTimeout(()=>{ if(_bgThemeKey!=='off') resizeBgCanvas(); }, 200);
+  _bgResizeTimer = setTimeout(()=>{ if(snowIsActive()) snowResize(); else if(_bgThemeKey!=='off') resizeBgCanvas(); }, 200);
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -20679,10 +21080,23 @@ function darkModeSettingsRow(){
 }
 function bgThemeSettingsRow(){
   if(BG_THEME_LOCKED){
-    const theme = BG_THEMES[BG_THEME_LOCKED];
+    const theme = BG_THEMES[BG_THEME_LOCKED], o = snowOpts();
+    const chip = (on, label, click)=>`<span class="qb-tag" style="cursor:pointer;padding:8px 14px;font-size:12.5px;background:${on?'var(--active-accent-tint,var(--umang-tint))':'var(--surface2)'};border:1px solid ${on?'var(--active-accent,var(--umang))':'var(--border)'}" onclick="${click}">${label}</span>`;
     return `<div style="padding:12px 14px">
       <div class="settings-row-lbl" style="margin-bottom:4px">Motion background</div>
-      <div class="settings-row-sub">Fixed to ${theme.emoji} ${theme.label} — white flakes at Night, blue flakes in Day mode. It keeps falling (slowly) even if your phone is set to reduce motion.</div>
+      <div class="settings-row-sub" style="padding:0 0 10px">${theme.emoji} ${theme.label} — white flakes at Night, blue flakes in Day mode. It keeps falling (slowly) even if your phone is set to reduce motion.</div>
+      <div style="font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Snowfall</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${chip(o.level==='gentle','🌨 Gentle',"setSnowOption('level','gentle')")}${chip(o.level==='normal','❄️ Normal',"setSnowOption('level','normal')")}${chip(o.level==='heavy','🌬 Heavy',"setSnowOption('level','heavy')")}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px">
+        <div><div class="settings-row-lbl">Wind follows you</div><div class="settings-row-sub" style="padding:0">Swipe to blow a gust, tap to puff the flakes, tilt your phone to lean the wind; scrolling shifts the snow in layers.</div></div>
+        <button class="chl-sw ${o.interact?'on':''}" style="--c1:var(--active-accent,var(--umang))" role="switch" aria-checked="${o.interact}" aria-label="Wind follows your touch and scrolling" onclick="setSnowOption('interact',${!o.interact})"></button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px">
+        <div><div class="settings-row-lbl">Northern glow</div><div class="settings-row-sub" style="padding:0">A faint green-violet shimmer across the top of the screen, Night mode only.</div></div>
+        <button class="chl-sw ${o.aurora?'on':''}" style="--c1:var(--active-accent,var(--umang))" role="switch" aria-checked="${o.aurora}" aria-label="Northern glow" onclick="setSnowOption('aurora',${!o.aurora})"></button>
+      </div>
     </div>`;
   }
   const current = (S.local && S.local.bgTheme) || 'off';
