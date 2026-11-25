@@ -1269,6 +1269,7 @@ body.daily-challenges-mode #daily-challenges-root{display:flex}
 /* v161: long-press to edit rules */
 .chl-tpl,.chl-card{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .chl-tpl.lp,.chl-card.lp{box-shadow:0 0 0 2px var(--c1),0 6px 22px color-mix(in srgb,var(--c1) 35%,transparent);filter:brightness(1.1);transition:box-shadow .3s,filter .3s}
+.chl-lapsed{margin-top:12px;padding:12px;border-radius:12px;background:color-mix(in srgb,var(--danger,#d33) 14%,var(--surface2));color:var(--danger,#d33);font-size:12.5px;font-weight:700;text-align:center;line-height:1.4}
 .chl-hint{margin:14px 2px 2px;font-size:11.5px;color:var(--text-faint);text-align:center}
 .chl-step{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);border-radius:14px;background:var(--surface2);padding:6px}
 .chl-step b{flex:1;text-align:center;font-size:16px;font-weight:800;color:var(--text)}
@@ -13272,6 +13273,7 @@ const LIVE_BUILDERS = {
   homeTarget:  pid => homeTargetInnerHtml(pid),
   homeWeek:    pid => homeWeekInnerHtml(pid),
   cmp:         key => homeCmpRow(key),
+  chlHome:     pid => homeDailyChallengesCard(pid),     // v163: study challenges move with the running timer on Home too
 };
 const _liveLast = {};
 let _ptrDownAt = 0; // a finger/mouse is mid-press: don't swap nodes under it (the click would be lost)
@@ -13373,7 +13375,7 @@ function timerTickBody(){
       if(!celebStamped('target', me) && checkDailyTargetForPush(me, true)) checkMinHoursCelebration(me, true);
       // v157: live crossing of a study challenge's goal; an open Challenges screen also shows its ring/bar moving (not while a form is open).
       const _cc = chlSync(me);
-      if(S.dcPopupOpen){ if(!S._chSheet) renderDailyChallengesPopup(); }
+      if(S.dcPopupOpen) chlLiveTick();
       else if(_cc && S.view==='home') renderApp();
     }
   }
@@ -14077,7 +14079,7 @@ function viewHome(){
     </div>
   </div>
   `,
-    habits: ()=> isMe ? homeDailyChallengesCard(vp) : '',
+    habits: ()=> isMe ? liveRegion('chlHome', vp) : '',
     targets: ()=> targetsNeedsAttentionWidgetHtml(vp, isMe),
     features: ()=> `<div class="section-title"><span>Features</span></div>
   ${featuresGridHtml()}`,
@@ -20440,7 +20442,7 @@ function postToSw(msg){
   try{
     if(!('serviceWorker' in navigator)) return;
     if(navigator.serviceWorker.controller){ navigator.serviceWorker.controller.postMessage(msg); return; }
-    navigator.serviceWorker.ready.then(reg=>{ if(reg && reg.active) reg.active.postMessage(msg); }).catch(()=>{});
+    navigator.serviceWorker.getRegistration().then(reg=>{ if(reg && reg.active) reg.active.postMessage(msg); }).catch(()=>{});
   }catch(e){}
 }
 function postStaticTimerNotification(ts){
@@ -20997,7 +20999,7 @@ const CHL_TPLS = [
   {id:'target',   icon:'🎯', name:'Hit Your Target', kind:'target',  blurb:'Reach your daily study target, every day', days:7, c1:'#4D9BFF', c2:'#7C5CFF', open:true, cueEx:'e.g. Start by 8 AM, finish before dinner'},
   {id:'plan',     icon:'✅', name:'Clear the Plan', kind:'plan',     blurb:'Finish every Planner task, every day', days:7, c1:'#22D3A0', c2:'#1FA2FF', open:true, cueEx:'e.g. Plan tomorrow at 9 PM tonight'},
   {id:'sessions', icon:'⚡', name:'Deep Work',      kind:'sessions', goal:3, goalOpts:[2,3,4,5], goalLbl:'Study sessions a day', blurb:'Log several focused sessions daily', days:7, c1:'#FFC93C', c2:'#FF8A3D', open:true, cueEx:'e.g. Morning, afternoon and evening block'},
-  {id:'early',    icon:'🌅', name:'Early Bird',     kind:'manual',   blurb:'Up before 6:30 AM', days:7, c1:'#FFB86B', c2:'#FF6B9D', open:false, cueEx:'e.g. Alarm across the room, water first'},
+  {id:'early',    icon:'🌅', name:'Early Bird',     kind:'manual',   wake:true, wakeAt:540, blurb:'Wake up before 9:00 AM', days:7, c1:'#FFB86B', c2:'#FF6B9D', open:false, cueEx:'e.g. Alarm across the room, water first'},
   {id:'move',     icon:'🏃', name:'Move Daily',     kind:'manual',   blurb:'30 minutes of exercise', days:7, c1:'#FF6B6B', c2:'#FF9F43', open:false, cueEx:'e.g. After the evening tea'},
   {id:'clean',    icon:'🥗', name:'Clean Eating',   kind:'manual',   blurb:'No junk food today', days:7, c1:'#7BE495', c2:'#2FB67C', open:false, cueEx:'e.g. Pack lunch the night before'},
   {id:'sleep',    icon:'😴', name:'Early Sleep',    kind:'manual',   blurb:'Lights out before 11 PM', days:7, c1:'#8C9BFF', c2:'#5A4FCF', open:false, cueEx:'e.g. Phone on charge at 10:30 PM'},
@@ -21025,7 +21027,24 @@ function chlGoalAt(ch, date){
   if(ch.gh) for(let i=0;i<ch.gh.length;i++) if(date >= ch.gh[i].from) g = ch.gh[i].goal;
   return Number(g);
 }
+// v163 -- Early Bird is time-locked. The check-in is only accepted from the start of the study day (5 AM) until the wake-up time you set (default 9:00 AM)
+// plus a 10-minute buffer; after that the day is LAPSED (counts as a missed day) and can't be ticked any more. ch.wake = minutes after midnight,
+// ch.grace = buffer minutes, ch.at[date] = minute of the check-in, ch.wakeFrom = first day the lock applies (older Early Birds are moved over without
+// punishing a day that was already past the window).
+const CHL_WAKE_GRACE = 10, CHL_WAKE_MIN = 300, CHL_WAKE_MAX = 720;
+function chlClock(min){ min = ((min%1440)+1440)%1440; let h = Math.floor(min/60); const m = min%60, ap = h>=12 ? 'PM' : 'AM'; h = h%12 || 12; return h+':'+String(m).padStart(2,'0')+' '+ap; }
+function chlWakeOn(ch, date){ return ch.wake!=null && (!ch.wakeFrom || date >= ch.wakeFrom); }
+function chlWakeInfo(ch, now){
+  now = now || new Date();
+  const grace = ch.grace!=null ? ch.grace : CHL_WAKE_GRACE;
+  const sinceSec = (((now.getHours()*60 + now.getMinutes() - 300 + 1440) % 1440) * 60) + now.getSeconds();   // seconds since the 5 AM study-day start
+  const cutSec = (ch.wake - 300) * 60, closeSec = cutSec + grace*60;
+  return {onTime: sinceSec <= cutSec, open: sinceSec <= closeSec, closeMin: ch.wake + grace, cutLeft: cutSec - sinceSec, closeLeft: closeSec - sinceSec, nowMin: now.getHours()*60 + now.getMinutes()};
+}
+function chlLeftText(sec){ const m = Math.max(1, Math.ceil(sec/60)); return m>=60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`; }
+function chlWakeLapsedToday(ch){ const t = todayStr(); return chlWakeOn(ch, t) && !(ch.res && ch.res[t]) && !chlWakeInfo(ch).open; }
 function chlGoalText(ch){
+  if(ch.wake!=null) return `Wake up before ${chlClock(ch.wake)}`;
   if(ch.kind==='hours')    return `Study ${gcHM(Number(ch.goal)||0)} every day`;
   if(ch.kind==='target')   return 'Reach your daily study target';
   if(ch.kind==='plan')     return 'Finish every Planner task';
@@ -21076,7 +21095,7 @@ function chlEval(p, ch){
     let state;
     if(date > today) state = 'future';
     else if(hit)     state = 'hit';
-    else if(date===today) state = 'today';
+    else if(date===today) state = (chlWakeOn(ch, date) && !chlWakeInfo(ch).open) ? 'miss' : 'today';     // Early Bird: window closed = lapsed
     else state = 'miss';
     if(state==='hit') hits++;
     if(state==='miss') misses++;
@@ -21110,6 +21129,12 @@ function chlToday(p, ch, ev){
     const n = liveSessionsOnDate(p, todayStr()), g = Number(ch.goal)||1;
     return {frac:Math.min(1, n/g), hit, label:`${n} of ${g} sessions`, left: n>=g ? '' : `${g-n} more to go`};
   }
+  if(chlWakeOn(ch, todayStr())){
+    const w = chlWakeInfo(ch), at = ch.at && ch.at[todayStr()];
+    if(hit) return {frac:1, hit, label: at!=null ? `Up at ${chlClock(at)}` : 'Done today', left:''};
+    if(!w.open) return {frac:0, hit, label:'Lapsed', left:`Window closed at ${chlClock(w.closeMin)}`};
+    return {frac:0, hit, label:'Not up yet', left: w.onTime ? `Check in before ${chlClock(ch.wake)} · ${chlLeftText(w.cutLeft)} left` : `Buffer until ${chlClock(w.closeMin)} · ${chlLeftText(w.closeLeft)} left`};
+  }
   return {frac: hit?1:0, hit, label: hit ? 'Done today' : 'Not done yet', left:''};
 }
 
@@ -21119,6 +21144,10 @@ function chlSync(p){
   const today = todayStr(); let changed = false;
   chlList(p).forEach(ch=>{
     if(ch.status !== 'active') return;
+    if(ch.tpl==='early' && ch.wake==null){                       // v163: a pre-time-lock Early Bird adopts the 9 AM rule
+      const t = chlTpl('early'); ch.wake = t.wakeAt; ch.grace = CHL_WAKE_GRACE; if(!ch.at) ch.at = {}; ch.blurb = `Wake up before ${chlClock(ch.wake)}`;
+      ch.wakeFrom = chlWakeInfo(ch).open ? today : chlAddDays(today, 1); changed = true;
+    }
     const ev = chlEval(p, ch);
     if(!ch.res) ch.res = {};
     if(!ch.cel) ch.cel = {};
@@ -21170,10 +21199,35 @@ function chlMark(id){
   const ch = chlList(me).find(c=>c.id===id);
   if(!ch || ch.status!=='active' || ch.kind!=='manual') return;
   const today = todayStr(); if(!ch.res) ch.res = {};
-  if(ch.res[today]) delete ch.res[today];          // tapping again takes it back (only while the day is still open)
-  else { ch.res[today] = 1; try{ if(navigator.vibrate) navigator.vibrate(18); }catch(e){} }
+  const locked = chlWakeOn(ch, today), w = locked ? chlWakeInfo(ch) : null;
+  if(locked && !w.open){
+    showToast(ch.res[today] ? 'Locked in — a check-in can\'t be undone after the window.' : `Too late — the check-in closed at ${chlClock(w.closeMin)}. Today has lapsed.`);
+    chlRefresh(); return;
+  }
+  if(ch.res[today]){ delete ch.res[today]; if(ch.at) delete ch.at[today]; }          // tapping again takes it back (only while the day is still open)
+  else {
+    ch.res[today] = 1; try{ if(navigator.vibrate) navigator.vibrate(18); }catch(e){}
+    if(locked){ if(!ch.at) ch.at = {}; ch.at[today] = w.nowMin; if(!w.onTime) showToast(`Just in time — inside the ${ch.grace!=null?ch.grace:CHL_WAKE_GRACE}-minute buffer.`); }
+  }
   if(!chlSync(me)) saveShared();                   // chlSync saves by itself when it changed something
   chlRefresh();
+}
+// v163: the open Challenges screen keeps itself current (study ring/bar following the running timer, the Early Bird window counting down) on its own
+// 5-second clock -- before, it only moved while the Timer/Home tick loop happened to be running -- and only redraws when a number actually changed, never
+// while a form is open or a finger is down on a card.
+let _chlLiveT = 0, _chlSig = '';
+// "a finger is down" is time-boxed (not a flag that has to be cleared by a pointerup): if the card under the finger is replaced mid-press the pointerup
+// goes to a detached node and a flag would stay set forever, freezing the live refresh.
+const chlPressing = ()=> !!_ptrDownAt && (Date.now() - _ptrDownAt) < 1500;
+function chlSig(me){
+  return chlList(me).filter(c=>c.status==='active').map(c=>{ const ev = chlEval(me, c), t = chlToday(me, c, ev); return [c.id, ev.status, ev.hits, ev.misses, t.label, t.left].join('|'); }).join(';');
+}
+function chlLiveTick(){
+  const me = S.local && S.local.myProfile;
+  if(!S.dcPopupOpen){ clearInterval(_chlLiveT); _chlLiveT = 0; return; }       // closed some other way (sign-out, profile switch): stop the clock
+  if(!me || S._chSheet || chlPressing() || document.hidden) return;
+  chlSync(me);
+  if(chlSig(me) !== _chlSig) renderDailyChallengesPopup();
 }
 let _chlQT = 0;
 function chlQuit(id){
@@ -21197,7 +21251,7 @@ function chlOpenSheet(tplId, pre){
   if(chlList(me).filter(c=>c.status==='active').length >= CHL_MAX_ACTIVE){ showToast(`You already have ${CHL_MAX_ACTIVE} active challenges — finish or quit one first.`); return; }
   const t = chlTpl(tplId); pre = pre || {};
   S._chSheet = {tpl:t.id, goal: pre.goal!=null ? pre.goal : t.goal, days: pre.days || t.days || 7, strict: !!pre.strict, rest: pre.rest!=null ? pre.rest : null,
-    blurb: pre.blurb || '', adv: !!pre.adv, edit: null, minRest: 0, minDays: CHL_MINDAYS,
+    blurb: pre.blurb || '', wake: pre.wake!=null ? pre.wake : (t.wakeAt||null), adv: !!pre.adv, edit: null, minRest: 0, minDays: CHL_MINDAYS,
     cue: pre.cue || '', open: pre.open!=null ? !!pre.open : !!t.open, name: pre.name || '', icon: pre.icon || '🎯', retry: pre.retry || null, fresh: true};
   S._chQuit = null;
   renderDailyChallengesPopup();
@@ -21212,6 +21266,8 @@ function chlStep(k, dir){
   if(k==='goal'){
     const hrs = t.kind==='hours', st = hrs ? 0.5 : 1, lo = hrs ? 0.5 : 1, hi = hrs ? 16 : 10;
     sh.goal = Math.max(lo, Math.min(hi, Math.round(((Number(sh.goal)||t.goal) + dir*st)*2)/2));
+  } else if(k==='wake'){
+    sh.wake = Math.max(CHL_WAKE_MIN, Math.min(CHL_WAKE_MAX, (Number(sh.wake)||540) + dir*15));
   } else if(k==='days'){
     sh.days = Math.max(sh.minDays||CHL_MINDAYS, Math.min(CHL_MAXDAYS, (Number(sh.days)||7) + dir));
     if(sh.rest!=null) sh.rest = Math.min(sh.rest, sh.days-1);
@@ -21223,7 +21279,7 @@ function chlEditOpen(id){
   chlSync(me);                                                   // freezes finished days first, so editing can't rewrite them
   const ch = chlList(me).find(c=>c.id===id); if(!ch || ch.status!=='active'){ chlRefresh(); return; }
   const ev = chlEval(me, ch), t = chlTpl(ch.tpl);
-  S._chSheet = {tpl:t.id, goal:ch.goal, days:ch.days, strict:!!ch.strict, rest:ch.rest|0, blurb: ch.blurb || '', adv:true, edit:ch.id,
+  S._chSheet = {tpl:t.id, goal:ch.goal, days:ch.days, strict:!!ch.strict, rest:ch.rest|0, blurb: ch.blurb || '', wake: ch.wake!=null ? ch.wake : null, adv:true, edit:ch.id,
     minRest:ev.misses, minDays:ch.days, cue:ch.cue||'', open:!!ch.open, name:ch.name, icon:ch.icon, retry:null, fresh:true};
   S._chQuit = null;
   renderDailyChallengesPopup();
@@ -21243,13 +21299,17 @@ function chlSaveEdit(){
       ch.gh = (ch.gh||[]).filter(e=>e.from !== today); ch.gh.push({from:today, goal:g}); ch.goal = g;
     }
   }
+  if(ch.wake!=null && sh.wake!=null && Number(sh.wake)!==ch.wake){
+    if(chlWakeLapsedToday(ch)) showToast('Wake-up time can\'t be changed after today\'s window has closed.');     // no reopening a lapsed day
+    else ch.wake = Math.max(CHL_WAKE_MIN, Math.min(CHL_WAKE_MAX, Number(sh.wake)));
+  }
   const days = Math.max(ch.days, Math.min(CHL_MAXDAYS, Math.floor(Number(sh.days)||ch.days)));
   const rule = String(sh.blurb||'').trim().slice(0,60);
   sh.days = days;
   const rest = chlEffRest(sh);
   ch.days = days; ch.rest = rest; ch.strict = rest===0 && chlRestFor(days,false)>0;
   ch.name = name; if(t.custom) ch.icon = sh.icon || ch.icon;
-  ch.blurb = t.custom ? rule : (rule || t.blurb);
+  ch.blurb = t.custom ? rule : (ch.wake!=null ? `Wake up before ${chlClock(ch.wake)}` : (rule || t.blurb));
   ch.cue = String(sh.cue||'').trim().slice(0,80); ch.open = !!sh.open;
   S._chSheet = null;
   saveShared();
@@ -21309,7 +21369,8 @@ function chlPreFrom(ch, days, goal){
   const t = chlTpl(ch.tpl), std = chlRestFor(ch.days, ch.strict), oddRest = (ch.rest|0) !== std;   // "custom" = differs from the default of the run it came from
   const oddText = !!ch.blurb && ch.blurb !== t.blurb && !t.custom;
   const oddGoal = !!t.goalOpts && !t.goalOpts.includes(Number(goal));
-  return {goal, days, strict:!!ch.strict, name:ch.name, icon:ch.icon, blurb:ch.blurb||'', rest: oddRest ? Math.min(ch.rest|0, days-1) : null, adv: oddRest || oddText || oddGoal || !CHL_DURS.includes(days)};
+  const oddWake = ch.wake!=null && ch.wake !== t.wakeAt;
+  return {goal, days, strict:!!ch.strict, name:ch.name, icon:ch.icon, blurb:ch.blurb||'', wake: ch.wake!=null ? ch.wake : null, rest: oddRest ? Math.min(ch.rest|0, days-1) : null, adv: oddRest || oddText || oddGoal || oddWake || !CHL_DURS.includes(days)};
 }
 function chlStart(){
   const me = S.local.myProfile, sh = S._chSheet; if(!me || !sh) return;
@@ -21321,9 +21382,16 @@ function chlStart(){
   const rest = chlEffRest(Object.assign({}, sh, {days, minRest:0}));
   const rule = String(sh.blurb||'').trim().slice(0,60);
   if(chlList(me).some(c=>c.status==='active' && c.tpl===t.id && (!t.custom || String(c.name).trim().toLowerCase()===name.toLowerCase()))){ showToast(`"${name}" is already running.`); return; }
+  const wake = t.wake ? Math.max(CHL_WAKE_MIN, Math.min(CHL_WAKE_MAX, Number(sh.wake)||t.wakeAt)) : null;
   const ch = {id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), tpl:t.id, name, icon: t.custom ? (sh.icon||'🎯') : t.icon,
-    kind:t.kind, goal: t.goal!=null ? Number(sh.goal)||t.goal : null, blurb: t.custom ? rule : (rule || t.blurb), days, strict: rest===0 && chlRestFor(days,false)>0, rest,
+    kind:t.kind, goal: t.goal!=null ? Number(sh.goal)||t.goal : null, blurb: wake!=null ? `Wake up before ${chlClock(wake)}` : (t.custom ? rule : (rule || t.blurb)), days, strict: rest===0 && chlRestFor(days,false)>0, rest,
     start:todayStr(), cue:String(sh.cue||'').trim().slice(0,80), open:!!sh.open, status:'active', res:{}, cel:{}, created:nowISO()};
+  if(wake!=null){
+    ch.wake = wake; ch.grace = CHL_WAKE_GRACE; ch.at = {};
+    // Started after today's window already closed? Day 1 would be lapsed before it began (and could end a strict run on the spot), so the time lock
+    // starts tomorrow; today is a normal check-in.
+    if(!chlWakeInfo(ch).open){ ch.wakeFrom = chlAddDays(todayStr(), 1); showToast(`Today's ${chlClock(wake)} window has passed — the time lock starts tomorrow.`); }
+  }
   chlList(me).push(ch);
   if(sh.retry){ const old = chlList(me).find(c=>c.id===sh.retry); if(old) old.seen = 1; }
   S._chSheet = null;
@@ -21359,7 +21427,7 @@ function chlEveningNotification(profileId){
   chlList(profileId).forEach(ch=>{
     if(ch.status!=='active') return;
     const ev = chlEval(profileId, ch);
-    if(ev.status!=='active' || ev.todayHit) return;
+    if(ev.status!=='active' || ev.todayHit || chlWakeLapsedToday(ch)) return;      // a lapsed Early Bird can't be saved by a nudge
     open.push({ch, risk: ev.rest>0 && ev.misses===ev.rest});
   });
   if(!open.length) return null;
@@ -21401,6 +21469,11 @@ function chlCardHtml(me, ch){
     if(!tdy.hit) action += ch.kind==='plan'
       ? `<button class="chl-btn ghost" onclick="exitDailyChallengesPopup();switchView('planner')">Open Planner</button>`
       : `<button class="chl-btn ghost" onclick="exitDailyChallengesPopup();switchView('timer')">⏱ Start studying</button>`;
+  } else if(chlWakeOn(ch, todayStr())){
+    const w = chlWakeInfo(ch);
+    if(tdy.hit) action = `<div class="chl-donebar"><span>✓ ${escChat(tdy.label)} — see you tomorrow</span>${w.open ? `<button class="chl-link" onclick="chlMark('${ch.id}')">Undo</button>` : ''}</div>`;
+    else if(w.open) action = `<button class="chl-btn" onclick="chlMark('${ch.id}')">☀️ I'm up</button><div class="chl-sm" style="text-align:center">${escChat(tdy.left)}</div>`;
+    else action = `<div class="chl-lapsed">⏰ Lapsed — the check-in closed at ${chlClock(w.closeMin)}. Back tomorrow.</div>`;
   } else if(tdy.hit){
     action = `<div class="chl-donebar"><span>✓ Done today — see you tomorrow</span><button class="chl-link" onclick="chlMark('${ch.id}')">Undo</button></div>`;
   } else {
@@ -21441,21 +21514,28 @@ function chlSheetHtml(){
   const styleCtl = adv
     ? `<div class="chl-lbl">Rest days</div><div class="chl-chips">${restOpts.map(r=>`<button class="chl-chip ${rest===r?'on':''}" onclick="S._chSheet.rest=${r};S._chSheet.strict=${r===0};renderDailyChallengesPopup()">${r===0?'⚡ None':'🛡 '+r}</button>`).join('')}</div><span class="chl-sm">Days you can miss and still win.${edit && sh.minRest ? ` ${sh.minRest} already used, so ${sh.minRest===1?'that is':'those are'} the minimum.` : ''}</span>`
     : (sh.days>=7 ? `<div class="chl-lbl">Style</div><div class="chl-chips"><button class="chl-chip ${!sh.strict?'on':''}" onclick="chlSet('strict',false)">🛡 Flexible</button><button class="chl-chip ${sh.strict?'on':''}" onclick="chlSet('strict',true)">⚡ Strict</button></div>` : '');
-  const ruleCtl = (adv && (t.kind==='manual' || t.custom))
+  const wakeV = Number(sh.wake)||540;
+  const wakeLocked = edit && t.wake && (()=>{ const c = chlList(S.local.myProfile).find(x=>x.id===sh.edit); return !!c && chlWakeLapsedToday(c); })();
+  const wakeCtl = !t.wake ? '' : `<div class="chl-lbl">Wake up before</div>` + (adv
+    ? `<div class="chl-step"><button onclick="chlStep('wake',-1)" aria-label="Earlier" ${wakeV<=CHL_WAKE_MIN||wakeLocked?'disabled':''}>−</button><b>${chlClock(wakeV)}</b><button onclick="chlStep('wake',1)" aria-label="Later" ${wakeV>=CHL_WAKE_MAX||wakeLocked?'disabled':''}>+</button></div>`
+    : `<div class="chl-chips">${[360,420,480,540,600].map(m=>`<button class="chl-chip ${wakeV===m?'on':''}" onclick="chlSet('wake',${m})">${chlClock(m)}</button>`).join('')}</div>`)
+    + `<span class="chl-sm">${wakeLocked ? 'Today’s window has closed, so the time can’t be changed until tomorrow. ' : ''}Tap “I’m up” before ${chlClock(wakeV)}. There’s a ${CHL_WAKE_GRACE}-minute buffer to ${chlClock(wakeV+CHL_WAKE_GRACE)}; after that the day lapses and can’t be ticked.</span>`;
+  const ruleCtl = (adv && !t.wake && (t.kind==='manual' || t.custom))
     ? `<div class="chl-lbl">Your rule${t.custom ? ' <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span>' : ''}</div><input class="chl-in" maxlength="60" placeholder="${escChat(t.custom ? 'e.g. 20 MCQs before lunch' : t.blurb)}" value="${escChat(sh.blurb)}" oninput="S._chSheet.blurb=this.value">`
     : '';
-  const sub = edit ? 'Edit the rules of this challenge' : (t.custom ? 'A daily habit you check in on' : escChat(sh.blurb || t.blurb));
+  const sub = edit ? 'Edit the rules of this challenge' : (t.wake ? `Wake up before ${chlClock(wakeV)}` : (t.custom ? 'A daily habit you check in on' : escChat(sh.blurb || t.blurb)));
   return `<div class="chl-sheet-bg ${sh.fresh?'':'nf'}" onclick="chlCloseSheet()"></div>
   <div class="chl-sheet ${sh.fresh?'':'nf'}" style="--c1:${t.c1};--c2:${t.c2}" role="dialog" aria-modal="true" aria-label="${edit?'Edit':'Start'} ${escChat(title)}">
     <div class="chl-grab"></div>
     <div class="chl-sh-head"><div class="e">${icon}</div><div><b>${escChat(title)}</b><span>${sub}</span></div></div>
     ${t.custom ? `<div class="chl-lbl">Name</div><input class="chl-in" maxlength="40" placeholder="e.g. Solve 20 MCQs" value="${escChat(sh.name)}" oninput="S._chSheet.name=this.value">
       <div class="chl-lbl">Icon</div><div class="chl-chips">${CHL_ICONS.map(e=>`<button class="chl-chip ${sh.icon===e?'on':''}" onclick="chlSet('icon','${e}')">${e}</button>`).join('')}</div>` : ''}
+    ${wakeCtl}
     ${ruleCtl}
     ${goalCtl}
     ${daysCtl}
     ${styleCtl}
-    <div class="chl-note">Win by hitting <b>${need} of ${sh.days} days</b>${rest>0 ? ` — <b>${rest} rest day${rest>1?'s':''}</b> are built in, so one slip won't end it.` : ' — every single day counts.'} ${auto ? 'It tracks itself from your study data.' : 'Tap once a day to check in.'}</div>
+    <div class="chl-note">Win by hitting <b>${need} of ${sh.days} days</b>${rest>0 ? ` — <b>${rest} rest day${rest>1?'s':''}</b> are built in, so one slip won't end it.` : ' — every single day counts.'} ${auto ? 'It tracks itself from your study data.' : (t.wake ? 'The check-in is time-locked.' : 'Tap once a day to check in.')}</div>
     <div class="chl-lbl">When &amp; where will you do it? <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span></div>
     <input class="chl-in" maxlength="80" placeholder="${escChat(t.cueEx)}" value="${escChat(sh.cue)}" oninput="S._chSheet.cue=this.value">
     <div class="chl-row"><div>Let ${nick} see &amp; join<small>Shows this challenge and your progress to ${nick}</small></div><button class="chl-sw ${sh.open?'on':''}" role="switch" aria-checked="${!!sh.open}" aria-label="Let ${nick} see and join" onclick="chlSet('open',${!sh.open})"></button></div>
@@ -21464,7 +21544,7 @@ function chlSheetHtml(){
   </div>`;
 }
 function chlTplCardHtml(t){
-  return `<button class="chl-tpl ${t.rec?'rec':''}" data-lp-tpl="${t.id}" style="--c1:${t.c1};--c2:${t.c2}" onclick="chlOpenSheet('${t.id}')"><span class="e">${t.icon}</span><b>${t.name}</b><span>${t.blurb}</span><em>${t.kind==='manual' ? 'Daily check-in' : 'Tracks itself'}</em></button>`;
+  return `<button class="chl-tpl ${t.rec?'rec':''}" data-lp-tpl="${t.id}" style="--c1:${t.c1};--c2:${t.c2}" onclick="chlOpenSheet('${t.id}')"><span class="e">${t.icon}</span><b>${t.name}</b><span>${t.blurb}</span><em>${t.wake ? 'Time-locked check-in' : t.kind==='manual' ? 'Daily check-in' : 'Tracks itself'}</em></button>`;
 }
 function chlShelfHtml(shelf){
   return `<div class="chl-shelf">${shelf.slice(0,12).map(c=>{
@@ -21511,6 +21591,7 @@ function renderDailyChallengesPopup(){
   ${chlSheetHtml()}`;
   const sc = root.querySelector('.chl-scroll'); if(sc && prevScroll) sc.scrollTop = prevScroll;
   const shEl = root.querySelector('.chl-sheet'); if(shEl && prevSheetScroll) shEl.scrollTop = prevSheetScroll;
+  _chlSig = chlSig(me);
   if(S._chSheet) S._chSheet.fresh = false;                                   // the sheet slides up once; chip taps just update it in place
 }
 
@@ -21528,6 +21609,7 @@ function homeDailyChallengesCard(p){
     const t = chlTpl(ch.tpl), ev = chlEval(p, ch), tdy = chlToday(p, ch, ev);
     let right;
     if(ev.todayHit) right = `<span class="chl-hok">✓ Done</span>`;
+    else if(chlWakeOn(ch, todayStr())) right = chlWakeInfo(ch).open ? `<button class="chl-hmini" onclick="event.stopPropagation();chlMark('${ch.id}')">☀️ I'm up</button>` : `<span class="chl-hok" style="color:var(--danger,#d33)">Lapsed</span>`;
     else if(ch.kind==='manual') right = `<button class="chl-hmini" onclick="event.stopPropagation();chlMark('${ch.id}')">✓ Done</button>`;
     else right = `<span class="chl-hok">${Math.round(tdy.frac*100)}%</span>`;
     return `<div class="chl-hrow ${ev.todayHit?'done':''}" style="--c1:${t.c1};--c2:${t.c2}"><div class="chl-hic">${ch.icon}</div><div class="chl-hmid"><b>${escChat(ch.name)}</b><div class="chl-dots fit">${chlDotsHtml(ev, ch, false)}</div><small>Day ${ev.dayNo} of ${ch.days} · ${ev.need-ev.hits>0 ? `${ev.need-ev.hits} more to win` : 'win secured 🏆'}</small></div>${right}</div>`;
@@ -21546,6 +21628,7 @@ function openDailyChallengesPopup(){
   }
   S.dcPopupOpen = true; S._chSheet = null; S._chQuit = null; S._chAnim = true;
   chlBindLongPress(document.getElementById('daily-challenges-root'));
+  clearInterval(_chlLiveT); _chlLiveT = setInterval(chlLiveTick, 5000);
   document.addEventListener('keydown', _onDCKey);
   document.body.classList.add('daily-challenges-mode');
   renderDailyChallengesPopup();
@@ -21554,7 +21637,7 @@ function _onDCBackButton(){ if(S._chSheet){ S._chSheet = null; try{ history.push
 function _onDCKey(e){ if(e.key==='Escape'){ if(S._chSheet) chlCloseSheet(); else exitDailyChallengesPopup(); } }
 function closeDailyChallengesPopup(){
   if(_dcHistoryActive){ window.removeEventListener('popstate', _onDCBackButton); _dcHistoryActive = false; }
-  S.dcPopupOpen = false; S._chSheet = null; S._chQuit = null; clearTimeout(_chlQT);
+  S.dcPopupOpen = false; S._chSheet = null; S._chQuit = null; clearTimeout(_chlQT); clearInterval(_chlLiveT); _chlLiveT = 0;
   document.removeEventListener('keydown', _onDCKey);
   document.body.classList.remove('daily-challenges-mode');
   const el = document.getElementById('daily-challenges-root'); if(el) el.innerHTML = '';

@@ -267,13 +267,17 @@
 //        challenges, decline a partner invite, Esc closes, open screen's ring/bar update live while the timer runs. index.html only.
 // v159 — Challenge notifications: morning kick-off push + evening nudge (server crons), in-app evening banner/device notification, Settings switches,
 //        tapping one opens Challenges (?go=challenges / OPEN_GO). index.html only (api/check-morning.js + api/check-reminders.js also changed).
+// v164 — audit: Early Bird started after its window no longer begins with a lapsed day 1; Challenges live refresh can't freeze after a mid-press redraw and stops itself
+//        when the screen closes; SW messaging fallback can't pile up when no worker is registered; wake stepper locked once today lapsed. index.html + sw.js.
+// v163 — Early Bird is time-locked (check in before your wake-up time, 9:00 AM by default, +10 min buffer, then the day lapses); study challenges and the Challenges
+//        screen update live from the running timer on their own clock. index.html + sw.js (+ api/check-morning.js, api/check-reminders.js).
 // v162 — challenge rules editor hardening: click-swallow after a long press ends at the next touch (phones may never deliver the lift), buttons inside a card
 //        aren't press targets, "✎ Edit rules" button on each card, strict only when it differs from the default. index.html + sw.js.
 // v161 — challenges: hold a challenge card (or a template) to edit its rules — goal, length, rest days, rule text; running challenges can be extended. index.html + sw.js.
 // v160 — timer-start notifications: own running-timer notification now also works when the page has no SW controller (first visit / hard refresh)
 //        and is shown via waitUntil; partner's "started studying" push only for a session still running, throttled, says what is studied, replaces
 //        instead of stacking, is skipped while the app is visible and is cleared when the session ends. index.html + sw.js.
-const CACHE_VERSION = 'olympus-v162';
+const CACHE_VERSION = 'olympus-v164';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
