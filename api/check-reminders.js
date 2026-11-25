@@ -148,22 +148,29 @@ function challengeSnapshot(data, profileId, todayStr, hoursFn, targetToday) {
     if (ch.kind === 'sessions') return logs.filter((l) => l.date === d).length >= Number(ch.goal || 1);
     return false; // 'manual' counts only what was ticked (ch.res)
   };
+  // v163: Early Bird is time-locked (ch.wake = minutes after midnight, ch.grace = buffer minutes). Once the window has closed the day is lapsed, so it counts as
+  // a miss and must not be nudged. IST clock, study day starting at 5 AM -- same as the cron's own todayStr.
+  const istNow = new Date(Date.now() + 5.5 * 3600 * 1000);
+  const sinceMin = (((istNow.getUTCHours() * 60 + istNow.getUTCMinutes() - 300) % 1440) + 1440) % 1440;
+  const wakeOn = (ch, d) => ch.wake != null && (!ch.wakeFrom || d >= ch.wakeFrom);
+  const wakeClosed = (ch) => sinceMin > (ch.wake - 300) + (ch.grace != null ? ch.grace : 10);
+  const clock = (m) => { const h = Math.floor(m / 60) % 24; return `${h % 12 || 12}:${String(m % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; };
   const goalText = (ch) => ch.kind === 'hours' ? `Study ${ch.goal}h` : ch.kind === 'target' ? 'Reach your daily target'
-    : ch.kind === 'plan' ? 'Finish every planner task' : ch.kind === 'sessions' ? `Log ${ch.goal}+ study sessions` : (ch.blurb || ch.name);
+    : ch.kind === 'plan' ? 'Finish every planner task' : ch.kind === 'sessions' ? `Log ${ch.goal}+ study sessions` : (ch.wake != null ? `Wake up before ${clock(ch.wake)}` : (ch.blurb || ch.name));
   const out = [];
   list.forEach((ch) => {
     if (!ch || ch.status !== 'active' || !ch.start || !(ch.days > 0)) return;
-    let hits = 0, misses = 0, todayHit = false;
+    let hits = 0, misses = 0, todayHit = false, lapsed = false;
     for (let i = 0; i < ch.days; i++) {
       const d = addDays(ch.start, i);
       if (d > todayStr) break;
       const h = hitOn(ch, d);
-      if (d === todayStr) { todayHit = h; if (h) hits++; } else if (h) hits++; else misses++;
+      if (d === todayStr) { todayHit = h; if (h) hits++; else if (wakeOn(ch, d) && wakeClosed(ch)) { misses++; lapsed = true; } } else if (h) hits++; else misses++;
     }
     const rest = ch.rest | 0;
     if (misses > rest || todayStr > addDays(ch.start, ch.days - 1) || todayStr < ch.start) return;
     const dayNo = Math.round((new Date(todayStr + 'T00:00:00Z') - new Date(ch.start + 'T00:00:00Z')) / 864e5) + 1;
-    out.push({ name: String(ch.name || 'Challenge'), icon: ch.icon || '🏁', goalText: goalText(ch), days: ch.days, dayNo, hits, need: ch.days - rest, todayHit,
+    out.push({ name: String(ch.name || 'Challenge'), icon: ch.icon || '🏁', goalText: goalText(ch), days: ch.days, dayNo, hits, need: ch.days - rest, todayHit, lapsed,
       atRisk: !todayHit && rest > 0 && misses === rest });
   });
   return out;
@@ -221,7 +228,7 @@ function buildReminderReasons(data, profileId, todayIST) {
   // v159: challenges still open today (evening nudge). Honours the challengeReminder switch (a pushPrefs entry, so it syncs to Drive).
   const chlPrefOff = data.pushPrefs && data.pushPrefs[profileId] && data.pushPrefs[profileId].challengeReminder === false;
   if (!chlPrefOff) {
-    const open = challengeSnapshot(data, profileId, todayIST, (d) => hoursOnDate(data, profileId, d), target).filter((c) => !c.todayHit);
+    const open = challengeSnapshot(data, profileId, todayIST, (d) => hoursOnDate(data, profileId, d), target).filter((c) => !c.todayHit && !c.lapsed);
     if (open.length) {
       const risky = open.filter((c) => c.atRisk);
       const warn = risky.length ? ` ⚠️ ${risky.length === 1 ? risky[0].name + ' has' : 'Some have'} no rest days left — a miss today ends the run.` : '';
