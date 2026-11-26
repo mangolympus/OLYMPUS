@@ -501,13 +501,28 @@ textarea.jsonbox{width:100%;height:90px;border:1px solid var(--border);border-ra
 .qb-tag{font-size:9.5px;font-weight:700;background:var(--surface2);color:var(--text-muted);padding:2px 7px;border-radius:4px;text-transform:capitalize}
 
 /* ═══════════════════════════════════════════════════════════
-   CHAT PAGE — full-screen overlay, own header/composer, hides
-   the app chrome (header + bottom nav) while active.
+   CHAT PAGE — a normal page of the app (v168), exactly like Timer / Planner / Money: the app header and the bottom nav stay
+   put, the page fills the space between them, and the bottom nav is how you leave. #chat-root is a persistent sibling of
+   #app-root (same reasoning as #money-root). The one deliberate exception: while the phone keyboard is up (body.chat-kb) the
+   bottom nav steps aside so the composer gets the room -- it comes straight back when the keyboard closes.
+   --app-hdr-h / --app-nav-h are measured by syncChromeVars() so the page height is exact on every phone and safe-area.
    ═══════════════════════════════════════════════════════════ */
-body.chat-mode header,
-body.chat-mode .bottomnav,
+body.chat-mode #app-root{display:none}
 body.chat-mode .fab{display:none!important}
 body.chat-mode{padding-bottom:0;overflow:hidden}
+body.chat-kb .bottomnav{display:none}
+@media (max-height:620px){ body.chat-kb > header{display:none} }
+#chat-root{display:none;width:100%}
+body.chat-mode #chat-root{display:block}
+/* v168 PAGE SWIPE — the little tab that slides in from the edge while you drag towards the next / previous page. */
+#page-swipe-hint{position:fixed;top:46%;left:0;z-index:90;display:flex;align-items:center;gap:7px;padding:9px 14px 9px 10px;
+  border-radius:0 24px 24px 0;background:var(--surface);color:var(--text-muted);border:1px solid var(--border);border-left:none;
+  box-shadow:0 6px 22px rgba(0,0,0,.28);font-size:11.5px;font-weight:800;letter-spacing:.02em;pointer-events:none;opacity:0;
+  transform:translateX(-110%);will-change:transform,opacity;transition:background .15s,color .15s,box-shadow .15s}
+#page-swipe-hint.r{left:auto;right:0;border-radius:24px 0 0 24px;border-left:1px solid var(--border);border-right:none;flex-direction:row-reverse;
+  padding:9px 10px 9px 14px;transform:translateX(110%)}
+#page-swipe-hint svg{width:18px;height:18px;flex-shrink:0}
+#page-swipe-hint.ready{background:var(--active-accent,var(--umang));color:#fff;border-color:transparent;box-shadow:0 6px 24px color-mix(in srgb,var(--active-accent,var(--umang)) 55%,transparent)}
 /* MONEY PAGE — a real 5th tab like Home/Timer/Planner (header + bottom nav stay put so
    switching to/from it feels like changing tabs, not leaving into a separate window). The
    FAB (Quick study log) is hidden since it isn't relevant here. #money-root itself stays a
@@ -1348,9 +1363,12 @@ body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
 #fullscreen-timer-root .fs-control-bar button:active{background:rgba(255,255,255,.18)}
 
 .chat-page{
-  position:fixed;inset:0;z-index:400;
+  position:relative;  /* NOT fixed/z-indexed: a stacking context here would trap the message sheets under the bottom nav */
   display:flex;flex-direction:column;
-  height:100vh;height:100dvh;
+  width:100%;max-width:640px;margin:0 auto;
+  height:calc(100vh - var(--app-hdr-h,58px) - var(--app-nav-h,56px));
+  height:calc(var(--app-vvh,100dvh) - var(--app-hdr-h,58px) - var(--app-nav-h,56px));
+  overflow:hidden;
   background:var(--bg);
   color:var(--text);
 }
@@ -1360,7 +1378,7 @@ body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
 /* ── Header ───────────────────────────────────────────────── */
 .chat-header{
   flex-shrink:0;display:flex;align-items:center;gap:10px;
-  padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;
+  padding:8px 12px;min-height:54px;
   background:color-mix(in srgb, var(--surface) 82%, transparent);
   backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);
   border-bottom:1px solid var(--border);
@@ -1456,7 +1474,6 @@ body.fullscreen-timer-mode #fullscreen-timer-root{display:flex}
   position:relative;padding:15px 17px;border-radius:18px;
   font-size:15px;line-height:1.55;word-wrap:break-word;overflow-wrap:break-word;
   box-shadow:var(--shadow-sm);
-  animation:bubbleIn .22s cubic-bezier(.22,.8,.4,1);
   max-width:100%;
   transition:transform .12s, box-shadow .15s;
   touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
@@ -1558,7 +1575,7 @@ html[data-mode="light"] .chat-group.in .chat-bubble .rt-link{color:#0b63ce}
 .chat-reply-bar .close,.chat-edit-bar .close{flex-shrink:0;background:none;border:none;color:var(--text-faint);cursor:pointer;padding:4px}
 
 .chat-composer{
-  display:flex;align-items:flex-end;gap:6px;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);
+  display:flex;align-items:flex-end;gap:6px;padding:8px 10px 8px;  /* v168: the bottom nav (not the composer) owns the home-indicator inset now */
   background:color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);
   border-top:1px solid var(--border);
@@ -1580,6 +1597,66 @@ html[data-mode="light"] .chat-group.in .chat-bubble .rt-link{color:#0b63ce}
 .chat-compose-icon-btn{background:none;color:var(--text-muted)}
 .chat-compose-icon-btn:hover{background:var(--surface2);color:var(--text)}
 .chat-compose-icon-btn svg{width:20px;height:20px}
+
+
+/* ═══ v169 CHAT POLISH ═══ */
+.chat-part{display:contents}
+/* the scroll-to-latest button lives INSIDE this wrapper, so it always sits above whatever the bottom bar currently is (tray, reply bar, ...) */
+.chat-msgs-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.chat-msgs-wrap > .chat-messages{flex:1;min-height:0}
+.chat-date-sep{opacity:.94}
+/* only a message that has just ARRIVED gets the entry pop -- re-patching the list never replays it */
+.chat-bubble.pop-in{animation:bubbleIn .26s cubic-bezier(.22,.8,.4,1)}
+body.chat-kb .chat-composer{padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+/* wallpapers (per device) */
+.chat-page[data-wp="photo"] .chat-messages{background-image:linear-gradient(rgba(8,10,14,.72),rgba(8,10,14,.72)),var(--chat-photo);background-size:cover;background-position:center}
+.chat-page[data-wp="aurora"] .chat-messages{background:
+  radial-gradient(120% 70% at 0% 0%,color-mix(in srgb,var(--my-accent) 30%,transparent),transparent 62%),
+  radial-gradient(90% 60% at 100% 100%,color-mix(in srgb,var(--other-accent) 28%,transparent),transparent 58%),
+  radial-gradient(70% 50% at 100% 0%,rgba(120,90,255,.14),transparent 60%),var(--bg)}
+.chat-page[data-wp="dots"] .chat-messages{background:radial-gradient(circle at 1px 1px,color-mix(in srgb,var(--text) 11%,transparent) 1.2px,transparent 0) 0 0/22px 22px,var(--bg)}
+.chat-page[data-wp="plain"] .chat-messages{background:var(--bg)}
+.chat-wp-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600}
+.chat-wp-row > span{flex:1;white-space:nowrap}
+.chat-wp-sw{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);padding:0;cursor:pointer;background:var(--surface2);flex-shrink:0}
+.chat-wp-sw.on{border-color:var(--active-accent,var(--umang));box-shadow:0 0 0 2px color-mix(in srgb,var(--active-accent,var(--umang)) 35%,transparent)}
+.chat-wp-sw[data-wp="photo"]{background:linear-gradient(135deg,#3b4a63,#16202e)}
+.chat-wp-sw[data-wp="aurora"]{background:radial-gradient(circle at 20% 20%,#6f7cff,transparent 60%),radial-gradient(circle at 85% 85%,#e0679a,transparent 60%),#10131c}
+.chat-wp-sw[data-wp="dots"]{background:radial-gradient(circle at 2px 2px,#8a93a6 1.4px,transparent 0) 0 0/8px 8px,var(--surface2)}
+.chat-wp-sw[data-wp="plain"]{background:var(--bg)}
+/* bubbles: a little more depth, a tinted glow on mine, glassier theirs */
+.chat-group.out .chat-bubble{box-shadow:0 2px 10px color-mix(in srgb,var(--my-accent) 30%,transparent),inset 0 1px 0 rgba(255,255,255,.18)}
+.chat-group.in .chat-bubble{background:color-mix(in srgb,var(--surface) 94%,transparent)}
+/* emoji-only message: big, no bubble */
+.chat-bubble.jumbo{background:none!important;border:none!important;box-shadow:none!important;padding:2px 6px 0;font-size:46px;line-height:1.12}
+.chat-bubble.jumbo .chat-meta-row{font-size:10px;color:var(--text-faint)!important}
+.chat-bubble.jumbo .chat-meta-row *{color:var(--text-faint)!important}
+.chat-bubble.jumbo .chat-ticks{color:var(--text-faint)}
+/* "N new messages" divider */
+.chat-new-divider{display:flex;align-items:center;gap:10px;margin:10px 4px 12px;color:var(--other-accent);font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.chat-new-divider::before,.chat-new-divider::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--other-accent) 60%,transparent),transparent)}
+/* send button: dim until there is something to send, then lights up */
+.chat-send-btn{opacity:.5;transform:scale(.92);filter:saturate(.6);transition:transform .18s cubic-bezier(.34,1.56,.64,1),opacity .15s,filter .15s}
+.chat-send-btn.on{opacity:1;transform:none;filter:none;box-shadow:0 3px 14px color-mix(in srgb,var(--my-accent) 50%,transparent)}
+.chat-send-btn.on:active{transform:scale(.88)}
+.chat-compose-icon-btn.active{background:color-mix(in srgb,var(--my-accent) 18%,transparent);color:var(--my-accent)}
+/* swipe-to-reply arrow + double-tap heart */
+.chat-swipe-ico{position:absolute;left:-40px;top:50%;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--surface2);color:var(--text-muted);opacity:0;transform:translateY(-50%) scale(.55);pointer-events:none;transition:background .12s,color .12s}
+.chat-swipe-ico svg{width:16px;height:16px}
+.chat-swipe-ico.armed{background:var(--my-accent);color:#fff}
+.chat-heart-burst{position:absolute;z-index:30;font-size:54px;line-height:1;pointer-events:none;transform:translate(-50%,-50%);animation:heartBurst .75s cubic-bezier(.2,.9,.3,1) forwards;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+@keyframes heartBurst{0%{transform:translate(-50%,-50%) scale(.2);opacity:0}25%{transform:translate(-50%,-62%) scale(1.25);opacity:1}60%{transform:translate(-50%,-70%) scale(1);opacity:1}100%{transform:translate(-50%,-120%) scale(.9);opacity:0}}
+/* draggable action sheet */
+.chat-sheet-grab{touch-action:none;cursor:grab}
+.chat-sheet-overlay{transition:opacity .12s}
+/* quick-share tray */
+.chat-quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.chat-quick-cell{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-family:inherit;transition:transform .1s,background .15s}
+.chat-quick-cell:active{transform:scale(.93)}
+.chat-quick-cell .i{font-size:24px;line-height:1}
+.chat-quick-cell .t{font-size:10.5px;font-weight:700;color:var(--text-muted);text-align:center;line-height:1.2}
+@media (prefers-reduced-motion:reduce){ .chat-bubble.pop-in,.chat-heart-burst{animation:none} .chat-heart-burst{opacity:0} }
 
 /* Picker trays (sticker/poll) */
 .chat-tray{background:var(--surface);border-top:1px solid var(--border);padding:12px;animation:chatSlideIn .18s;
@@ -1634,7 +1711,7 @@ html[data-mode="light"] .chat-group.in .chat-bubble .rt-link{color:#0b63ce}
   outline:2px solid var(--other-accent);outline-offset:2px}
 
 @media (min-width:820px){
-  .chat-page{max-width:640px;left:50%;transform:translateX(-50%);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+  .chat-page{border-left:1px solid var(--border);border-right:1px solid var(--border)}
   .chat-row{max-width:78%}
   .chat-group.out .chat-row{max-width:80%}
 }
@@ -4913,10 +4990,51 @@ function renderNav(){
   if(fab) fab.style.display = (S.view==='timer') ? 'flex' : 'none';
   document.body.classList.toggle('chat-mode', S.view==='chat');
   document.body.classList.toggle('money-mode', S.view==='money');
+  chatKbSync(); // also runs syncChromeVars()
   // Update Drive sync badge
   const badge = document.getElementById('drive-sync-badge');
   if(badge) badge.innerHTML = syncBadgeHtml();
 }
+// ── v168: chat as a page: chrome measurements + keyboard ─────────────────────────────────────────────────────────────────
+// The chat page fills exactly the space between the app header and the bottom nav, so both heights are published as CSS variables.
+function syncChromeVars(){
+  const r = document.documentElement.style, h = document.querySelector('body > header'), n = document.getElementById('bottomnav');
+  const hh = h ? (getComputedStyle(h).display==='none' ? 0 : Math.round(h.getBoundingClientRect().height)) : 0;
+  const nh = n ? (getComputedStyle(n).display==='none' ? 0 : Math.round(n.getBoundingClientRect().height)) : 0;
+  if(S.view==='chat' || hh) r.setProperty('--app-hdr-h', hh+'px');
+  if(S.view==='chat' || nh) r.setProperty('--app-nav-h', nh+'px');
+}
+// While the phone keyboard is open over Chat the bottom nav (and, on short screens, the app header) step aside so the composer isn't squeezed.
+function chatKbSync(){
+  const ae = document.activeElement;
+  const typing = S.view==='chat' && !!ae && (ae.id==='chat-composer-input' || ae.id==='chat-search-input') && !!(window.matchMedia && matchMedia('(pointer:coarse)').matches);
+  document.body.classList.toggle('chat-kb', typing);
+  syncChromeVars();
+  if(S.view==='chat'){ const l = document.getElementById('chat-messages-list'); if(l && S._chatPinToBottom) l.scrollTop = l.scrollHeight; }
+}
+(function chromeWatch(){
+  if(window._chromeWatchBound) return; window._chromeWatchBound = true;
+  document.addEventListener('focusin', ()=>{ if(S.view==='chat') chatKbSync(); });
+  // A finger that is still down must never see the layout move under it (the nav popping back would shift Send out from under a slow tap):
+  // while any pointer is down, the keyboard-closed re-layout waits for it to lift.
+  let down = 0;
+  const dn = ()=>{ down++; }, up = ()=>{ down = Math.max(0, down-1); };
+  document.addEventListener('pointerdown', dn, true); document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', up, true);
+  const settle = (n)=>{ if(S.view!=='chat') return; if(down>0 && n<15){ setTimeout(()=>settle(n+1), 120); return; } down = 0; chatKbSync(); }; // n: never wait forever on a lost pointerup
+  document.addEventListener('focusout', ()=>{ if(S.view==='chat') setTimeout(()=>settle(0), 160); }); // delay: Send / a re-render hands focus straight back
+  window.addEventListener('resize', ()=>syncChromeVars());
+  window.addEventListener('orientationchange', ()=>setTimeout(syncChromeVars, 250));
+  try{ if(window.ResizeObserver){ const ro = new ResizeObserver(()=>syncChromeVars()); const h = document.querySelector('body > header'); if(h) ro.observe(h); const n = document.getElementById('bottomnav'); if(n) ro.observe(n); } }catch(e){}
+  // iOS shrinks only the VISUAL viewport for the keyboard: follow it, and keep the (sticky) app header from being scrolled out of view.
+  const vv = window.visualViewport;
+  if(vv){
+    const sync = ()=>{
+      document.documentElement.style.setProperty('--app-vvh', Math.round(vv.height)+'px');
+      if(S.view==='chat' && vv.offsetTop>1){ try{ window.scrollTo(0,0); }catch(e){} }
+    };
+    vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync);
+  }
+})();
 function renderHeaderPill(){
   document.getElementById('header-profile-pill').innerHTML = PROFILES.map(p=>
     `<button class="${S.viewingProfile===p.id?'on-'+p.color:''}" onclick="setViewingProfile('${p.id}')">${p.nick}</button>`
@@ -4962,20 +5080,177 @@ window.addEventListener('popstate', e=>{
   }
 });
 function switchView(v){
+  if(v==='chat' && S.view==='chat'){ scrollChatToBottom(true); return; } // tapping the tab you are on = jump to the newest message (like any chat app)
   if(!confirmLeaveTest()) return;
   if(v==='money' && !S.local.myProfile) return;
   if(v==='money') moneyVaultSync({minAgeMs:5000}); // v144: look at this person's private Money file whenever the page is opened
   const enteringChat = v==='chat' && S.view!=='chat';
   if(enteringChat) S._chatReturnView = (S.view==='workspace' ? 'timer' : S.view) || 'home';
+  const leavingChat = S.view==='chat' && v!=='chat';
+  if(leavingChat) leaveChatForNav();
   S.view=v;
+  if(leavingChat) postSwViewState();
   wsHistLeave(v);
   if(v==='planner' && !S.plannerDateFilter){
     S.plannerDateFilter = todayStr();
     S.selectedCalDay = todayStr();
   }
   S._justNavigated=true; renderNav(); renderApp();
-  if(enteringChat) enterChat();
+  if(enteringChat){ try{ window.scrollTo(0,0); }catch(e){} enterChat(); }
 }
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// v168 — SWIPE BETWEEN PAGES.  Drag sideways anywhere on a page to move to the neighbouring tab (Home ⇄ Timer ⇄ Planner ⇄ Chat ⇄ Settings ⇄ Money).
+//   • The page follows the finger 1:1 with a tab peeking in from the edge ("‹ Planner") that fills in when letting go would switch; a light tick
+//     marks the moment it crosses the line. Release past ~22 % of the width -- or flick quickly -- to go; otherwise it springs back.
+//   • At the first / last page it rubber-bands instead of doing nothing, so you can feel the end of the row.
+//   • It never fights anything that already owns a sideways drag: text fields, sliders, sideways-scrolling strips (unless already scrolled to their
+//     end), the money charts (data-noswipe), message bubbles' swipe-to-reply (rightwards only) and any open sheet / dialog / fullscreen timer.
+//   • Touch only (a mouse has the bottom nav); honours "reduce motion" (switches with no movement).
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+const PS_OVERLAYS = '.modal-overlay,.search-overlay,.chat-sheet-overlay,.splash-overlay,.modal-bg,[aria-modal="true"]';
+function psPages(){ return navItems().map(n=>n.id); }
+function psCurrent(){ return S.view==='workspace' ? 'timer' : S.view; }
+function psViewEl(){
+  if(S.view==='chat') return document.querySelector('#chat-root .chat-page') || document.getElementById('chat-root');
+  if(S.view==='money') return document.getElementById('money-root');
+  return document.getElementById('app-root');
+}
+function psHint(){
+  let h = document.getElementById('page-swipe-hint');
+  if(!h){ h = document.createElement('div'); h.id = 'page-swipe-hint'; h.setAttribute('aria-hidden','true'); document.body.appendChild(h); }
+  return h;
+}
+// Can the finger that went down on `t` hand this sideways drag to the page? dir = -1 (dragging left) / +1 (dragging right).
+function psAllowed(t, dir){
+  if(!t || !t.closest) return false;
+  if(t.closest('input,textarea,select,[contenteditable="true"],[data-noswipe],canvas,.ch-handle,svg [draggable]')) return false;
+  if(t.closest('.chat-row') && dir>0) return false; // swipe-to-reply
+  for(let el=t; el && el!==document.body; el=el.parentElement){
+    const cs = getComputedStyle(el);
+    if((cs.overflowX==='auto' || cs.overflowX==='scroll') && el.scrollWidth > el.clientWidth + 2){
+      const atStart = el.scrollLeft <= 1, atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+      if(dir<0 ? !atEnd : !atStart) return false; // it can still scroll that way: let it
+    }
+  }
+  return true;
+}
+function psAvailable(){
+  if(!S.appSession && !(S.local && S.local.myProfile)) return false;
+  const nav = document.getElementById('bottomnav');
+  if(!nav || getComputedStyle(nav).display==='none') return false;      // overlays / keyboard-over-chat hide the nav: no page swiping then
+  if(S.view==='workspace' || S.fullscreenTimerOpen || S._chatSelectMode) return false;
+  if(document.querySelector(PS_OVERLAYS)) return false;
+  return true;
+}
+(function pageSwipeInit(){
+  if(window._pageSwipeBound) return; window._pageSwipeBound = true;
+  let g = null;
+  const W = ()=> Math.max(280, window.innerWidth || 360);
+  function reset(animate){
+    if(!g) return;
+    const el = g.el, hint = document.getElementById('page-swipe-hint');
+    if(hint){ hint.style.transition = 'transform .2s, opacity .2s'; hint.style.opacity = '0'; hint.style.transform = hint.classList.contains('r') ? 'translateX(110%)' : 'translateX(-110%)'; }
+    if(el && g.locked==='h'){
+      if(animate && !prefersReducedMotion() && el.animate){
+        const from = el.style.transform || 'none', fo = el.style.opacity || '1';
+        el.style.transform = ''; el.style.opacity = '';
+        try{ el.animate([{transform:from, opacity:fo},{transform:'none', opacity:1}], {duration:200, easing:'cubic-bezier(.22,.8,.4,1)'}); }catch(e){}
+      } else { el.style.transform = ''; el.style.opacity = ''; }
+    }
+    g = null;
+  }
+  document.addEventListener('touchstart', e=>{
+    if(g){ reset(false); }
+    if(e.touches.length!==1 || !psAvailable()) return;
+    const t = e.touches[0];
+    g = { x0:t.clientX, y0:t.clientY, t0:e.timeStamp, tgt:e.target, locked:null, dx:0, last:[{x:t.clientX,t:e.timeStamp}], ready:false, to:null, dir:0, el:null };
+  }, {passive:true});
+  document.addEventListener('touchmove', e=>{
+    if(!g) return;
+    if(e.touches.length!==1){ reset(false); return; }
+    const t = e.touches[0], dx = t.clientX - g.x0, dy = t.clientY - g.y0;
+    if(g.locked==='v') return;
+    if(!g.locked){
+      if(Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)){ g.locked = 'v'; return; }
+      if(Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy)*1.5) return;
+      const dir = dx<0 ? -1 : 1;
+      if(!psAllowed(g.tgt, dir)){ g.locked = 'v'; return; }
+      const order = psPages(), i = order.indexOf(psCurrent());
+      if(i<0){ g.locked = 'v'; return; }
+      g.dir = dir; g.el = psViewEl();
+      if(g.el) g.el.classList.remove('view-enter','entering');   // their fill-mode:both animations would otherwise hold the page still and ignore the finger
+      g.to = order[i - dir];                      // dragging right (+) reveals the page on the LEFT, i.e. the previous one
+      g.locked = 'h';
+      if(g.to){
+        const hint = psHint(), n = navItems().find(x=>x.id===g.to);
+        hint.className = dir>0 ? '' : 'r';
+        hint.innerHTML = (ICONS[g.to]||'') + '<span>' + (n ? n.label : '') + '</span>';
+        hint.style.transition = 'none';
+      }
+    }
+    // locked horizontal: the page follows the finger
+    if(e.cancelable) e.preventDefault();
+    g.dx = dx;
+    g.last.push({x:t.clientX, t:e.timeStamp}); if(g.last.length>5) g.last.shift();
+    const w = W(), thr = Math.max(70, w*0.22), has = !!g.to;
+    const shown = has ? dx : Math.sign(dx) * Math.min(46, Math.abs(dx)*0.22);   // rubber band at either end
+    const prog = has ? Math.min(1, Math.abs(dx)/thr) : 0;
+    if(!prefersReducedMotion() && g.el){
+      g.el.style.transform = `translateX(${shown}px)`;
+      g.el.style.opacity = String(Math.max(.45, 1 - Math.abs(dx)/(w*1.1)));
+    }
+    if(has){
+      const hint = psHint();
+      hint.style.opacity = String(Math.min(1, prog*1.6));
+      hint.style.transform = `translateX(${(g.dir>0 ? -1 : 1) * (1 - prog) * 110}%)`;
+      const ready = prog >= 1;
+      if(ready !== g.ready){
+        g.ready = ready; hint.classList.toggle('ready', ready);
+        try{ if(navigator.vibrate && !prefersReducedMotion()) navigator.vibrate(ready ? 9 : 0); }catch(_){}
+      }
+    }
+  }, {passive:false});
+  function finish(e){
+    if(!g) return;
+    if(e.type==='touchcancel' || g.locked!=='h'){ reset(true); return; }
+    const w = W(), thr = Math.max(70, w*0.22);
+    // velocity over the last ~100 ms of the drag (px per ms), signed like dx
+    const b = g.last[g.last.length-1]; let a = g.last[0];
+    for(const smp of g.last){ if(b.t - smp.t <= 120){ a = smp; break; } }     // the freshest ~120 ms of movement, not the whole drag
+    const dt = Math.max(1, b.t - a.t), v = (b.x - a.x)/dt;
+    const flick = Math.abs(v) > 0.4 && Math.abs(g.dx) > 28 && Math.sign(v)===Math.sign(g.dx);
+    const go = !!g.to && (Math.abs(g.dx) >= thr || flick) && Math.sign(g.dx)===g.dir;
+    if(!go){ reset(true); return; }
+    const to = g.to, dir = g.dir, el = g.el, hint = document.getElementById('page-swipe-hint');
+    if(hint){ hint.style.transition = 'opacity .12s'; hint.style.opacity = '0'; }
+    const rm = prefersReducedMotion();
+    let an = null;
+    const done = ()=>{
+      if(an){ try{ an.cancel(); }catch(err){} an = null; }   // the slide-out holds its end state (fill:forwards) -- release it before the page is reused
+      if(el){ el.style.transform = ''; el.style.opacity = ''; }
+      g = null;
+      switchView(to);
+      if(S.view!==to) return;                    // refused (e.g. leaving a test in progress): stay put
+      const nel = psViewEl();
+      if(nel){
+        nel.classList.remove('view-enter','entering');
+        if(!rm && nel.animate){
+          try{ nel.animate([{transform:`translateX(${-dir*34}px)`, opacity:0},{transform:'none', opacity:1}], {duration:230, easing:'cubic-bezier(.22,.8,.4,1)'}); }catch(err){}
+        }
+      }
+    };
+    if(rm || !el || !el.animate){ done(); return; }
+    // slide the old page the rest of the way out (carrying on in the direction of the drag), then swap
+    const cur = el.style.transform || 'none', co = el.style.opacity || '1';
+    let finished = false; const once = ()=>{ if(finished) return; finished = true; done(); };
+    try{
+      an = el.animate([{transform:cur, opacity:co},{transform:`translateX(${dir*w*0.32}px)`, opacity:0}], {duration:140, easing:'cubic-bezier(.4,0,1,1)', fill:'forwards'});
+      an.onfinish = once; setTimeout(once, 220);
+    }catch(err){ once(); }
+  }
+  document.addEventListener('touchend', finish, {passive:true});
+  document.addEventListener('touchcancel', finish, {passive:true});
+})();
 function setViewingProfile(id){
   if(!confirmLeaveTest()) return;
   // Reset the planner date filter when switching profiles so the new profile's planner
@@ -7351,6 +7626,7 @@ function moneyPageHtml(){
   // a horizontal swipe (touch / pen / mouse drag) that is clearly more sideways than vertical; the click that follows it is swallowed
   function attachSwipe(el, onLeft, onRight, skip){
     if(!el) return;
+    el.setAttribute('data-noswipe', ''); // v168: this element owns its own sideways swipe -- the page-to-page swipe must not also fire
     let sx = 0, sy = 0, st = 0, pid = null;
     el.addEventListener('pointerdown', e=>{ if(skip && skip(e.target)){ pid = null; return; } pid = e.pointerId; sx = e.clientX; sy = e.clientY; st = Date.now(); });
     const end = e=>{
@@ -10885,6 +11161,7 @@ const CHAT_ICONS = {
   chevronDown:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   chevronUp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>',
   noEntry:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
   chatBig:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
 };
 const QUICK_REACTIONS = ['❤️','😂','👍','😮','😢','🙏'];
@@ -11769,6 +12046,7 @@ function updateChatHeaderStatus(){
   }
   const dotEl = document.querySelector('.chat-header-avatar .dot');
   if(dotEl) dotEl.classList.toggle('online', !!status.online);
+  if(_chatCache) _chatCache.header = null;     // v169: the live DOM is now newer than the cached header markup -- the next patch re-renders it
   return status;
 }
 function updateChatPresenceUI(){
@@ -11894,6 +12172,16 @@ function enterChat(){
   S._chatTray = null; S._chatSearchOpen = false; S._chatSearchQuery = ''; S._chatSearchMatches = []; S._chatSearchIdx = -1;
   S._chatHeaderMenuOpen = false; S._chatStarredFilter = false; S._chatSheetFor = null;
   S._chatJustEntered = true;
+  _chatCache = null; _chatSeen = new Set();
+  S._chatNewFromId = null; S._chatNewCount = 0; S._chatWinStartId = null;
+  { // v169: "N new messages" divider -- where my read pointer was when I opened the chat
+    const me0 = S.local.myProfile;
+    if(me0 && S.shared.chat){
+      const ru = S.shared.chat.readUpto && S.shared.chat.readUpto[me0], t0 = ru ? new Date(ru).getTime() : 0;
+      const fresh = (S.shared.chat.messages||[]).filter(m=> m.from!==me0 && !m.deleted && new Date(m.createdAt).getTime() > t0);
+      if(fresh.length && fresh.length < 200){ S._chatNewFromId = fresh[0].id; S._chatNewCount = fresh.length; }
+    }
+  }
   // Hold the view at the newest message until the user deliberately scrolls up. Without
   // this, startChatPolling()'s immediate first poll can resolve mid-entry and its
   // re-render restores whatever half-settled scroll position it happens to measure.
@@ -11916,7 +12204,7 @@ function enterChat(){
   startChatPolling();
   startChatHeartbeat();
   postSwViewState(); // chat is on screen now: sw.js clears the chat notification and won't show a new one while we look at it
-  focusComposer();
+  if(!(window.matchMedia && matchMedia('(pointer:coarse)').matches)) focusComposer();  // v168: on a phone opening the tab must not raise the keyboard
 }
 // Common cleanup, used whether chat was left via the in-app back arrow or the hardware/browser back button.
 function finishLeavingChat(){
@@ -11927,6 +12215,14 @@ function finishLeavingChat(){
   }
   // v154: chat opened from a paper page: going back lands on that page's (now unused) history entry -- give it back, so the next phone-back isn't swallowed.
   if(_wsStaleEntry){ _wsStaleEntry = false; if(_viaHistory && !_wsHistToken){ _wsSilentPops++; try{ history.back(); }catch(e){ _wsSilentPops--; } } }
+  chatTeardown();
+  S.view = S._chatReturnView || 'home';
+  postSwViewState();
+  S._justNavigated = true;
+  renderNav(); renderApp();
+}
+function chatTeardown(){
+  _chatCache = null;
   stopChatPolling();
   stopChatHeartbeat();
   const el = document.getElementById('chat-root');
@@ -11941,10 +12237,17 @@ function finishLeavingChat(){
     S.shared.chat.typingUntil[me] = null;
     saveShared();
   }
-  S.view = S._chatReturnView || 'home';
-  postSwViewState();
-  S._justNavigated = true;
-  renderNav(); renderApp();
+}
+// v168: Chat is a tab now, so it is also left by tapping another tab (or swiping to one) -- not only by the back button. Same cleanup, and the
+// history entry Chat pushed on the way in (plus the paper page's handed-over one, if Chat was opened from there) is quietly removed, so the phone's
+// back button behaves exactly as it did before Chat was opened. Called from switchView() BEFORE S.view changes.
+function leaveChatForNav(){
+  const wasActive = _chatHistoryActive;
+  if(wasActive){ window.removeEventListener('popstate', onChatBackButton); _chatHistoryActive = false; }
+  const pops = (wasActive ? 1 : 0) + ((wasActive && _wsStaleEntry) ? 1 : 0);
+  _wsStaleEntry = false;
+  chatTeardown();
+  if(pops){ _wsSilentPops++; try{ history.go(-pops); }catch(e){ _wsSilentPops--; } }
 }
 // In-app back arrow: go through history.back() so it takes the exact same path as the
 // hardware button (onChatBackButton → finishLeavingChat), keeping browser history tidy.
@@ -12062,21 +12365,42 @@ async function forceRefreshChat(){
 
 
 // ── Render: page shell ──────────────────────────────────────
-function chatPageHtml(){
+// v169: the page is built from independently-patchable PARTS (header / top strips / message list / bottom bar / sheet). renderChatPage() compares each
+// part with what is already on screen and touches only what changed -- so reacting, opening a sheet, ticking a selection or a poll tick no longer
+// rebuilds the whole page (which used to replay every bubble's entry animation, drop the textarea's caret/IME state and flash the header).
+let _chatCache = null;                 // what each part currently shows: {header, top, sheet, bottomKind, bottom, segs[]}
+let _chatSeen = new Set();            // message ids already on screen -- only ids NOT in here get the entry pop
+const CHAT_WALLPAPERS = [{id:'photo',name:'Photo'},{id:'aurora',name:'Aurora'},{id:'dots',name:'Dots'},{id:'plain',name:'Plain'}];
+function chatWp(){ const w = S.local && S.local.chatWallpaper; return CHAT_WALLPAPERS.some(x=>x.id===w) ? w : 'photo'; }
+function chatPartsHtml(){
+  const sel = !!S._chatSelectMode;
+  return {
+    header: chatHeaderHtml(),
+    top: ((!sel && !S._chatSearchOpen && pinnedMessages().length) ? chatPinnedStripHtml() : '') + (S._chatSearchOpen ? chatSearchBarHtml() : ''),
+    bottomKind: sel ? 'sel' : 'comp',
+    bottom: sel ? chatSelectBarHtml() : chatComposerTopHtml(),
+    sheet: chatSheetHtml()
+  };
+}
+function chatBottomShellHtml(P){
+  return P.bottomKind==='sel' ? P.bottom
+    : `<div class="chat-composer-wrap"><div id="chat-composer-top" class="chat-part">${P.bottom}</div>${chatComposerRowHtml()}</div>`;
+}
+function chatPageHtml(P, segs){
   if(isUmangBlockedForViewer()) return chatBlockedHtml();
+  P = P || chatPartsHtml(); segs = segs || chatMessageSegments();
   const me = S.local.myProfile || 'umang';
   const myP = profileById(me);
   const otherP = profileById(otherProfileId(me));
-  return `<div class="chat-page ${S._chatJustEntered?'entering':''}" style="--my-accent:var(--${myP.color});--my-accent-2:var(--${myP.color}-2);--other-accent:var(--${otherP.color})">
-    ${chatHeaderHtml()}
-    ${(!S._chatSelectMode && !S._chatSearchOpen && pinnedMessages().length) ? chatPinnedStripHtml() : ''}
-    ${S._chatSearchOpen ? chatSearchBarHtml() : ''}
-    <div class="chat-messages" id="chat-messages-list" onscroll="onChatScroll(this)" role="log" aria-label="Chat messages" aria-live="polite" style="background-image:linear-gradient(rgba(8,10,14,.72),rgba(8,10,14,.72)), url('${CHAT_BG_DATA_URI}')">
-      ${chatMessagesInnerHtml()}
+  return `<div class="chat-page ${S._chatJustEntered?'entering':''}" data-wp="${chatWp()}" style="--my-accent:var(--${myP.color});--my-accent-2:var(--${myP.color}-2);--other-accent:var(--${otherP.color});--chat-photo:url('${CHAT_BG_DATA_URI}')">
+    <div id="chat-part-header" class="chat-part">${P.header}</div>
+    <div id="chat-part-top" class="chat-part">${P.top}</div>
+    <div class="chat-msgs-wrap">
+      <div class="chat-messages" id="chat-messages-list" onscroll="onChatScroll(this)" role="log" aria-label="Chat messages" aria-live="polite">${segs.join('')}</div>
+      <button class="chat-scrollbottom" id="chat-scrollbottom-fab" onclick="scrollChatToBottom(true)" aria-label="Scroll to latest message">${CHAT_ICONS.chevronDown}</button>
     </div>
-    <button class="chat-scrollbottom" id="chat-scrollbottom-fab" onclick="scrollChatToBottom(true)" aria-label="Scroll to latest message">${CHAT_ICONS.chevronDown}</button>
-    ${S._chatSelectMode ? chatSelectBarHtml() : chatComposerAreaHtml()}
-    ${chatSheetHtml()}
+    <div id="chat-part-bottom" class="chat-part">${chatBottomShellHtml(P)}</div>
+    <div id="chat-part-sheet" class="chat-part">${P.sheet}</div>
   </div>`;
 }
 function chatHeaderHtml(){
@@ -12097,7 +12421,6 @@ function chatHeaderHtml(){
   }
   const status = chatStatusInfo(other);
   return `<div class="chat-header">
-    <button class="chat-back-btn" onclick="exitChatPage()" aria-label="Back">${CHAT_ICONS.back}</button>
     <div class="chat-header-avatar" style="background:linear-gradient(135deg,var(--${otherP.color}),var(--${otherP.color}-2))">${otherP.nick[0]}<span class="dot ${status.online?'online':''}"></span></div>
     <div class="chat-header-info">
       <div class="chat-header-name">${escChat(otherP.name)}</div>
@@ -12110,6 +12433,7 @@ function chatHeaderHtml(){
         <button class="chat-icon-btn" onclick="toggleChatHeaderMenu()" aria-label="More options" aria-haspopup="true" aria-expanded="${S._chatHeaderMenuOpen}">${CHAT_ICONS.more}</button>
         ${S._chatHeaderMenuOpen ? `<div class="status-menu" role="menu">
           <button role="menuitem" onclick="viewStarredMessages()">${S._chatStarredFilter?'★ Showing starred — tap to exit':'⭐ Starred messages'}</button>
+          <div class="chat-wp-row" role="group" aria-label="Chat wallpaper"><span>🎨 Wallpaper</span>${CHAT_WALLPAPERS.map(w=>`<button class="chat-wp-sw ${chatWp()===w.id?'on':''}" data-wp="${w.id}" onclick="setChatWallpaper('${w.id}')" aria-label="${w.name} wallpaper" title="${w.name}"></button>`).join('')}</div>
           <button role="menuitem" class="opt-cancel" onclick="clearChatHistory()">🗑️ Clear chat</button>
         </div>` : ''}
       </div>
@@ -12158,8 +12482,8 @@ function chatSheetHtml(){
   const live = isLiveMsg(id);
   return `<div class="chat-sheet-overlay" onclick="if(event.target===this) dismissChatSheet()">
     <div class="chat-sheet" role="menu" aria-label="Message actions">
-      <div class="chat-sheet-handle"></div>
-      <div class="chat-sheet-preview">${escChat(preview).slice(0,160)}</div>
+      <div class="chat-sheet-grab" onpointerdown="chatSheetGrab(event)"><div class="chat-sheet-handle"></div>
+      <div class="chat-sheet-preview">${escChat(preview).slice(0,160)}</div></div>
       ${live && !msg.deleted ? `<div class="chat-sheet-reactrow">${QUICK_REACTIONS.map(e=>`<button onclick="reactToMessage('${id}','${e}')" aria-label="React ${e}">${e}</button>`).join('')}</div>` : ''}
       ${!msg.deleted ? `<button class="opt" role="menuitem" onclick="replyToMessage('${id}')">${CHAT_ICONS.reply}Reply</button>` : ''}
       ${!msg.deleted && msg.type==='text' ? `<button class="opt" role="menuitem" onclick="copyMessageText('${id}')">${CHAT_ICONS.copy}Copy</button>` : ''}
@@ -12186,19 +12510,28 @@ function chatAllMessagesIncludingArchive(){
   if(!archived.length) return S.shared.chat.messages || [];
   return archived.concat(S.shared.chat.messages||[]).sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||''));
 }
-function chatMessagesInnerHtml(){
+// The list is produced as an ARRAY OF TOP-LEVEL ELEMENTS (load-older button, date chips, message groups, "new messages" divider) so renderChatPage can
+// diff it against what is on screen. The typing bubble is NOT part of it -- updateChatPresenceUI() owns that one.
+function chatMessageSegments(){
   const me = S.local.myProfile || 'umang';
   let all = chatAllMessagesIncludingArchive();
   if(S._chatStarredFilter) all = all.filter(m=> m.starredBy && m.starredBy[me]);
   if(!all.length){
-    return `<div class="chat-empty-state">${CHAT_ICONS.chatBig}
+    return [`<div class="chat-empty-state">${CHAT_ICONS.chatBig}
       <div class="t">${S._chatStarredFilter?'No starred messages yet':'No messages yet'}</div>
       <div class="s">${S._chatStarredFilter?'Long-press any message and tap Star to save it here.':`Say hi to ${escChat(profileById(otherProfileId(me)).nick)} — this is just between the two of you.`}</div>
-    </div>`;
+    </div>`];
   }
   const total = all.length;
-  const windowSize = S._chatStarredFilter ? total : Math.min(S._chatWindow||40, total);
+  let windowSize = S._chatStarredFilter ? total : Math.min(S._chatWindow||40, total);
+  // v169: anchor the window's START (by message id) instead of always "the last N": when a message arrives the window GROWS at the end rather than sliding,
+  // so the first group on screen stays byte-identical and the list diff only has to touch the tail.
+  if(!S._chatStarredFilter && S._chatWinStartId){
+    const si = all.findIndex(m=>m.id===S._chatWinStartId);
+    if(si>=0 && total-si > windowSize && total-si-windowSize < 60){ windowSize = total-si; S._chatWindow = windowSize; }
+  }
   const slice = all.slice(total-windowSize);
+  if(!S._chatStarredFilter && slice.length) S._chatWinStartId = slice[0].id;
   // Also offer "Load earlier" once even if every local message already fits in the window —
   // that's exactly the case where older history might exist only in the archive and hasn't
   // been checked yet. S._archiveChecked flips true after the one lazy fetch (see
@@ -12206,28 +12539,72 @@ function chatMessagesInnerHtml(){
   const mightHaveArchive = !S._archiveChecked && S.appSession && isHosted();
   const hasMore = !S._chatStarredFilter && (windowSize < total || mightHaveArchive);
   const groups = buildChatGroups(slice);
-  let html = '';
-  if(hasMore) html += `<div class="chat-load-older" onclick="loadOlderMessages()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')loadOlderMessages()">Load earlier messages</div>`;
+  const segs = [];
+  const divId = S._chatStarredFilter ? null : S._chatNewFromId;
+  if(hasMore) segs.push(`<div class="chat-load-older" onclick="loadOlderMessages()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')loadOlderMessages()">Load earlier messages</div>`);
+  const dividerHtml = ()=> `<div class="chat-new-divider" role="separator"><span>${S._chatNewCount>1 ? S._chatNewCount+' new messages' : 'New message'}</span></div>`;
   groups.forEach(day=>{
-    html += `<div class="chat-date-sep">${escChat(day.dateLabel)}</div>`;
+    segs.push(`<div class="chat-date-sep">${escChat(day.dateLabel)}</div>`);
     day.clusters.forEach(cluster=>{
       const isOut = cluster.from === me;
-      html += `<div class="chat-group ${isOut?'out':'in'}">`;
-      cluster.rows.forEach((msg,i)=>{
-        const isLastInCluster = i===cluster.rows.length-1;
-        let posClass = '';
-        if(cluster.rows.length>1) posClass = i===0 ? 'grouped-first' : (isLastInCluster ? 'grouped-last' : 'grouped-mid');
-        html += renderChatRow(msg, !isOut && isLastInCluster, posClass);
+      // a "new messages" divider can fall in the middle of one sender's run: split the run there
+      const at = divId ? cluster.rows.findIndex(m=>m.id===divId) : -1;
+      const runs = at>0 ? [cluster.rows.slice(0,at), cluster.rows.slice(at)] : [cluster.rows];
+      runs.forEach((rows,ri)=>{
+        if(at>=0 && ((at===0 && ri===0) || (at>0 && ri===1))) segs.push(dividerHtml());
+        let h = `<div class="chat-group ${isOut?'out':'in'}">`;
+        rows.forEach((msg,i)=>{
+          const isLast = i===rows.length-1;
+          let posClass = '';
+          if(rows.length>1) posClass = i===0 ? 'grouped-first' : (isLast ? 'grouped-last' : 'grouped-mid');
+          h += renderChatRow(msg, !isOut && isLast, posClass);
+        });
+        segs.push(h + `</div>`);
       });
-      html += `</div>`;
     });
   });
-  const otherId = otherProfileId(me);
+  return segs;
+}
+function chatTypingHtml(){
+  const me = S.local.myProfile || 'umang', otherId = otherProfileId(me);
   const status = chatStatusInfo(otherId);
-  if(status.typing && !S._chatStarredFilter){
-    html += `<div class="chat-typing-bubble" aria-label="${escChat(profileById(otherId).nick)} is typing"><span></span><span></span><span></span></div>`;
+  return (status.typing && !S._chatStarredFilter)
+    ? `<div class="chat-typing-bubble" aria-label="${escChat(profileById(otherId).nick)} is typing"><span></span><span></span><span></span></div>` : '';
+}
+function chatMessagesInnerHtml(){ return chatMessageSegments().join('') + chatTypingHtml(); }
+// Brings the DOM list in line with `segs` by replacing only the span that differs (common prefix / suffix are left untouched, nodes and all).
+// Typically a new message touches the last group only; a reaction touches one group; an unchanged poll touches nothing.
+function chatDiffList(list, segs){
+  const C = _chatCache;
+  const tb = list.querySelector(':scope > .chat-typing-bubble'); if(tb) tb.remove();
+  const al = document.getElementById('chat-archive-loading'); if(al) al.remove();
+  const old = C && C.segs;
+  const markNew = (root, animate)=>{
+    root.querySelectorAll('.chat-bubble[id^="msg-"]').forEach(el=>{
+      if(!_chatSeen.has(el.id)){ _chatSeen.add(el.id); if(animate) el.classList.add('pop-in'); }
+    });
+  };
+  if(!old || list.children.length !== old.length){
+    list.innerHTML = segs.join(''); markNew(list, false);
+    if(C) C.segs = segs;
+    return;
   }
-  return html;
+  let p = 0; const n = Math.min(old.length, segs.length);
+  while(p<n && old[p]===segs[p]) p++;
+  let q = 0;
+  while(q < n-p && old[old.length-1-q]===segs[segs.length-1-q]) q++;
+  if(p===old.length && p===segs.length) return;                                  // nothing changed
+  const kids = Array.from(list.children);
+  const delEnd = old.length - q;
+  for(let i=p;i<delEnd;i++) kids[i].remove();
+  const ref = q>0 ? kids[delEnd] : null;
+  const html = segs.slice(p, segs.length-q).join('');
+  if(html){
+    const t = document.createElement('template'); t.innerHTML = html;
+    markNew(t.content, q===0);                                                    // only something added at the very end is "new"; older history loading in above is not
+    list.insertBefore(t.content, ref);
+  }
+  C.segs = segs;
 }
 function renderChatRow(msg, showAvatar, posClass){
   const me = S.local.myProfile || 'umang';
@@ -12280,7 +12657,7 @@ function renderChatRow(msg, showAvatar, posClass){
     </div>` : '';
   return `<div class="chat-row ${posClass} ${showAvatar?'show-avatar':''}">
     <div class="chat-row-avatar" style="background:var(--${p.color})">${p.nick[0]}</div>
-    <div class="chat-bubble ${selected?'selected':''}" id="msg-${msg.id}" tabindex="0" role="group"
+    <div class="chat-bubble ${selected?'selected':''}${(!msg.deleted && msg.type==='text' && !msg.replyTo && !msg.forwarded && chatIsJumboEmoji(msg.text))?' jumbo':''}" id="msg-${msg.id}" tabindex="0" role="group"
       aria-label="${escChat(p.nick)}, ${time}${msg.deleted?', message deleted':', '+escChat(chatPlainPreview(msg)).slice(0,80)}"
       onpointerdown="chatPressStart(event,'${msg.id}')" onpointerup="chatPressEnd(event)" onpointermove="chatPressMove(event)" onpointercancel="chatPressEnd(event)"
       oncontextmenu="event.preventDefault();${msg.deleted?'':`openChatSheet('${msg.id}')`}"
@@ -12289,6 +12666,9 @@ function renderChatRow(msg, showAvatar, posClass){
     </div>
   </div>`;
 }
+// 1-3 emoji and nothing else -> shown big, without a bubble (the way every chat app does)
+const _JUMBO_RE = (()=>{ try{ return new RegExp('^(?:\\p{Extended_Pictographic}(?:\\uFE0F|\\u200D\\p{Extended_Pictographic}|\\p{Emoji_Modifier})*\\s*){1,3}$','u'); }catch(e){ return null; } })();
+function chatIsJumboEmoji(t){ const x = String(t||'').trim(); return !!(x && x.length<=24 && _JUMBO_RE && _JUMBO_RE.test(x)); }
 function chatTicksHtml(msg){
   const me = S.local.myProfile || 'umang';
   const other = otherProfileId(me);
@@ -12328,7 +12708,7 @@ function renderPollBubble(msg){
 }
 
 // ── Render: composer ─────────────────────────────────────────
-function chatComposerAreaHtml(){
+function chatComposerTopHtml(){
   const replyMsg = S._chatReplyTo ? findMsg(S._chatReplyTo) : null;
   const editingMsg = S._chatEditing ? findMsg(S._chatEditing) : null;
   let bars = '';
@@ -12345,16 +12725,76 @@ function chatComposerAreaHtml(){
   }
   let tray = '';
   if(S._chatTray==='sticker') tray = chatStickerTrayHtml();
-  return `<div class="chat-composer-wrap">
-    ${bars}${tray}
-    <div class="chat-composer">
-      <button class="chat-compose-icon-btn" onclick="toggleChatTray('sticker')" aria-label="Stickers" aria-pressed="${S._chatTray==='sticker'}">${CHAT_ICONS.sticker}</button>
+  else if(S._chatTray==='quick') tray = chatQuickTrayHtml();
+  // the two tray buttons' pressed state lives here too, so the (never re-created) input row below needs no re-render for it
+  return `${bars}${tray}<i class="chat-tray-state" data-tray="${S._chatTray||''}" hidden></i>`;
+}
+// The input row is rendered ONCE per chat visit and then left alone: the textarea keeps its caret, selection and IME composition across every other update.
+function chatComposerRowHtml(){
+  return `<div class="chat-composer">
+      <button class="chat-compose-icon-btn" id="chat-plus-btn" onmousedown="event.preventDefault()" onclick="toggleChatTray('quick')" aria-label="Share something">${CHAT_ICONS.plus}</button>
+      <button class="chat-compose-icon-btn" id="chat-sticker-btn" onmousedown="event.preventDefault()" onclick="toggleChatTray('sticker')" aria-label="Stickers">${CHAT_ICONS.sticker}</button>
       <textarea id="chat-composer-input" class="chat-composer-input" rows="1" maxlength="4000" placeholder="Message…" aria-label="Message input"
         oninput="chatComposerInput(this)"
-        onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChatMessage(); }">${escChat(S._chatDraft||'')}</textarea>
-      <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()" aria-label="Send message">${CHAT_ICONS.send}</button>
-    </div>
-  </div>`;
+        onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChatMessage(); }"></textarea>
+      <button class="chat-send-btn" id="chat-send-btn" onmousedown="event.preventDefault()" onclick="sendChatMessage()" aria-label="Send message">${CHAT_ICONS.send}</button>
+    </div>`;
+}
+// keeps the textarea, the send button's "ready" look and the two tray buttons' pressed state in step with S (called after every full/patched render)
+function chatSyncComposer(){
+  const ta = document.getElementById('chat-composer-input');
+  if(ta){
+    const want = S._chatDraft || '';
+    if(ta.value !== want){ ta.value = want; }
+    autoGrowComposer(ta);
+    const btn = document.getElementById('chat-send-btn'); if(btn) btn.classList.toggle('on', !!want.trim());
+  }
+  const t = S._chatTray || '';
+  const pb = document.getElementById('chat-plus-btn'), sb = document.getElementById('chat-sticker-btn');
+  if(pb){ pb.classList.toggle('active', t==='quick'); pb.setAttribute('aria-pressed', String(t==='quick')); }
+  if(sb){ sb.classList.toggle('active', t==='sticker'); sb.setAttribute('aria-pressed', String(t==='sticker')); }
+}
+// ── v169: quick share tray ("+"): study stats go into the composer (editable), one-line nudges send straight away ──
+const CHAT_QUICK = [
+  {k:'stats',  ico:'📚', t:'Today\'s study'},
+  {k:'streak', ico:'🔥', t:'My streak'},
+  {k:'session',ico:'⏱', t:'Starting a session'},
+  {k:'nudge',  ico:'👋', t:'Nudge to study'},
+  {k:'luck',   ico:'🍀', t:'All the best'},
+  {k:'proud',  ico:'💪', t:'Proud of you'},
+  {k:'break',  ico:'☕', t:'Break time?'},
+  {k:'night',  ico:'🌙', t:'Good night'}
+];
+function chatQuickTrayHtml(){
+  return `<div class="chat-tray"><div class="chat-tray-title">Share</div><div class="chat-quick-grid">
+    ${CHAT_QUICK.map(q=>`<button class="chat-quick-cell" onclick="chatQuick('${q.k}')"><span class="i">${q.ico}</span><span class="t">${q.t}</span></button>`).join('')}
+  </div></div>`;
+}
+function chatQuickText(k){
+  const me = S.local.myProfile;
+  switch(k){
+    case 'stats': {
+      const h = todayHoursLive(me), n = liveSessionsOnDate(me, todayStr()), tg = effectiveTodayTarget(me);
+      const pct = tg>0 ? Math.round(h/tg*100) : 0;
+      return `📚 **Today's study**\n⏱ ${formatHoursAsHM(h)} · ${n} session${n===1?'':'s'}\n🎯 ${pct}% of my ${tg}h target`;
+    }
+    case 'streak': { const n = liveStreak(me); return n>0 ? `🔥 **${n}-day study streak** — ${n} day${n===1?'':'s'} in a row!` : `🔥 Starting a fresh streak today!`; }
+    case 'session': return '⏱ Starting a study session now — join me?';
+    case 'nudge':   return '👋 Hey! Ready to study?';
+    case 'luck':    return '🍀 All the best for today!';
+    case 'proud':   return '💪 Proud of you — keep going!';
+    case 'break':   return '☕ Break time? 10 minutes, then back at it.';
+    case 'night':   return '🌙 Good night — rest well, big day tomorrow.';
+  }
+  return '';
+}
+function chatQuick(k){
+  const text = chatQuickText(k); if(!text) return;
+  S._chatTray = null;
+  const instant = !['stats','streak'].includes(k) && !(S._chatDraft||'').trim() && !S._chatEditing;
+  if(instant){ S._chatDraft = text; sendChatMessage(); return; }
+  S._chatDraft = ((S._chatDraft||'').trim() ? S._chatDraft.replace(/\s+$/,'') + '\n' : '') + text;
+  persistChatDraft(); renderChatPage(); focusComposer();
 }
 function chatStickerTrayHtml(){
   return `<div class="chat-tray"><div class="chat-tray-title">Stickers</div><div class="chat-sticker-grid">
@@ -12366,45 +12806,86 @@ function chatStickerTrayHtml(){
 function renderChatPage(){
   const root = document.getElementById('chat-root');
   if(!root) return;
+  if(_chatCache && root.querySelector('#chat-part-header') && !isUmangBlockedForViewer()){ chatPatchPage(); return; }
+  chatFullRender(root);
+}
+function chatFullRender(root){
   const msgListOld = document.getElementById('chat-messages-list');
   const wasAtBottom = S._chatPinToBottom || !msgListOld || (msgListOld.scrollHeight - msgListOld.scrollTop - msgListOld.clientHeight < 80);
   const prevScrollTop = msgListOld ? msgListOld.scrollTop : 0;
   const prevScrollHeight = msgListOld ? msgListOld.scrollHeight : 0;
   const composerHadFocus = document.activeElement && document.activeElement.id==='chat-composer-input';
-  root.innerHTML = chatPageHtml();
+  if(isUmangBlockedForViewer()){ _chatCache = null; root.innerHTML = chatBlockedHtml(); return; }
+  const P = chatPartsHtml(), segs = chatMessageSegments();
+  root.innerHTML = chatPageHtml(P, segs);
+  _chatCache = {header:P.header, top:P.top, sheet:P.sheet, bottomKind:P.bottomKind, bottom:P.bottom, segs};
   S._chatJustEntered = false;
   const newList = document.getElementById('chat-messages-list');
   if(newList){
+    newList.insertAdjacentHTML('beforeend', chatTypingHtml());
+    newList.querySelectorAll('.chat-bubble[id^="msg-"]').forEach(el=>_chatSeen.add(el.id));
     if(wasAtBottom) newList.scrollTop = newList.scrollHeight;
     else newList.scrollTop = prevScrollTop + (newList.scrollHeight - prevScrollHeight);
     updateScrollToBottomFab(newList);
   }
+  chatSyncComposer();
   const composer = document.getElementById('chat-composer-input');
-  if(composer){
-    autoGrowComposer(composer);
-    if(composerHadFocus){ composer.focus(); const v=composer.value; composer.setSelectionRange(v.length,v.length); }
-  }
-  if(S._chatSearchOpen){
-    const si = document.getElementById('chat-search-input');
-    if(si){
-      si.value = S._chatSearchQuery||'';
-      // Re-focus the input — renderChatPage() destroys and recreates the entire DOM so
-      // any focus the user had on the search bar is lost. Restore it here so they can
-      // keep typing without having to tap the bar again.
-      if(!composerHadFocus) si.focus();
+  if(composer && composerHadFocus){ composer.focus(); const v=composer.value; composer.setSelectionRange(v.length,v.length); }
+  chatAfterPatch(false);
+}
+function chatPatchPage(){
+  const C = _chatCache, P = chatPartsHtml();
+  const ae = document.activeElement;
+  const composerHadFocus = !!ae && ae.id==='chat-composer-input';
+  const searchHadFocus = !!ae && ae.id==='chat-search-input';
+  const page = document.querySelector('#chat-root .chat-page');
+  if(page && page.dataset.wp !== chatWp()) page.dataset.wp = chatWp();
+  if(P.header !== C.header){ const el = document.getElementById('chat-part-header'); if(el){ el.innerHTML = P.header; C.header = P.header; } }
+  if(P.top !== C.top){
+    const el = document.getElementById('chat-part-top');
+    if(el){ el.innerHTML = P.top; C.top = P.top; }
+    if(S._chatSearchOpen){
+      const si = document.getElementById('chat-search-input');
+      if(si){ si.value = S._chatSearchQuery||''; if(searchHadFocus) si.focus(); }
+      updateChatSearchNav();
     }
-    updateChatSearchNav();
   }
+  chatApplyList();
+  const bEl = document.getElementById('chat-part-bottom');
+  if(bEl){
+    if(P.bottomKind !== C.bottomKind){
+      bEl.innerHTML = chatBottomShellHtml(P); C.bottomKind = P.bottomKind; C.bottom = P.bottom;
+    } else if(P.bottom !== C.bottom){
+      if(P.bottomKind==='comp'){ const t = document.getElementById('chat-composer-top'); if(t) t.innerHTML = P.bottom; }
+      else bEl.innerHTML = P.bottom;
+      C.bottom = P.bottom;
+    }
+    if(P.bottomKind==='comp'){
+      chatSyncComposer();
+      const ta = document.getElementById('chat-composer-input');
+      if(ta && composerHadFocus && document.activeElement!==ta){ ta.focus(); }
+    }
+  }
+  if(P.sheet !== C.sheet){ const el = document.getElementById('chat-part-sheet'); if(el){ el.innerHTML = P.sheet; C.sheet = P.sheet; } }
+  chatAfterPatch(true);
+}
+function chatAfterPatch(){ /* hook kept tiny on purpose */ }
+// Diff + scroll bookkeeping for the message list (shared by renderChatPage and renderChatMessagesOnly).
+function chatApplyList(){
+  const list = document.getElementById('chat-messages-list');
+  if(!list || !_chatCache) return;
+  const wasAtBottom = S._chatPinToBottom || (list.scrollHeight - list.scrollTop - list.clientHeight) < 80;
+  const prevTop = list.scrollTop, prevH = list.scrollHeight;
+  chatDiffList(list, chatMessageSegments());
+  list.insertAdjacentHTML('beforeend', chatTypingHtml());
+  if(wasAtBottom) list.scrollTop = list.scrollHeight;
+  else list.scrollTop = prevTop + (list.scrollHeight - prevH);
+  updateScrollToBottomFab(list);
 }
 function renderChatMessagesOnly(){
   const msgList = document.getElementById('chat-messages-list');
-  if(!msgList){ renderChatPage(); return; }
-  const wasAtBottom = S._chatPinToBottom || (msgList.scrollHeight - msgList.scrollTop - msgList.clientHeight) < 80;
-  const prevScrollTop = msgList.scrollTop, prevScrollHeight = msgList.scrollHeight;
-  msgList.innerHTML = chatMessagesInnerHtml();
-  if(wasAtBottom) msgList.scrollTop = msgList.scrollHeight;
-  else msgList.scrollTop = prevScrollTop + (msgList.scrollHeight - prevScrollHeight);
-  updateScrollToBottomFab(msgList);
+  if(!msgList || !_chatCache){ renderChatPage(); return; }
+  chatApplyList();
   updateChatHeaderStatus();
 }
 
@@ -12562,9 +13043,13 @@ async function jumpToChatId(id){
 }
 
 // ── Composer interactions ───────────────────────────────────
+// v168: opening Chat is just opening a page -- on a phone the keyboard must not leap up before the person has touched anything.
 function focusComposer(){ const el = document.getElementById('chat-composer-input'); if(el) el.focus(); }
 function autoGrowComposer(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
-function chatComposerInput(el){ S._chatDraft = el.value; autoGrowComposer(el); markComposerTyping(); persistChatDraft(); }
+function chatComposerInput(el){
+  S._chatDraft = el.value; autoGrowComposer(el); markComposerTyping(); persistChatDraft();
+  const b = document.getElementById('chat-send-btn'); if(b) b.classList.toggle('on', !!el.value.trim());
+}
 // v128: what is typed but not sent is kept on this device, so a reload / the OS killing the page doesn't throw it away.
 let _chatDraftTimer = null;
 function persistChatDraft(){
@@ -13046,6 +13531,11 @@ function starSelectedMessages(){
 }
 
 // ── Header menu / starred filter / clear ─────────────────────
+function setChatWallpaper(id){
+  if(!CHAT_WALLPAPERS.some(w=>w.id===id)) return;
+  S.local.chatWallpaper = id; try{ saveLocal(); }catch(e){}
+  S._chatHeaderMenuOpen = false; renderChatPage();
+}
 function toggleChatHeaderMenu(){ S._chatHeaderMenuOpen = !S._chatHeaderMenuOpen; renderChatPage(); }
 function viewStarredMessages(){ S._chatHeaderMenuOpen = false; S._chatStarredFilter = !S._chatStarredFilter; renderChatPage(); }
 async function clearChatHistory(){
@@ -13132,7 +13622,7 @@ function chatSearchPrev(){
 // finger is physically over the bubble, and any real horizontal swipe carries the finger
 // off a bubble almost immediately — so the drag would silently stop tracking, and a stray
 // pointerleave would end the gesture the instant the finger crossed the bubble's edge.
-let _pressTimer=null, _pressMsgId=null, _pressStartX=0, _pressStartY=0, _pressSwiping=false, _pressEl=null, _pressPointerId=null;
+let _pressArmed=false, _lastTap={id:null,t:0}, _pressTimer=null, _pressMsgId=null, _pressStartX=0, _pressStartY=0, _pressSwiping=false, _pressEl=null, _pressPointerId=null;
 function chatPressStart(ev, id){
   if(ev.pointerType==='mouse' && ev.button!==0) return;
   if(ev.target.closest('.chat-reaction-pill, .chat-reply-quote')) return;
@@ -13157,9 +13647,17 @@ function chatPressMove(ev){
   }
   if(_pressSwiping && _pressEl){
     ev.preventDefault(); // we've claimed this as a horizontal swipe — stop the page trying to scroll/select
-    const clamped = Math.max(0, Math.min(70, dx));
+    // v169: 1:1 up to the line (50px), then it stiffens (rubber band) up to 86px; an arrow grows in the gap and the phone ticks once as the line is crossed
+    const d = Math.max(0, dx), shown = d<=50 ? d : Math.min(86, 50 + (d-50)*0.35);
     _pressEl.style.transition = 'none';
-    _pressEl.style.transform = `translateX(${clamped}px)`;
+    _pressEl.style.transform = `translateX(${shown}px)`;
+    let ico = _pressEl.querySelector(':scope > .chat-swipe-ico');
+    if(!ico){ ico = document.createElement('span'); ico.className = 'chat-swipe-ico'; ico.innerHTML = CHAT_ICONS.reply; _pressEl.appendChild(ico); }
+    const pr = Math.min(1, d/50);
+    ico.style.opacity = String(Math.min(1, pr*1.3));
+    ico.style.transform = `translateY(-50%) scale(${.55 + .45*pr})`;
+    const armed = d >= 50;
+    if(armed !== _pressArmed){ _pressArmed = armed; ico.classList.toggle('armed', armed); try{ if(armed && navigator.vibrate && !prefersReducedMotion()) navigator.vibrate(8); }catch(e){} }
   }
 }
 function chatPressEnd(ev){
@@ -13167,16 +13665,60 @@ function chatPressEnd(ev){
   if(_pressSwiping && _pressEl){
     _chatSwipeAt = Date.now();
     const dx = (ev.clientX||_pressStartX) - _pressStartX;
-    _pressEl.style.transition = '';
-    _pressEl.style.transform = '';
+    const rowEl = _pressEl, ico = rowEl.querySelector(':scope > .chat-swipe-ico');
+    rowEl.style.transition = '';
+    rowEl.style.transform = '';
+    if(ico){ ico.style.opacity = '0'; setTimeout(()=>{ try{ ico.remove(); }catch(e){} }, 220); }
+    _pressArmed = false;
     // pointercancel means the gesture was interrupted (e.g. by the OS) — treat as abandoned,
     // never fire the reply action from a cancelled gesture even if it had crossed the threshold.
-    if(ev.type!=='pointercancel' && dx > 50 && _pressMsgId){ if(navigator.vibrate) navigator.vibrate(8); replyToMessage(_pressMsgId); }
+    if(ev.type!=='pointercancel' && dx > 50 && _pressMsgId){ replyToMessage(_pressMsgId); }
   } else if(ev.type!=='pointercancel' && !_pressSwiping && _pressMsgId && S._chatSelectMode){
     toggleMessageSelected(_pressMsgId);
+  } else if(ev.type==='pointerup' && !_pressSwiping && _pressMsgId && !S._chatSelectMode && Date.now() - (_chatLongPressAt||0) > 700
+            && !(ev.target.closest && ev.target.closest('.rt-link,.chat-reaction-pill,.chat-reply-quote'))){
+    // v169: double-tap a message = ❤️ (the same quick-react Instagram/WhatsApp-style people expect)
+    const now = Date.now();
+    if(_lastTap.id===_pressMsgId && now - _lastTap.t < 320){
+      _lastTap = {id:null, t:0};
+      chatDoubleTapHeart(_pressMsgId, ev.clientX, ev.clientY);
+    } else _lastTap = {id:_pressMsgId, t:now};
   }
   if(_pressPointerId!=null){ try{ ev.currentTarget.releasePointerCapture(_pressPointerId); }catch(e){} }
   _pressSwiping = false; _pressMsgId = null; _pressEl = null; _pressPointerId = null;
+}
+function chatDoubleTapHeart(id, x, y){
+  const msg = findMsg(id); if(!msg || msg.deleted) return;
+  const me = S.local.myProfile;
+  const has = !!(msg.reactions && (msg.reactions['❤️']||[]).includes(me));
+  if(!has) reactToMessage(id, '❤️');            // adds it (and replaces any other reaction of mine, as the sheet does); a second double-tap never removes it
+  const page = document.querySelector('#chat-root .chat-page'); if(!page) return;
+  const r = page.getBoundingClientRect();
+  const h = document.createElement('span'); h.className = 'chat-heart-burst'; h.textContent = '❤️';
+  h.style.left = (x - r.left) + 'px'; h.style.top = (y - r.top) + 'px';
+  page.appendChild(h); setTimeout(()=>{ try{ h.remove(); }catch(e){} }, 800);
+  try{ if(navigator.vibrate && !prefersReducedMotion()) navigator.vibrate(10); }catch(e){}
+}
+// v169: the action sheet follows your finger down and dismisses on a pull or a flick (grab it by the handle or the preview line)
+function chatSheetGrab(ev){
+  const grab = ev.currentTarget, sheet = grab.closest('.chat-sheet'); if(!sheet) return;
+  const overlay = sheet.parentElement, y0 = ev.clientY; let dy = 0; const hist = [{y:y0, t:ev.timeStamp}];
+  sheet.style.animation = 'none'; sheet.style.transition = 'none';
+  try{ grab.setPointerCapture(ev.pointerId); }catch(e){}
+  const mv = e=>{
+    dy = Math.max(0, e.clientY - y0); hist.push({y:e.clientY, t:e.timeStamp}); if(hist.length>5) hist.shift();
+    sheet.style.transform = `translateY(${dy}px)`; if(overlay) overlay.style.opacity = String(1 - Math.min(.7, dy/420));
+  };
+  const up = e=>{
+    grab.removeEventListener('pointermove', mv); grab.removeEventListener('pointerup', up); grab.removeEventListener('pointercancel', up);
+    const a = hist[0], b = hist[hist.length-1], v = (b.y - a.y) / Math.max(1, b.t - a.t);
+    sheet.style.transition = 'transform .18s cubic-bezier(.22,.8,.4,1)';
+    if(e.type!=='pointercancel' && (dy > 90 || (v > 0.55 && dy > 20))){
+      sheet.style.transform = 'translateY(110%)'; if(overlay) overlay.style.opacity = '0';
+      setTimeout(dismissChatSheet, 160);
+    } else { sheet.style.transform = ''; if(overlay) overlay.style.opacity = ''; }
+  };
+  grab.addEventListener('pointermove', mv); grab.addEventListener('pointerup', up); grab.addEventListener('pointercancel', up);
 }
 function chatBubbleKeydown(ev, id){
   if(ev.key==='Enter' || ev.key===' ' || ev.key==='ContextMenu'){
@@ -14209,7 +14751,6 @@ function chatBlockedHtml(){
   const nick = profileById('umang').nick;
   return `<div class="chat-page">
     <div class="chat-header">
-      <button class="chat-back-btn" onclick="exitChatPage()" aria-label="Back">${CHAT_ICONS.back}</button>
       <div class="chat-header-info"><div class="chat-header-name">${escChat(nick)}</div></div>
     </div>
     <div class="chat-empty-state">

@@ -267,6 +267,10 @@
 //        challenges, decline a partner invite, Esc closes, open screen's ring/bar update live while the timer runs. index.html only.
 // v159 — Challenge notifications: morning kick-off push + evening nudge (server crons), in-app evening banner/device notification, Settings switches,
 //        tapping one opens Challenges (?go=challenges / OPEN_GO). index.html only (api/check-morning.js + api/check-reminders.js also changed).
+// v169 — Chat upgrade: incremental updates (no more whole-page rebuilds), double-tap ❤️, swipe-to-reply arrow, draggable action sheet, "N new messages" divider,
+//        big-emoji messages, quick share tray, wallpapers, send-button state, scroll-to-latest button fixed. index.html + sw.js.
+// v168 — Chat is now a normal tab (app header + bottom nav stay, no separate full-screen window, no Back button, no keyboard pop on open) and pages can be
+//        swiped between (live drag, edge tab, flick, rubber-band at the ends). index.html + sw.js.
 // v167 — snow engine stops while the opaque full-screen timer is up (no hours of invisible animation / battery drain) and resumes when it closes. index.html + sw.js.
 // v166 — snow polish: tap puffs, tilt leans the wind, tumbling crystals + glints, wind-smeared dust, northern glow (toggle), celebration gust, calmer while the study timer runs,
 //        low-battery mode. index.html + sw.js.
@@ -282,7 +286,7 @@
 // v160 — timer-start notifications: own running-timer notification now also works when the page has no SW controller (first visit / hard refresh)
 //        and is shown via waitUntil; partner's "started studying" push only for a session still running, throttled, says what is studied, replaces
 //        instead of stacking, is skipped while the app is visible and is cleared when the session ends. index.html + sw.js.
-const CACHE_VERSION = 'olympus-v167';
+const CACHE_VERSION = 'olympus-v169';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
