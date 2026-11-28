@@ -1,10 +1,13 @@
-// api/check-morning.js  (v139)
+// api/check-morning.js  (v172 -- adds the Road-to-1-May morning push; v139 base)
 // Runs from Vercel's own cron (see vercel.json) every morning at ~08:00 IST -- no external scheduler, no extra secret: Vercel sends the
 // existing CRON_SECRET itself, exactly like check-reminders.js. It takes over the cron slot the midnight diary reminder used (the free
 // plan allows only two daily crons), and covers that job's purpose too:
 //   * Monday  -> the weekly review: "last week in numbers, open Statistics" (pref: weeklyReview)
 //   * any day -> if YESTERDAY's diary was never closed: "close it to unlock your timer" (pref: diaryReminder). Since v138 an unclosed
 //                yesterday blocks starting the timer, so the morning is the moment this matters, rather than midnight.
+//   * Road to 1 May (v172) -> ONE push a morning at most, in the person's own pref 'journey': a sprint's first morning, a countdown moment
+//                (150/100/75/50/30/14/7/1 days to go), sprint day 5 (check-in) and sprint day 9 ("review tomorrow"). Same stamp-and-skip
+//                idempotency as the others (pushState.journeySent).
 // (Today's diary is now reminded in the 9 PM combined reminder -- check-reminders.js.)
 // Pushes are high urgency with a TTL so Android's Doze mode doesn't hold them back. Idempotent: each is stamped in pushState, so a
 // second run the same day (manual test, retry) sends nothing twice. Same service-account Drive access, raw-fetch + hand-signed JWT and
@@ -112,6 +115,48 @@ function buildChallengeMorning(items) {
 }
 
 // Monday is `today`; the review covers last Monday..Sunday against the week before it.
+// ── v172: Road to 1 May ──────────────────────────────────────────────────────────────────────────────────────────────────────
+// Mirrors the app's sprint maths: 1 Dec 2026 is day 1; sprints 1-14 are 10 days, sprint 15 runs to the day before the exam.
+const JY_START = '2026-12-01';
+const JY_COUNTDOWNS = [150, 100, 75, 50, 30, 14, 7, 1];
+function dayDiff(a, b) { return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000); }
+function buildJourneyMorning(data, profileId, today) {
+  const exam = data.examDate || '2027-05-01';
+  const d = dayDiff(JY_START, today), total = dayDiff(JY_START, exam), left = dayDiff(today, exam);
+  if (d < 0 || left < 0) return null;
+  const idx = Math.min(14, Math.floor(d / 10)), n = idx + 1, dayIn = d - idx * 10 + 1;
+  const start = addDaysStr(JY_START, idx * 10), end = idx === 14 ? addDaysStr(exam, -1) : addDaysStr(start, 9);
+  const days = dayDiff(start, end) + 1;
+  const j = (data.journey && data.journey[profileId]) || {};
+  const goal = j.goals && j.goals[String(n)];
+  const target = Number((data.targets && data.targets[profileId]) || 4);
+  const hoursGoal = goal && Number(goal.hours) > 0 ? Number(goal.hours) : target * days;
+  let hrs = 0;
+  for (let k = 0; k < days; k++) { const dd = addDaysStr(start, k); if (dd > today) break; hrs += hoursOn(data, profileId, dd); }
+  const bits = [];
+  let title = null;
+  if (JY_COUNTDOWNS.includes(left)) {
+    title = left === 1 ? '⏳ Exam tomorrow' : `⏳ ${left} days to CA Final`;
+    bits.push(left === 1 ? 'Rest, revise lightly, trust the work you have done.' : `Sprint ${n} of 15 · day ${d + 1} of ${total}.`);
+  }
+  if (dayIn === 1) {
+    const prev = idx > 0 ? addDaysStr(start, -10) : null;
+    let prevH = 0;
+    if (prev) for (let k = 0; k < 10; k++) prevH += hoursOn(data, profileId, addDaysStr(prev, k));
+    title = title ? `${title} · Sprint ${n} starts` : `🏁 Sprint ${n} starts today`;
+    const hasGoals = goal && (Number(goal.hours) > 0 || Object.keys(goal.lec || {}).length || Number(goal.chap) > 0 || Number(goal.rev) > 0 || Number(goal.mock) > 0);
+    bits.push(hasGoals ? `Goal: ${fmtH(hoursGoal)}${goal && goal.lec ? Object.keys(goal.lec).length ? ' + lectures' : '' : ''}. ` + (prev ? `Last sprint you logged ${fmtH(prevH)}.` : 'Make day 1 count.')
+      : `${days} days to go. Set your goals (Even split does it in one tap) so the sprint has a finish line.`);
+  } else if (!title && dayIn === 5) {
+    const pace = hoursGoal * 0.5, pct = Math.round(hrs / hoursGoal * 100);
+    title = `📍 Sprint ${n} · halfway`;
+    bits.push(`${fmtH(hrs)} of ${fmtH(hoursGoal)} (${pct}%). ${hrs >= pace ? 'You are ahead of pace — keep it steady.' : `Half-way pace is ${fmtH(pace)} — a strong day today closes the gap.`}`);
+  } else if (!title && dayIn === 9 && !(j.reviews && j.reviews[String(n)])) {
+    title = `📝 Sprint ${n} ends tomorrow`;
+    bits.push('Take two minutes to write your sprint review in Journey — what worked, what didn\'t, one change.');
+  }
+  return title ? { title, body: bits.join(' ') } : null;
+}
 function weekStats(data, profileId, mondayStr) {
   const target = Number((data.targets && data.targets[profileId]) || 4);
   let total = 0, studied = 0, hit = 0;
@@ -240,6 +285,14 @@ export default async function handler(req, res) {
           if (msg) await send(profileId, 'challenge', 'am', msg.title, msg.body, { go: 'challenges', url: './?go=challenges' });
         }
       }
+      // v172: Road to 1 May -- at most one push a morning (pref: journey).
+      if (pp.journey !== false) {
+        const sentOn = state.journeySent && state.journeySent[profileId];
+        if (sentOn !== t.studyDay) {
+          const msg = buildJourneyMorning(data, profileId, t.studyDay);
+          if (msg) await send(profileId, 'journey', '', msg.title, msg.body, { go: 'journey', url: './?go=journey' });
+        }
+      }
       // Yesterday's diary still open (it blocks the timer from v138 on). Not for someone with no history at all.
       if (pp.diaryReminder !== false) {
         const hasHistory = ((data.logs && data.logs[profileId]) || []).some((l) => l.date < t.studyDay);
@@ -263,10 +316,12 @@ export default async function handler(req, res) {
       if (!target.pushState.weeklyReviewSent) target.pushState.weeklyReviewSent = {};
       if (!target.pushState.diaryMorningSent) target.pushState.diaryMorningSent = {};
       if (!target.pushState.challengeMorningSent) target.pushState.challengeMorningSent = {};
+      if (!target.pushState.journeySent) target.pushState.journeySent = {};
       stamps.forEach(({ profileId, kind }) => {
         if (kind === 'weekly') target.pushState.weeklyReviewSent[profileId] = t.studyDay;
         else if (kind === 'diary') target.pushState.diaryMorningSent[profileId] = t.studyDay;
         else if (kind === 'challenge') target.pushState.challengeMorningSent[profileId] = t.studyDay;
+        else if (kind === 'journey') target.pushState.journeySent[profileId] = t.studyDay;
       });
       // An expired subscription is left for the owner's own device to repair (see reconcilePushSubscription() in index.html).
       await uploadData(accessToken, fileId, target);
