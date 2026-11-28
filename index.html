@@ -2118,6 +2118,213 @@ button, a, .btn, .ptab, .icon-btn, .bottomnav button, .profile-pill button,
 }
 html[data-mode="dark"] .trend-area-fill{ opacity:.25; }
 
+
+/* ═══ v172 — ROAD TO 1 MAY ═══ */
+.jy-more{background:none;border:0;color:var(--active-accent,var(--umang));font:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:none;cursor:pointer;padding:4px 2px}
+.jy-count{gap:3px}
+.jy-count-sub{font-size:10.5px;color:var(--text-faint);margin-top:2px;font-weight:600}
+.jy-count-bar{display:flex;gap:2px;width:100%;max-width:150px;margin-top:8px}
+.jy-count-bar i{flex:1;height:4px;border-radius:2px;background:var(--surface2);border:0}
+.jy-count-bar i.done{background:var(--active-accent,var(--umang))}
+.jy-count-bar i.cur{background:linear-gradient(90deg,var(--active-accent,var(--umang)),var(--surface2));animation:jyBlink 1.8s ease-in-out infinite}
+@keyframes jyBlink{50%{opacity:.45}}
+.jy-card{padding:12px 12px 10px;overflow:hidden}
+.jy-card-top{display:flex;justify-content:center;margin-bottom:10px}
+.jy-seg{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
+.jy-seg button{border:0;background:transparent;color:var(--text-muted);font:inherit;font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
+.jy-seg button.on{background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--active-accent,var(--umang)) 40%,transparent)}
+.jy-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;margin:0 -4px;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.jy-chips::-webkit-scrollbar{display:none}
+.jy-sp{flex:0 0 auto;scroll-snap-align:center;position:relative;width:50px;padding:6px 0 5px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;font:inherit;transition:transform .15s,background .2s,border-color .2s}
+.jy-sp:active{transform:scale(.94)}
+.jy-sp-n{font-size:13px;font-weight:800;letter-spacing:-.01em}
+.jy-sp-d{font-size:8.5px;color:var(--text-faint);font-weight:600;white-space:nowrap}
+.jy-sp-g{height:14px;font-size:10.5px;font-weight:800;line-height:14px;color:var(--text-faint)}
+.jy-sp.st-future{opacity:.62}
+.jy-sp.g-A{border-bottom:2.5px solid var(--good)} .jy-sp.g-B{border-bottom:2.5px solid var(--active-accent,var(--umang))}
+.jy-sp.g-C{border-bottom:2.5px solid var(--amber)} .jy-sp.g-D{border-bottom:2.5px solid var(--bad)}
+.jy-sp.g-A .jy-sp-g{color:var(--good)} .jy-sp.g-C .jy-sp-g{color:var(--amber)} .jy-sp.g-D .jy-sp-g{color:var(--bad)}
+.jy-sp.st-current{border-color:var(--active-accent,var(--umang));background:color-mix(in srgb,var(--active-accent,var(--umang)) 14%,var(--surface2))}
+.jy-sp.sel{background:linear-gradient(160deg,var(--active-accent-2,var(--umang-2)),var(--active-accent,var(--umang)));border-color:transparent;color:#fff;opacity:1;box-shadow:0 4px 14px color-mix(in srgb,var(--active-accent,var(--umang)) 45%,transparent);transform:translateY(-1px)}
+.jy-sp.sel .jy-sp-d,.jy-sp.sel .jy-sp-g{color:rgba(255,255,255,.85)}
+.jy-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 var(--good);animation:jyPing 1.8s infinite;vertical-align:middle}
+.jy-sp.sel .jy-live-dot{background:#fff;box-shadow:0 0 0 0 #fff}
+@keyframes jyPing{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent)}80%,100%{box-shadow:0 0 0 7px transparent}}
+.jy-pills{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.jy-pills::-webkit-scrollbar{display:none}
+.jy-pills button{flex:0 0 auto;border:1px solid var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;cursor:pointer;transition:all .2s}
+.jy-pills button.on{background:color-mix(in srgb,var(--active-accent,var(--umang)) 16%,transparent);border-color:var(--active-accent,var(--umang));color:var(--active-accent,var(--umang))}
+.jy-graph-wrap{margin:0 -2px}
+.jy-graph{width:100%;height:auto;display:block;overflow:visible}
+.jy-grid{stroke:var(--border);stroke-width:.6;stroke-dasharray:2 3}.jy-grid.base{stroke-dasharray:none;stroke-width:.9}
+.jy-ytxt,.jy-xtxt,.jy-mtxt{fill:var(--text-faint);font-size:7.5px;font-weight:600}
+.jy-xtxt.sel{fill:var(--active-accent,var(--umang));font-weight:800}
+.jy-mtxt{font-size:7px;letter-spacing:.04em;text-transform:uppercase;fill:var(--text-muted)}
+.jy-vtxt{font-size:8px;font-weight:800}
+.jy-selbg{fill:color-mix(in srgb,var(--active-accent,var(--umang)) 11%,transparent);stroke:color-mix(in srgb,var(--active-accent,var(--umang)) 28%,transparent);stroke-width:.7}
+.jy-ghost{fill:none;stroke-width:1;stroke-dasharray:2.5 2.5;opacity:.5}
+.jy-goal{stroke:var(--amber);stroke-width:1.4;stroke-linecap:round}
+.jy-pulse{fill:var(--good);animation:jyBlink 1.6s ease-in-out infinite}
+.jy-legend{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:10.5px;color:var(--text-muted);font-weight:600;margin-top:2px}
+.jy-legend.sm{justify-content:flex-start;margin:0 0 8px}
+.jy-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.jy-legend i.goal{width:11px;height:2px;border-radius:1px;background:var(--amber);vertical-align:3px}
+.jy-sprintcard{margin-top:12px;touch-action:pan-y}
+.jy-sc-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.jy-sc-title{flex:1;min-width:0}
+.jy-sc-name{font-size:15px;font-weight:800;letter-spacing:-.01em}.jy-sc-name span{font-size:12px;color:var(--text-muted);font-weight:600}
+.jy-nav{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:18px;line-height:1;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0 0 2px}
+.jy-nav:disabled{opacity:.3;cursor:default}
+.jy-nav:active:not(:disabled){transform:scale(.9)}
+.jy-chip-st{display:inline-block;margin-top:3px;font-size:9.5px;font-weight:800;letter-spacing:.07em;padding:2px 7px;border-radius:999px}
+.jy-chip-st.live{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.jy-chip-st.done{background:var(--surface2);color:var(--text-muted)}
+.jy-chip-st.soon{background:color-mix(in srgb,var(--amber) 16%,transparent);color:var(--amber)}
+.jy-grade{width:var(--gs,30px);height:var(--gs,30px);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:calc(var(--gs,30px)*.5);flex-shrink:0;color:#fff;background:var(--surface2)}
+.jy-grade.none{color:var(--text-faint);border:1.5px dashed var(--border);background:transparent}
+.jy-grade.g-A{background:linear-gradient(145deg,#3fd08f,var(--good));box-shadow:0 2px 10px color-mix(in srgb,var(--good) 45%,transparent)}
+.jy-grade.g-B{background:linear-gradient(145deg,var(--active-accent-2,var(--umang-2)),var(--active-accent,var(--umang)))}
+.jy-grade.g-C{background:linear-gradient(145deg,var(--amber-2),var(--amber))}
+.jy-grade.g-D{background:linear-gradient(145deg,#ff8a8a,var(--bad))}
+.jy-rows{display:flex;flex-direction:column;gap:11px}
+.jy-row-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:4px}
+.jy-row-v b{color:var(--text);font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}.jy-row-v b span{color:var(--text-faint);font-weight:600;font-size:11px}
+.jy-row-v em{font-style:normal;color:var(--text-faint);margin:0 5px}
+.jy-bar{height:7px;border-radius:4px;background:var(--surface2);overflow:hidden}
+.jy-bar.thin{height:4px;margin-top:3px}
+.jy-bar i{display:block;height:100%;border-radius:inherit;transition:width .6s cubic-bezier(.22,.8,.4,1)}
+.jy-bar.full i{box-shadow:0 0 8px currentColor}
+.jy-gline{margin-top:12px;font-size:11.5px;color:var(--text-muted);font-weight:600;line-height:1.5}.jy-gline b{color:var(--text);font-weight:900}
+.jy-hint{margin-top:10px;font-size:11.5px;color:var(--text-faint);line-height:1.5}
+.jy-link-btn{margin-top:10px;background:none;border:0;color:var(--active-accent,var(--umang));font:inherit;font-size:12.5px;font-weight:800;padding:2px 0;cursor:pointer}
+.jy-open{width:100%;margin-top:12px}
+/* Journey page */
+.jy-page{display:block}
+.jy-hero{display:flex;gap:14px;align-items:center;background:linear-gradient(135deg,color-mix(in srgb,var(--active-accent,var(--umang)) 14%,var(--surface)),var(--surface))}
+.jy-ring{width:92px;height:92px;flex-shrink:0}
+.jy-ring .trk{fill:none;stroke:var(--surface2);stroke-width:7}
+.jy-ring .fg{fill:none;stroke:var(--active-accent,var(--umang));stroke-width:7;stroke-linecap:round}
+.jy-ring .rn{fill:var(--text);font-size:19px;font-weight:900}.jy-ring .rl{fill:var(--text-faint);font-size:7px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.jy-hero-body{flex:1;min-width:0}
+.jy-hero-t{font-size:17px;font-weight:900;letter-spacing:-.02em}
+.jy-hero-s{font-size:11.5px;color:var(--text-muted);margin:2px 0 10px;font-weight:600}
+.jy-hs-row{display:flex;gap:8px}
+.jy-hs{flex:1;background:var(--surface2);border-radius:10px;padding:6px 4px;text-align:center;min-width:0}
+.jy-hs b{display:block;font-size:14px;font-weight:900;font-variant-numeric:tabular-nums}.jy-hs span{font-size:9px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.jy-cards{display:flex;flex-direction:column;gap:8px}
+.jy-sc{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px;cursor:pointer;transition:transform .15s,border-color .2s}
+.jy-sc:active{transform:scale(.985)}
+.jy-sc.st-future{opacity:.62}
+.jy-sc.sel{border-color:var(--active-accent,var(--umang));box-shadow:0 0 0 1px var(--active-accent,var(--umang)) inset}
+.jy-sc-n{width:44px;text-align:center;flex-shrink:0}.jy-sc-n b{display:block;font-size:15px;font-weight:900}.jy-sc-n span{font-size:9.5px;color:var(--text-faint);font-weight:600}
+.jy-sc-mid{flex:1;min-width:0}.jy-sc-line{font-size:11.5px;color:var(--text-muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.jy-sc-line .soon{color:var(--text-faint)}
+/* Settings button + back bar */
+.jy-settings-btn{display:flex;align-items:center;gap:12px;width:100%;margin:26px 0 8px;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;cursor:pointer;text-align:left;transition:transform .15s,border-color .2s}
+.jy-settings-btn:active{transform:scale(.985)}
+.jy-settings-btn span{font-size:14px;font-weight:800}
+.jy-settings-btn em{flex:1;font-style:normal;font-size:11px;color:var(--text-faint);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jy-settings-btn i{font-style:normal;font-size:20px;color:var(--text-faint)}
+.jy-settings-btn svg{color:var(--text-muted);flex-shrink:0}
+.jy-back-bar{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:17px;font-weight:900}
+.jy-back{border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:13px;font-weight:800;padding:7px 12px;border-radius:999px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.jy-live-dot,.jy-pulse,.jy-count-bar i.cur{animation:none}.jy-bar i{transition:none}}
+/* v172b plan / review / shelf / partner */
+.jy-plan-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:12px}.jy-plan-h b{font-size:14px;font-weight:800}.jy-plan-h span{font-size:11px;color:var(--text-faint);font-weight:600}
+.jy-fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.jy-fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.jy-fld span{font-size:11.5px;color:var(--text-muted);font-weight:700}.jy-fld span em,.jy-rest span em{font-style:normal;font-weight:600;color:var(--text-faint);font-size:10.5px;margin-left:5px}
+.jy-fld input,.jy-rest select,.jy-dl input,.jy-ta textarea{width:100%;box-sizing:border-box;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;font-weight:700}
+.jy-fld input:focus,.jy-ta textarea:focus,.jy-rest select:focus,.jy-dl input:focus{outline:none;border-color:var(--active-accent,var(--umang));box-shadow:0 0 0 3px color-mix(in srgb,var(--active-accent,var(--umang)) 20%,transparent)}
+.jy-fld input::placeholder{color:var(--text-faint);font-weight:600}
+.jy-btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.jy-btnrow .btn{flex:1 1 auto;padding:9px 12px}.jy-btnrow.end{justify-content:flex-end}.jy-btnrow.end .btn{flex:0 0 auto;min-width:96px}
+.jy-ghostbtn{background:transparent!important;color:var(--text-faint)!important}
+.jy-rest{display:flex;flex-direction:column;gap:5px;margin-top:14px}.jy-rest>span{font-size:12px;font-weight:700;color:var(--text-muted)}
+.jy-rest select{font-size:13px}
+.jy-catch{margin-top:12px;border-left:3px solid var(--amber)}.jy-catch.ok{border-left-color:var(--good)}
+.jy-catch ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.6;color:var(--text-muted)}.jy-catch li b{color:var(--text)}
+.jy-burn{margin-top:10px;padding:9px 11px;border-radius:10px;background:color-mix(in srgb,var(--bad) 12%,transparent);font-size:12px;line-height:1.5;color:var(--text-muted)}
+.jy-acc{padding:0;margin-bottom:0}.jy-acc-h{display:flex;justify-content:space-between;align-items:center;width:100%;background:none;border:0;color:var(--text);font:inherit;font-size:13px;font-weight:800;padding:14px 16px;cursor:pointer}.jy-acc-h i{font-style:normal;color:var(--text-faint);font-size:18px}
+.jy-acc-b{padding:0 16px 16px}
+.jy-dls{display:flex;flex-direction:column;gap:14px}
+.jy-dlp-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}.jy-dlp-h b{font-size:13px;font-weight:900}.jy-dlp-h span{font-size:10.5px;color:var(--text-faint);font-weight:600}
+.jy-dl3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.jy-dl{display:flex;flex-direction:column;gap:3px;min-width:0}.jy-dl span{font-size:9.5px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.jy-dl input{font-size:11px;padding:7px 4px;border-radius:8px;min-width:0}
+.jy-banner{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 12px;padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--amber) 45%,var(--border));background:color-mix(in srgb,var(--amber) 11%,var(--surface));color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.jy-banner .e{font-size:22px}.jy-banner .t{flex:1;display:flex;flex-direction:column;gap:2px}.jy-banner b{font-size:13.5px}.jy-banner em{font-style:normal;font-size:11.5px;color:var(--text-muted)}.jy-banner i{font-style:normal;font-size:20px;color:var(--text-faint)}
+.jy-rv{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}.jy-rv-r b{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em}.jy-rv-r p{margin:2px 0 0;font-size:13px;line-height:1.5;white-space:pre-wrap}
+/* review sheet */
+.jy-sheet-ov{align-items:flex-end;padding:0;z-index:520}
+.jy-sheet{width:100%;max-width:520px;max-height:90vh;overflow-y:auto;background:var(--surface);border-radius:20px 20px 0 0;padding:10px 18px calc(22px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(0,0,0,.45);animation:sheetSpringIn .32s cubic-bezier(.22,.8,.4,1) both}
+.jy-sheet-grab{width:38px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 12px}
+.jy-sheet-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.jy-sheet-t{font-size:18px;font-weight:900;letter-spacing:-.02em}.jy-sheet-s{font-size:11.5px;color:var(--text-faint);font-weight:600}
+.jy-sheet-rows{margin-bottom:4px}
+.jy-ta{display:flex;flex-direction:column;gap:5px;margin-top:14px}.jy-ta span{font-size:12px;font-weight:800;color:var(--text-muted)}.jy-ta textarea{resize:vertical;font-weight:600;font-size:13.5px;line-height:1.45}
+body.jy-sheet-open{overflow:hidden}
+/* shelf */
+.jy-ms-t{font-size:10.5px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin:4px 0 8px}.jy-ms-t em{font-style:normal;text-transform:none;letter-spacing:0;margin-left:6px;font-weight:600}
+.jy-medals{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:6px}
+.jy-medal{position:relative;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--border);color:var(--text-faint);font-weight:900;font-size:14px}
+.jy-medal.on{border:0;color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.28)}
+.jy-medal.on.g-A{background:linear-gradient(145deg,#3fd08f,var(--good))}.jy-medal.on.g-B{background:linear-gradient(145deg,var(--active-accent-2,var(--umang-2)),var(--active-accent,var(--umang)))}.jy-medal.on.g-C{background:linear-gradient(145deg,var(--amber-2),var(--amber))}.jy-medal.on.g-D{background:linear-gradient(145deg,#ff8a8a,var(--bad))}
+.jy-medal i,.jy-medal u{position:absolute;font-style:normal;text-decoration:none;font-size:11px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.4)}.jy-medal i{top:-3px;right:-2px;color:#ffd24a}.jy-medal u{bottom:-3px;right:-2px;color:#fff}
+.jy-ms-g{margin-top:12px}.jy-ms-row{display:flex;flex-wrap:wrap;gap:6px}
+.jy-ms{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;border:1px dashed var(--border);font-size:11px;font-weight:700;color:var(--text-faint);filter:grayscale(1);opacity:.65}
+.jy-ms.on{border-style:solid;border-color:color-mix(in srgb,var(--good) 50%,var(--border));color:var(--text);filter:none;opacity:1;background:color-mix(in srgb,var(--good) 10%,transparent)}
+/* partner */
+.jy-pb-h{display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px}
+.jy-pb-r{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border);font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.jy-pb-r span:first-child{text-align:left}.jy-pb-r span:last-child{text-align:right}.jy-pb-r em{font-style:normal;font-size:10.5px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-align:center}
+.jy-pb-r .lead{font-size:16px}
+.jy-pb-v{text-align:center;margin-top:10px;font-size:13px;font-weight:800}.jy-pb-v span{font-size:12px;color:var(--good);font-weight:700}
+/* v172d progress + popup switcher */
+.jy-tabs{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:2px;text-transform:none;letter-spacing:0}
+.jy-tabs button{border:0;background:transparent;color:var(--text-muted);font:inherit;font-size:11px;font-weight:800;padding:4px 11px;border-radius:999px;cursor:pointer}
+.jy-tabs button.on{background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));color:#fff}
+.jy-prog-r{margin-bottom:12px}.jy-prog-l{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:5px}
+.jy-prog-l b{font-size:15px;color:var(--text);font-weight:900;font-variant-numeric:tabular-nums}.jy-prog-l b em{font-style:normal;font-size:11.5px;color:var(--text-faint);font-weight:600}
+.jy-prog-n{font-size:11.5px;color:var(--text-faint);margin-top:5px;font-weight:600}.jy-prog-n b{color:var(--text)}.jy-prog-n a{color:var(--active-accent,var(--umang));font-weight:800;cursor:pointer}
+.jy-prog-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.jy-prog-kpis div{background:var(--surface2);border-radius:12px;padding:8px 4px;text-align:center}
+.jy-prog-kpis b{display:block;font-size:16px;font-weight:900;font-variant-numeric:tabular-nums}.jy-prog-kpis span{font-size:9.5px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.jy-week{width:100%;height:auto;display:block}.jy-tgt{stroke:var(--amber);stroke-width:1;stroke-dasharray:3 3}
+.jy-prog-na{margin-top:12px}.jy-prog-nat{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin:0 0 8px}
+.jy-popseg{display:inline-flex;margin:0 auto;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:2px}
+#stats-root .stats-exit-bar .jy-popseg button,#targets-root .stats-exit-bar .jy-popseg button{font-size:12.5px;font-weight:800;padding:5px 14px;border-radius:999px;color:var(--text-muted)}
+#stats-root .stats-exit-bar .jy-popseg button.on,#targets-root .stats-exit-bar .jy-popseg button.on{background:linear-gradient(135deg,var(--active-accent,var(--umang)),var(--active-accent-2,var(--umang-2)));color:#fff}
+.jy-popseg-sp{flex:1;display:flex;justify-content:center}
+/* v173 head-to-head comparison */
+.hh-card{padding:14px 14px 12px}
+.hh-seg{justify-content:center;margin-bottom:6px}
+.hh-hero{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:4px;padding:6px 0 4px}
+.hh-p{text-align:center}.hh-p svg{display:block;margin:0 auto 4px}
+.hh-name{font-size:13px;font-weight:900}.hh-sub{font-size:11px;color:var(--text-faint);font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.hh-vs span{font-size:11px;font-weight:900;color:var(--text-faint);letter-spacing:.08em;padding:5px 8px;border:1px solid var(--border);border-radius:999px;background:var(--surface2)}
+.hh-verdict{margin:8px 0 2px;text-align:center;padding:8px 10px;border-radius:12px;background:var(--surface2)}
+.hh-verdict b{display:block;font-size:14px;font-weight:900}.hh-verdict span{font-size:11px;color:var(--text-faint);font-weight:600}
+.hh-sec{margin:16px 0 8px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint)}.hh-sec em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;margin-left:6px}
+.hh-row{margin-bottom:10px}
+.hh-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}
+.hh-lab{font-size:11.5px;font-weight:800;color:var(--text-muted)}
+.hh-bars{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.hh-side{display:flex;align-items:center;gap:6px;min-width:0}
+.hh-side.a{justify-content:flex-end}
+.hh-side b{font-size:12.5px;font-weight:700;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.hh-side.win b{font-weight:900;color:var(--text)}
+.hh-track{flex:1;height:9px;background:var(--surface2);border-radius:5px;display:flex;overflow:hidden;min-width:0}
+.hh-side.a .hh-track{justify-content:flex-end}
+.hh-track i{display:block;height:100%;border-radius:5px;transition:width .5s cubic-bezier(.22,.8,.4,1)}
+.hh-side.a .hh-track i{background:var(--umang);opacity:.55}.hh-side.b .hh-track i{background:var(--chetna);opacity:.55}
+.hh-side.win .hh-track i{opacity:1}
+.hh-delta{font-size:10.5px;font-weight:800;color:var(--text-faint)}.hh-delta.a{color:var(--umang)}.hh-delta.b{color:var(--chetna)}
+.hh-trend{width:100%;height:auto;display:block}
+.hh-leg{display:flex;gap:14px;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-muted);margin-top:2px}.hh-leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+.hh-pp{display:flex;align-items:center;gap:10px;margin-bottom:9px}.hh-pp-n{width:42px;font-size:11.5px;font-weight:800;color:var(--text-muted);flex-shrink:0}
+.hh-pp-b{flex:1;display:grid;grid-template-columns:1fr 26px;gap:3px 6px;align-items:center;min-width:0}
+.hh-pp-t{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden}.hh-pp-t i{display:block;height:100%;border-radius:4px}
+.hh-pp-b em{font-style:normal;font-size:10.5px;font-weight:800;color:var(--text-muted);text-align:right;font-variant-numeric:tabular-nums}
+.hh-road-r{display:flex;align-items:center;gap:8px;margin-bottom:5px}.hh-road-r>b{width:42px;font-size:11px;font-weight:800;flex-shrink:0}.hh-road-r>div{flex:1;display:grid;grid-template-columns:repeat(15,1fr);gap:2px}
+.hh-g{height:20px;border-radius:5px;background:var(--surface2);color:var(--text-faint);font-size:9.5px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.hh-g.g-A{background:var(--good);color:#fff}.hh-g.g-B{background:var(--active-accent,var(--umang));color:#fff}.hh-g.g-C{background:var(--amber);color:#fff}.hh-g.g-D{background:var(--bad);color:#fff}.hh-g.cur{outline:1.5px solid var(--text);outline-offset:1px}
+.hh-note{font-size:11.5px;color:var(--text-faint);font-weight:600;line-height:1.5;margin-top:6px}
 </style>
 <!-- Money (Umang-only) — html2canvas and jsPDF previously loaded here as blocking
      <script src> tags (~2 MB combined, fetched synchronously on every page load for
@@ -4050,9 +4257,9 @@ function buildDefaultShared(){
     dailyChallenges[p.id] = { defs: [], log: {} };
     dcState[p.id] = { xp: 0, streakCount: 0, lastStreakDate: null };
   });
-  return { examDate:'2027-05-02', papers, logs, targets, chapters, lectures, mockScores, notes, tasks, questions:[], qStats:{}, mcqScenarios:{}, mcqSeeds:{}, chat,
+  return { examDate:'2027-05-01', papers, logs, targets, chapters, lectures, mockScores, notes, tasks, questions:[], qStats:{}, mcqScenarios:{}, mcqSeeds:{}, chat,
     profileInfo, timerState, dailyTargetOverride, prefs, celebratedMilestones, pushSubscriptions, pushState, pushPrefs, habits, habitLog,
-    money:{ __nativeSchema:true, settings:{}, invoices:[], transactions:[], deleted:{} }, adminAnnouncement:'', dailyQuote:{}, diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget,
+    money:{ __nativeSchema:true, settings:{}, invoices:[], transactions:[], deleted:{} }, adminAnnouncement:'', diary, diaryMood, diaryReflections, plannerTargets, lectureCompletionTarget,
     milestoneTargets, dailyChallenges, dcState, challenges:{ umang:{list:[]}, chetna:{list:[]} } };
 }
 // Umang and Chetna each have their own real Indirect Tax lecture schedule (different lecturers,
@@ -4161,7 +4368,13 @@ function migrateFrChapters(data, profileId){
 }
 // Fills in any keys missing from a save made under an earlier phase, without wiping existing data.
 function migrateShared(data){
-  if(data.examDate===undefined) data.examDate = '2027-05-02';
+  if(data.examDate===undefined) data.examDate = '2027-05-01';
+  // v172: the exam is 1 May 2027 (the first build stored the 2nd). Corrected once, so a date picked on purpose later is never touched.
+  if(!data.examDateFixV172){ data.examDateFixV172 = true; if(data.examDate==='2027-05-02') data.examDate = '2027-05-01'; }
+  if(!data.journey || typeof data.journey!=='object') data.journey = {};
+  // v173: the Home sequence was re-ordered (date, War Countdown, papers, challenges, journey + progress graphs, lecture completion, features,
+  // comparison, settings). A saved custom order is cleared ONCE so everybody lands on it; hidden cards and later re-ordering are kept.
+  if(data.prefs && typeof data.prefs==='object') Object.keys(data.prefs).forEach(pid=>{ const pr = data.prefs[pid]; if(pr && typeof pr==='object' && !pr.homeOrderV173){ delete pr.homeOrder; pr.homeOrderV173 = true; } });
   if(!data.targets){ data.targets = {}; PROFILES.forEach(p=> data.targets[p.id] = 4); }
   // Ensure chapters/lectures/mockScores/papers each have a fully-populated
   // [profileId][paperId] bucket for every profile×paper combination. The old migration
@@ -4287,15 +4500,8 @@ function migrateShared(data){
   if(!data.pushState.targetHitDate) data.pushState.targetHitDate = {};
   if(!data.pushState.minHoursHitDate) data.pushState.minHoursHitDate = {};
   if(data.adminAnnouncement===undefined) data.adminAnnouncement = '';
-  // dailyQuote used to be one shared {date,text} for BOTH profiles — whichever device
-  // generated it that day "won", baking its own profile's name/stats into text that then
-  // synced to and displayed on the OTHER profile's Home too (reported: Chetna's Home showing
-  // a message addressed to Umang, or vice versa). Now keyed per profile id
-  // ({umang:{date,text}, chetna:{date,text}}); 'date' being a direct key is the old shape's
-  // tell (a real profile id never collides with it), so that one day's already-generated text
-  // is dropped and freshly (and correctly) regenerated per profile on next ensureDailyQuote()
-  // — a one-time extra AI call each, not a real loss.
-  if(!data.dailyQuote || 'date' in data.dailyQuote) data.dailyQuote = {};
+  // v173: the daily motivation message was removed for both profiles -- its stored copies are dropped.
+  if('dailyQuote' in data) delete data.dailyQuote;
   if(!data.diary) data.diary = {};
   if(!data.diaryMood) data.diaryMood = {};
   // diaryReflections is NEW and purely additive (structured Energy/Focus/Mood + 4 reflection
@@ -4994,6 +5200,7 @@ const ICONS = {
   planner:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   stats:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>',
   settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+  journey:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4"/><path d="M4 5h13l-2.5 4L17 13H4"/><path d="M8 21h8"/></svg>',
   chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
   timer:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></svg>',
   money:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 6v.01M18 18v-.01"/></svg>',
@@ -5003,7 +5210,7 @@ const NAV_ITEMS = [
   {id:'timer', label:'Timer'},
   {id:'planner', label:'Planner'},
   {id:'chat', label:'Chat'},
-  {id:'settings', label:'Settings'},
+  {id:'journey', label:'Journey'},
 ];
 // v144: Money is a page in BOTH profiles, but each person's Money is private to them (their own file on Drive that the server only
 // hands to its owner -- see moneyVault below). Computed rather than a static array so it can key off whoever is logged in.
@@ -5013,7 +5220,7 @@ function navItems(){
   return items;
 }
 function renderNav(){
-  const effectiveView = S.view==='workspace' ? 'timer' : S.view;
+  const effectiveView = S.view==='workspace' ? 'timer' : (S.view==='settings' ? (S._settingsFrom && S._settingsFrom!=='settings' ? S._settingsFrom : 'home') : S.view);
   const unread = unreadChatCount();
   syncAppBadge(unread);
   document.getElementById('bottomnav').innerHTML = navItems().map(n=>{
@@ -5126,6 +5333,7 @@ function switchView(v){
   S.view=v;
   if(leavingChat) postSwViewState();
   wsHistLeave(v);
+  setHistLeave(v);
   if(v==='planner' && !S.plannerDateFilter){
     S.plannerDateFilter = todayStr();
     S.selectedCalDay = todayStr();
@@ -5173,7 +5381,7 @@ function psAvailable(){
   if(!S.appSession && !(S.local && S.local.myProfile)) return false;
   const nav = document.getElementById('bottomnav');
   if(!nav || getComputedStyle(nav).display==='none') return false;      // overlays / keyboard-over-chat hide the nav: no page swiping then
-  if(S.view==='workspace' || S.fullscreenTimerOpen || S._chatSelectMode) return false;
+  if(S.view==='workspace' || S.view==='settings' || S.fullscreenTimerOpen || S._chatSelectMode) return false;
   if(psOverlayOpen()) return false;
   return true;
 }
@@ -5318,13 +5526,13 @@ function _renderAppImpl(){
   const root = document.getElementById('app-root');
   const _dayFlipped = !!_renderedStudyDay && _renderedStudyDay !== todayStr();
   _renderedStudyDay = todayStr();
-  if(_dayFlipped) setTimeout(()=>{ try{ ensureDailyQuote(); }catch(e){} }, 0); // 5 AM passed with the app open: today's motivation
   applyTheme();
   if(S.view==='home') root.innerHTML = viewHome();
   else if(S.view==='timer') root.innerHTML = viewTimerPage();
   else if(S.view==='workspace') root.innerHTML = viewWorkspace();
   else if(S.view==='planner') root.innerHTML = viewPlanner();
-  else if(S.view==='settings') root.innerHTML = viewSettings();
+  else if(S.view==='settings') root.innerHTML = settingsBackBarHtml() + viewSettings();
+  else if(S.view==='journey') root.innerHTML = viewJourney();
   else if(S.view==='chat'){ /* rendered into #chat-root by renderChatPage(), not #app-root */ }
   else if(S.view==='money'){ renderMoneyPage(); /* rendered into #money-root, not #app-root */ }
   if(S._justNavigated){
@@ -5366,6 +5574,7 @@ function _renderAppImpl(){
   // notification tap, for example — until the user exited and re-entered fullscreen.
   if(S.fullscreenTimerOpen && typeof renderFullscreenTimer === 'function') renderFullscreenTimer();
   ensureTimerTickIfLive();
+  jyPostRender();
 }
 // v123: whatever redraws the screen (poll, push, visibility, navigation), a live session on either phone must have the
 // 1s tick running -- before, only certain cards started it, so e.g. a reload straight onto Home left the clocks frozen.
@@ -8658,9 +8867,9 @@ let _statsHistoryActive = false;
 function onStatsBackButton(){
   if(S.statsPopupOpen) closeStatsPopup();
 }
-function openStatsPopup(){
+function openStatsPopup(reuse){
   if(!_statsHistoryActive){
-    try{ history.pushState({olympusStats:true}, '', location.href); }catch(e){}
+    if(reuse!==true){ try{ history.pushState({olympusStats:true}, '', location.href); }catch(e){} } // reuse: swapped in from Targets, whose history entry is still there
     _statsHistoryActive = true;
     window.addEventListener('popstate', onStatsBackButton);
   }
@@ -8689,7 +8898,7 @@ function renderStatsPopup(){
   const root = document.getElementById('stats-root');
   if(!root) return;
   root.innerHTML = `
-    <div class="stats-exit-bar"><button onclick="exitStatsPopup()">&larr; <span>Back</span></button></div>
+    <div class="stats-exit-bar"><button onclick="exitStatsPopup()">&larr; <span>Back</span></button><div class="jy-popseg-sp">${jyPopSeg('stats')}</div><span style="width:74px" aria-hidden="true"></span></div>
     <div class="stats-scroll" id="stats-scroll">${viewStats()}</div>`;
   const scroll = document.getElementById('stats-scroll');
   if(scroll){ animateCountUps(scroll); triggerChartAnimations(scroll); }
@@ -9897,9 +10106,9 @@ function targetsProfileId(){
   return (p && PROFILES.some(x=>x.id===p)) ? p : me;
 }
 function targetsReadOnly(){ return targetsProfileId() !== (S.local && S.local.myProfile); }
-function openTargetsPopup(profileId){
+function openTargetsPopup(profileId, reuse){
   if(!_targetsHistoryActive){
-    try{ history.pushState({olympusTargets:true}, '', location.href); }catch(e){}
+    if(reuse!==true){ try{ history.pushState({olympusTargets:true}, '', location.href); }catch(e){} } // reuse: swapped in from Statistics, whose history entry is still there
     _targetsHistoryActive = true;
     window.addEventListener('popstate', onTargetsBackButton);
   }
@@ -10927,7 +11136,8 @@ function renderTargetsPopup(){
   S._tgViewKey = _viewKey;
   root.innerHTML = `
     <div class="stats-exit-bar">
-      <button onclick="exitTargetsPopup()">${CHAT_ICONS.back || '&larr;'} <span>${titles[view]||'Targets'}</span></button>
+      <button onclick="exitTargetsPopup()">${CHAT_ICONS.back || '&larr;'} <span>${view==='dashboard' ? 'Back' : (titles[view]||'Targets')}</span></button>
+      ${view==='dashboard' ? `<div class="jy-popseg-sp">${jyPopSeg('targets')}</div>` : ''}
       ${view==='dashboard' && !ro ?`<button onclick="openTargetCreateForm()" style="color:var(--active-accent,var(--umang))">+ <span>New</span></button>`:''}
     </div>
     <div class="stats-scroll" id="targets-scroll">${body}</div>`;
@@ -11586,7 +11796,7 @@ document.addEventListener('visibilitychange', ()=>{
   postSwViewState();
   if(document.hidden) flushPendingSaveNow(); // v128: don't wait out the debounce when the screen is going off
   else flushDriveIfDirty();                  // v128: anything that never reached Drive goes up now
-  if(!document.hidden){ refreshPartnerTimerSoon([0, 2000, 5000]); renderIfStudyDayChanged(); try{ ensureDailyQuote(); }catch(e){} } // ensureDailyQuote is a no-op once today's message exists
+  if(!document.hidden){ refreshPartnerTimerSoon([0, 2000, 5000]); renderIfStudyDayChanged(); }
 });
 function chatStatusInfo(otherId){
   const chat = S.shared.chat;
@@ -11615,14 +11825,12 @@ function chatStatusInfo(otherId){
 // longer deletes the partner's (it remembers a dead endpoint on its own device instead -- see sendPush()).
 const SINGLE_OWNER_SHARED_KEYS = ['logs','targets','chapters','lectures','mockScores','tasks',
   'profileInfo','dailyTargetOverride','prefs','celebratedMilestones','habits','habitLog',
-  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','dailyQuote','pushSubscriptions','pushPrefs',
-  'diaryMood','diaryReflections','dailyChallenges','dcState','frChaptersLegacy','challenges'];
+  'diary','plannerTargets','lectureCompletionTarget','papers','milestoneTargets','pushSubscriptions','pushPrefs',
+  'diaryMood','diaryReflections','dailyChallenges','dcState','frChaptersLegacy','challenges','journey'];
 // v150: frChaptersLegacy (the pre-Ind AS-wise FR chapter list, kept as a backup per profile) is each person's own slice too.
 // v136: the Diary's reflections (and the mistakes log inside them) and the daily-challenge records are each person's own too, but were
 // never registered here, so a partner's save made from a stale copy could roll back a diary entry you had just written, and her diary
 // view on your phone only updated when you reopened the app. Same protection as the other per-person data now.
-// v124: 'dailyQuote' added -- each profile writes only its own motivation, and without this the partner's phone could re-upload a stale
-// copy of it, wiping today's message and triggering a second generation.
 // milestoneTargets was missing from this list entirely — the rebuilt Targets page (see its
 // own big comment above) added a genuinely new single-owner field but never registered it
 // here, so a target you created could survive locally for a while and then quietly vanish:
@@ -11654,14 +11862,13 @@ function refreshOtherProfileDataFromRemote(freshRemote){
     const L = (S.shared.logs && S.shared.logs[other]) || [];
     let h = 0, c = 0;
     for(const l of L){ h += Number(l.hours||0); c = (c*31 + (l.date ? l.date.charCodeAt(9)*7 + l.date.charCodeAt(8) : 0)) | 0; }
-    // v124: the partner's daily motivation is part of the slice too, so her card on my Home appears the moment her message lands
     // v132: her lecture progress and chosen Home paper are drawn on my Home too (Lecture Completion shows both of us)
     const lecSig = Object.entries((S.shared.lectures||{})[other]||{}).map(([p,ls])=>p+'='+(ls||[]).filter(l=>l.status==='done').length+'/'+(ls||[]).length).join(',');
     // v134: her targets are readable on my Targets page / Home, so a change to them counts too
     const tgSig = ((S.shared.milestoneTargets||{})[other]||[]).map(t=>[t.id,t.title,t.deadline,t.targetValue,t.unit,t.completedAt,t.manualProgress,t.paperId,t.type].join('~')).join('|');
     // v136: her Diary (closed days, mistakes log) is readable on my phone too
     const dgSig = JSON.stringify(((S.shared.diaryReflections||{})[other])||{}).length+':'+JSON.stringify(((S.shared.diary||{})[other])||{}).length;
-    return L.length+':'+h.toFixed(4)+':'+c+'|'+dgSig+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], ((S.shared.dailyQuote||{})[other]||{}).text, lecSig, ((S.shared.prefs||{})[other]||{}).homeLecturePaper, tgSig]);
+    return L.length+':'+h.toFixed(4)+':'+c+'|'+dgSig+'|'+JSON.stringify([(S.shared.targets||{})[other], (S.shared.dailyTargetOverride||{})[other], lecSig, ((S.shared.prefs||{})[other]||{}).homeLecturePaper, tgSig, JSON.stringify(((S.shared.journey||{})[other])||{}), JSON.stringify(((S.shared.chapters||{})[other])||{}).length]);
   };
   const before = slice();
   SINGLE_OWNER_SHARED_KEYS.forEach(key=>{
@@ -12139,6 +12346,7 @@ function applyPendingOpenFromUrl(){
     const params = new URLSearchParams(location.search);
     if(params.get('go') === 'stats'){ history.replaceState(null, '', location.pathname); openWeeklyReview(); return; }
     if(params.get('go') === 'challenges'){ history.replaceState(null, '', location.pathname); if(!S.dcPopupOpen) openDailyChallengesPopup(); return; }
+    if(params.get('go') === 'journey'){ history.replaceState(null, '', location.pathname); if(S.appSession && S.local && S.local.myProfile) switchView('journey'); return; }
     if(params.get('open') !== 'chat') return;
     history.replaceState(null, '', location.pathname);
     openChatFromNotification();
@@ -14262,7 +14470,7 @@ const LIVE_BUILDERS = {
   homeLive:    pid => homeLiveCardHtml(pid),
   homeTarget:  pid => homeTargetInnerHtml(pid),
   homeWeek:    pid => homeWeekInnerHtml(pid),
-  cmp:         key => homeCmpRow(key),
+  hh:          range => hhBody(range),
   chlHome:     pid => homeDailyChallengesCard(pid),     // v163: study challenges move with the running timer on Home too
 };
 const _liveLast = {};
@@ -14867,19 +15075,13 @@ function featuresGridHtml(){
     {label:'Countdown', icon:icoCountdown, onclick:"openStrictCountdownFromHome()"},
     {label:'Challenges', icon:icoChallenges, onclick:"openDailyChallengesPopup()"},
     {label:'Planner', icon:ICONS.planner, onclick:"switchView('planner')"},
-    {label:'Statistics', icon:ICONS.stats, onclick:"openStatsPopup()"},
     {label:'Games', icon:icoGames, onclick:"openGamesPopup()"},
     {label:'Diary', icon:icoDiary, onclick:"openDiary()"},
-    {label:'Targets', icon:icoTarget, onclick:"openTargetsPopup()"},
   ];
   return `<div class="features-grid">
     ${cards.map(c=>`<button class="feature-card" onclick="${c.onclick}">${c.icon}<span>${c.label}${c.wip?' <span style="opacity:.55;font-weight:700;font-size:9px;letter-spacing:.04em">(WIP)</span>':''}</span></button>`).join('')}
   </div>`;
 }
-// Daily Hinglish motivational quote — the actual fetch/sync lives in ensureDailyQuote()
-// (triggered from initAfterLogin(), see there); this just renders whatever's currently in
-// S.shared.dailyQuote, including the loading state on the very first render of a new day
-// before either device has fetched yet.
 // Today's date, spelled out ("September 17, 2026, Thursday") — built manually rather than
 // via a single toLocaleDateString() call with all four options at once, since locale
 // defaults order weekday/month differently (usually "Thursday, September 17, 2026") and
@@ -14899,42 +15101,6 @@ function homeDateHeaderHtml(){
   return `<div class="home-date-hero">
     <span class="home-date-text">${month} ${day}, ${year}<span class="home-date-weekday">${weekday}</span></span>
   </div>`;
-}
-// ═══ v124: DAILY MOTIVATION — rebuilt from scratch ═══════════════════════════════════════════════════════════
-// One message per profile per STUDY DAY (5 AM boundary), written in the voice of the person who believes in you most.
-// Generation lives in ensureDailyQuote() (see the AI FEATURES section); this only draws what is stored in
-// S.shared.dailyQuote[profile] = {v, date, text, source:'ai'|'offline', at, tries, recent[]}. There is deliberately NO
-// hold-to-refresh any more: the message is generated once and then simply stays for the day.
-function motivationInnerHtml(){
-  const vp = S.viewingProfile;
-  const isMe = vp === S.local.myProfile;
-  const prof = profileById(vp);
-  const q = (S.shared.dailyQuote||{})[vp];
-  const hasToday = !!(q && q.date===todayStr() && q.v>=MOTIVATION_VERSION && q.text);
-  const label = isMe ? "Today's Motivation" : `${escChat(prof.nick)}'s Motivation`;
-  const cardStyle = `background:linear-gradient(135deg,color-mix(in srgb,var(--active-accent,var(--umang)) 13%,var(--surface)),color-mix(in srgb,var(--active-accent-2,var(--umang-2)) 5%,var(--surface)));border-color:color-mix(in srgb,var(--active-accent,var(--umang)) 26%,var(--border));padding:16px 16px 14px`;
-  let body;
-  if(hasToday){
-    body = `<div style="font-size:14.5px;font-weight:600;line-height:1.62;color:var(--text);letter-spacing:-.01em">${escChat(q.text)}</div>`;
-  } else if(isMe){
-    body = `<div style="display:flex;align-items:center;gap:10px;color:var(--text-faint)">
-        <div class="loading-dots" style="margin:0"><span></span><span></span><span></span></div>
-        <span style="font-size:12.5px">Writing today's message for you…</span>
-      </div>`;
-  } else {
-    body = `<div style="font-size:12.5px;color:var(--text-faint);line-height:1.5">${escChat(prof.nick)} hasn't opened Olympus yet today — their message appears here once they do.</div>`;
-  }
-  return `
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:4px">
-    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint)">${label}</div>
-  </div>
-  <div class="card" id="motivation-card" style="${cardStyle}">${body}</div>`;
-}
-function dailyQuoteBoxHtml(){ return `<div id="motivation-wrap">${motivationInnerHtml()}</div>`; }
-// Redraws just the card (generation finishes asynchronously, long after the page was drawn).
-function refreshMotivationCard(){
-  const w = document.getElementById('motivation-wrap');
-  if(w && S.view==='home') w.innerHTML = motivationInnerHtml();
 }
 // Paper grid — 3×2. Row 1: FR, AFM, AUDIT | Row 2: DT, IDT, IBS
 // Clean flat design: tier-tinted card, prominent ring with score inside,
@@ -15010,34 +15176,6 @@ function homeWeekInnerHtml(vp){
   return `<div class="week-vals">${weekValsRow(vp, off)}</div>
     <div class="week-bars">${weekBars(vp, off)}</div>`;
 }
-function homeVsBar(label, numA, numB, suffix, decimals){
-  suffix = suffix||''; decimals = decimals||0;
-  const total = Math.max(0.01, numA+numB);
-  const pctA = Math.round(numA/total*100), pctB = 100-pctA;
-  const aW = numA >= numB, bW = numB >= numA;
-  const fmtA = decimals ? numA.toFixed(decimals) : Math.round(numA);
-  const fmtB = decimals ? numB.toFixed(decimals) : Math.round(numB);
-  return `
-    <div style="margin-bottom:10px">
-      <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-align:center;letter-spacing:.05em;margin-bottom:4px;text-transform:uppercase">${label}</div>
-      <div style="display:flex;align-items:center;gap:7px">
-        <span style="font-size:12.5px;font-weight:${aW?'800':'500'};color:${aW?'var(--umang)':'var(--text-muted)'};min-width:36px;text-align:right">${fmtA}${suffix}</span>
-        <div style="flex:1;display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface2)">
-          <div style="width:${pctA}%;background:var(--umang);border-radius:4px 0 0 4px;transition:width .6s cubic-bezier(.22,.8,.4,1)"></div>
-          <div style="width:${pctB}%;background:var(--chetna);border-radius:0 4px 4px 0;transition:width .6s cubic-bezier(.22,.8,.4,1)"></div>
-        </div>
-        <span style="font-size:12.5px;font-weight:${bW?'800':'500'};color:${bW?'var(--chetna)':'var(--text-muted)'};min-width:36px">${fmtB}${suffix}</span>
-      </div>
-    </div>`;
-}
-function homeCmpRow(key){
-  const a = PROFILES[0], b = PROFILES[1];
-  if(key==='today')  return homeVsBar('Today',       todayHoursLive(a.id),         todayHoursLive(b.id),         'h', 1);
-  if(key==='week')   return homeVsBar('This Week',   liveHoursInRange(a.id,7),     liveHoursInRange(b.id,7),     'h', 1);
-  if(key==='total')  return homeVsBar('Total Hours', liveTotalHours(a.id),         liveTotalHours(b.id),         'h', 1);
-  if(key==='streak') return homeVsBar('Streak',      liveStreak(a.id),             liveStreak(b.id),             'd', 0);
-  return '';
-}
 function viewHome(){
   const vp = S.viewingProfile;
   if(vp==='umang' && isUmangBlockedForViewer()) return blockedScreenHtml();
@@ -15046,30 +15184,14 @@ function viewHome(){
   const isOverridden = !!(S.shared.dailyTargetOverride && S.shared.dailyTargetOverride[vp] && S.shared.dailyTargetOverride[vp].date===todayStr());
 
   const blocks = {
-    quote: ()=> dailyQuoteBoxHtml(),
     // v123: the live timer cards sit right under the motivation card. On your Home: your own session, then the partner's.
     // On the partner's Home: the partner's session. Both tick and appear/disappear on their own (live region 'homeLive').
     timer: ()=> liveRegion('homeLive', isMe ? S.local.myProfile : vp),
     partner: ()=> isMe ? liveRegion('homeLive', otherProfileId(S.local.myProfile)) : '',
-    countdown: ()=> `
-  <div class="section-title">Countdown</div>
-  <div class="top-row">
-    <div class="card countdown-card">
-      <div class="countdown-n hero-num" data-countup="${Math.max(0,daysUntilExam())}">0</div>
-      <div class="countdown-l">Days to CA Final</div>
-    </div>
-    <div class="card target-card" ${isMe?`onclick="promptEditTodaysTarget('${vp}')" style="cursor:pointer"`:''}>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;display:flex;align-items:center;gap:5px">
-        ${prof.nick}'s target today${isOverridden?' <span style="color:var(--amber);font-weight:700">(raised)</span>':''}
-        ${isMe?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;opacity:.6;flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>`:''}
-      </div>
-      ${liveRegion('homeTarget', vp)}
-      ${isMe && isOverridden ? `<div style="margin-top:6px;text-align:right"><span onclick="event.stopPropagation();clearTodaysTargetOverride('${vp}')" style="font-size:10px;color:var(--text-faint);text-decoration:underline;cursor:pointer">Reset to ${S.shared.targets[vp]||4}h minimum</span></div>` : ''}
-    </div>
-  </div>
-  `,
+    countdown: ()=> jyHomeHtml(vp, isMe, prof, isOverridden),
+    journey: ()=> jyRoadHomeHtml(),
     habits: ()=> isMe ? liveRegion('chlHome', vp) : '',
-    targets: ()=> targetsNeedsAttentionWidgetHtml(vp, isMe),
+    targets: ()=> jyProgressHtml(vp, isMe),
     features: ()=> `<div class="section-title"><span>Features</span></div>
   ${featuresGridHtml()}`,
     papers: ()=> `<div class="section-title">Papers</div>
@@ -15088,7 +15210,7 @@ function viewHome(){
     <div class="week-dates">${weekDatesRow(S.homeWeekOffset||0)}</div>
   </div>
   `,
-    compare: ()=> `<div class="section-title">Inter-Profile Comparison</div>
+    compare: ()=> `<div class="section-title"><span>Inter-Profile Comparison</span></div>
   ${comparisonBlock()}`,
   };
   // Which cards show, and in what order, is the VIEWER's own choice (Settings → Display), so it
@@ -15100,8 +15222,1106 @@ function viewHome(){
   ${isMe ? renderNotifBanners(vp) : ''}
   ${homeDateHeaderHtml()}
   ${body}
+  ${isMe ? settingsButtonHtml() : ''}
   `;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// v172 — ROAD TO 1 MAY.  Five months, fifteen 10-day sprints (1 Dec 2026 → the exam), tracked for both of you.
+//   • Sprint 1 starts 1 Dec; sprints 1–14 are 10 days each and sprint 15 runs on to the day before the exam (11 days), so the road is
+//     exactly "Day 1 … Day 151" and the exam itself is D-day.
+//   • Everything a sprint shows is DERIVED from data the app already keeps (study logs, lecture completion dates, mock-test dates, chapter
+//     ticks) -- the only new stored data is what a person types: S.shared.journey[profile] = {goals, deadlines, reviews, rest, ms, partner, base}.
+//     Chapter ticks had no dates, so from v172 each tick is stamped with the day it was ticked (chapter.stamp[flag]); ticks that were already
+//     there when the journey was first opened are stamped 'base' (done "before the road") and are not credited to any sprint.
+//   • Grade (A/B/C/D): hours 70 % · goals 20 % · consistency (days that hit the daily target) 10 %.  A sprint with no goals typed has no goals
+//     part, so hours and consistency are re-weighted (70:10) instead of the sprint being punished for it.  The running sprint is graded
+//     against the part of its targets that should be done by today, so "tracking B" means on pace.
+//   • Views: Together (both of you added up, the default), Individual (whoever the profile pill is on) and Compare (both drawn side by side).
+//     Each person types their OWN goals and deadlines (lectures differ per person), so every number here is read from that person's slice.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+const JY_START = '2026-12-01', JY_N = 15, JY_LEN = 10;
+const JY_METRICS = [
+  {k:'hours', label:'Hours'}, {k:'lec', label:'Lectures'}, {k:'chap', label:'Chapters'},
+  {k:'rev', label:'Revision'}, {k:'mock', label:'Mocks'}, {k:'cons', label:'Days on target'},
+];
+function jyAdd(ds, n){ const d = new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return localDateStr(d); }
+function jyExam(){ return (S.shared && S.shared.examDate) || '2027-05-01'; }
+function jyTotal(){ return Math.max(1, daysBetweenDates(JY_START, jyExam())); }
+function jySprint(i){
+  const s = jyAdd(JY_START, JY_LEN*i);
+  let e = (i===JY_N-1) ? jyAdd(jyExam(), -1) : jyAdd(s, JY_LEN-1);
+  if(e < s) e = s;
+  return {i, n:i+1, start:s, end:e, days: daysBetweenDates(s, e)+1};
+}
+// before = road not started · live = on the road · exam = exam day · after = done
+function jyPhase(){
+  const t = todayStr(), d = daysBetweenDates(JY_START, t), ex = jyExam(), total = jyTotal();
+  if(d < 0) return {phase:'before', day:0, idx:-1, toStart:-d, total};
+  if(t >= ex) return {phase: t===ex ? 'exam' : 'after', day:total, idx:JY_N, total};
+  return {phase:'live', day:d+1, idx:Math.min(JY_N-1, Math.floor(d/JY_LEN)), total};
+}
+function jyStateOf(i, ph){ return ph.idx > i ? 'past' : (ph.idx === i ? 'current' : 'future'); }
+function jyFmtDay(ds){ return new Date(ds+'T00:00:00').toLocaleDateString('en-IN', {day:'numeric', month:'short'}); }
+function jyRange(sp){
+  const a = new Date(sp.start+'T00:00:00'), b = new Date(sp.end+'T00:00:00');
+  const mo = d => d.toLocaleDateString('en-IN', {month:'short'});
+  return a.getMonth()===b.getMonth() ? `${a.getDate()}–${b.getDate()} ${mo(a)}` : `${a.getDate()} ${mo(a)} – ${b.getDate()} ${mo(b)}`;
+}
+function jyH(h){ h = Number(h)||0; return (h>=100 ? Math.round(h) : Math.round(h*10)/10) + 'h'; }
+function jyNum(n){ n = Number(n)||0; return String(Math.round(n*10)/10); }
+function jyNice(m){
+  if(!(m>0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(m))), n = m/p;
+  return (n<=1 ? 1 : n<=2 ? 2 : n<=5 ? 5 : 10) * p;
+}
+
+// ── stored data (only what a person types) ────────────────────────────────────────────────────────────────
+function jyStore(pid, create){
+  if(!S.shared) return null;
+  if(!S.shared.journey){ if(!create) return null; S.shared.journey = {}; }
+  let j = S.shared.journey[pid];
+  if(!j){ if(!create) return null; j = S.shared.journey[pid] = {v:1}; }
+  ['goals','deadlines','reviews','rest','ms','partner'].forEach(k=>{ if(!j[k] || typeof j[k] !== 'object') j[k] = {}; });
+  return j;
+}
+function jyGoalOf(pid, i){ const j = jyStore(pid); return (j && j.goals && j.goals[String(i+1)]) || null; }
+function jyMe(){ return S.local && S.local.myProfile; }
+// Who can be shown: both of you, unless the partner has blocked you (then only your own).
+function jyProfiles(){
+  const me = jyMe();
+  if(isUmangBlockedForViewer && isUmangBlockedForViewer()) return me ? [me] : [];
+  return PROFILES.map(p=>p.id);
+}
+function jyMode(){
+  const ids = jyProfiles(), m = S.local && S.local.jyMode;
+  if(ids.length < 2) return 'solo';
+  return (m==='solo' || m==='compare' || m==='together') ? m : 'together';
+}
+function jySoloPid(){
+  const ids = jyProfiles(), vp = S.viewingProfile;
+  return ids.includes(vp) ? vp : (ids[0] || jyMe() || 'umang');
+}
+function jyMetric(){ const m = S.local && S.local.jyMetric; return JY_METRICS.some(x=>x.k===m) ? m : 'hours'; }
+function jySelIdx(ph){
+  ph = ph || jyPhase();
+  const s = S.local && S.local.jySel;
+  if(Number.isInteger(s) && s>=0 && s<JY_N) return s;
+  return ph.phase==='before' ? 0 : Math.min(JY_N-1, Math.max(0, ph.idx));
+}
+
+// ── chapter tick dates ────────────────────────────────────────────────────────────────────────────────────────
+// Every place that ticks a chapter flag ends in saveShared()+renderApp(); renderApp() calls this for the signed-in profile, so a tick (from the
+// workspace, the Planner, or anywhere else) is dated the day it was first seen, without touching any of those code paths.
+const JY_FLAGS = ['lecDone','rev1','rev2','practice'];
+function jySyncStamps(){
+  const me = jyMe(); if(!me || !S.shared || !S.shared.chapters || !S.shared.chapters[me]) return;
+  const j = jyStore(me, true), first = !j.base, today = todayStr();
+  let changed = false;
+  PAPERS.forEach(pp=>{
+    (chaptersFor(me, pp.id)||[]).forEach(c=>{
+      JY_FLAGS.forEach(k=>{
+        const st = c.stamp;
+        if(c[k]){
+          if(!st || !st[k]){ if(!c.stamp) c.stamp = {}; c.stamp[k] = first ? 'base' : today; changed = true; }
+        } else if(st && st[k]){ delete st[k]; changed = true; }
+      });
+    });
+  });
+  if(first){ j.base = today; changed = true; }
+  if(changed) saveShared();
+}
+function jyUsesLectures(pid, p){ return LECTURE_TRACKER_PAPERS.includes(p) && lecturesFor(pid, p).length > 0; }
+
+// ── per-profile index of dated events since the road began ─────────────────────────────────────────────────
+function jyIndex(pid){
+  const hrs = {};
+  logsFor(pid).forEach(l=>{ if(l && l.date && l.date >= JY_START) hrs[l.date] = (hrs[l.date]||0) + (Number(l.hours)||0); });
+  const L = (typeof liveSessionInfo === 'function') ? liveSessionInfo(pid) : null;
+  if(L && L.date >= JY_START) hrs[L.date] = (hrs[L.date]||0) + (Number(L.hours)||0);
+  const lec = [];
+  LECTURE_TRACKER_PAPERS.forEach(p=> lecturesFor(pid, p).forEach(l=>{
+    if(l.status==='done' && l.completionDate){ const d = studyDayOf(l.completionDate); if(d >= JY_START) lec.push({d, p}); }
+  }));
+  const ch = {lecDone:[], rev1:[], rev2:[], practice:[]};
+  PAPERS.forEach(pp=>{
+    const viaLec = jyUsesLectures(pid, pp.id);
+    chaptersFor(pid, pp.id).forEach(c=>{
+      const st = c.stamp || {};
+      JY_FLAGS.forEach(k=>{
+        if(!c[k] || !st[k] || st[k]==='base' || st[k] < JY_START) return;
+        if(k==='lecDone' && viaLec) return; // that paper's lectures are counted as lectures, not as chapters
+        ch[k].push({d:st[k], p:pp.id});
+      });
+    });
+  });
+  const mocks = [];
+  PAPERS.forEach(pp=> mockScoresFor(pid, pp.id).forEach(m=>{ if(m && m.date){ const d = studyDayOf(m.date); if(d >= JY_START) mocks.push(d); } }));
+  return {hrs, lec, ch, mocks};
+}
+
+// One person's numbers for one sprint.
+function jyStats(pid, i, ix){
+  ix = ix || jyIndex(pid);
+  const sp = jySprint(i), ph = jyPhase(), state = jyStateOf(i, ph), today = todayStr();
+  const target = Number(S.shared.targets && S.shared.targets[pid]) || 4;
+  const inR = d => d >= sp.start && d <= sp.end;
+  const jr = jyStore(pid), restRaw = jr && jr.rest && jr.rest[String(i+1)], rest = (restRaw && restRaw >= sp.start && restRaw <= sp.end) ? restRaw : null;
+  const consDays = Math.max(1, sp.days - (rest ? 1 : 0));
+  let hours = 0, active = 0, hit = 0, elapsed = 0;
+  for(let k=0; k<sp.days; k++){
+    const d = jyAdd(sp.start, k); if(d > today) break;
+    const h = ix.hrs[d] || 0; hours += h; if(h > 0) active++;
+    if(d === rest) continue;            // a rest day never counts for or against consistency
+    elapsed++; if(h >= target - 1e-9) hit++;
+  }
+  const lec = {}; let lecTotal = 0;
+  ix.lec.forEach(x=>{ if(inR(x.d)){ lec[x.p] = (lec[x.p]||0) + 1; lecTotal++; } });
+  const cnt = k => ix.ch[k].filter(x=>inR(x.d)).length;
+  const g = jyGoalOf(pid, i);
+  const goals = {lec:{}, chap:Number(g && g.chap)||0, rev:Number(g && g.rev)||0, mock:Number(g && g.mock)||0};
+  if(g && g.lec) Object.keys(g.lec).forEach(p=>{ const n = Number(g.lec[p])||0; if(n>0) goals.lec[p] = n; });
+  const hoursGoalSet = !!(g && Number(g.hours) > 0);
+  const s = {
+    pid, i, sp, state, target, hours, hoursGoal: hoursGoalSet ? Number(g.hours) : target*sp.days, hoursGoalSet,
+    active, hit, elapsed, consDays, rest, lec, lecTotal, chap:cnt('lecDone'), rev:cnt('rev1')+cnt('rev2'), mock:ix.mocks.filter(inR).length,
+    goals, goalLecTotal: Object.values(goals.lec).reduce((a,b)=>a+b, 0),
+  };
+  return jyGrade(s);
+}
+// Fills score / letter / parts on a stats object (see the header comment for the formula).
+function jyGrade(s){
+  s.score = null; s.letter = ''; s.goalsSet = false; s.allGoalsMet = false; s.parts = null;
+  if(s.state==='future' || s.elapsed < 1) return s;
+  const frac = s.state==='current' ? Math.max(0.1, s.elapsed/s.consDays) : 1;
+  const ratio = (v, g) => Math.min(1, v/(g*frac));
+  const hp = Math.min(1, s.hours/(s.hoursGoal*frac));
+  const cp = Math.min(1, s.hit/s.elapsed);
+  const rs = [];
+  Object.keys(s.goals.lec).forEach(p=> rs.push(ratio(s.lec[p]||0, s.goals.lec[p])));
+  if(s.goals.chap > 0) rs.push(ratio(s.chap, s.goals.chap));
+  if(s.goals.rev > 0) rs.push(ratio(s.rev, s.goals.rev));
+  if(s.goals.mock > 0) rs.push(ratio(s.mock, s.goals.mock));
+  s.goalsSet = rs.length > 0;
+  const gp = rs.length ? rs.reduce((a,b)=>a+b, 0)/rs.length : null;
+  s.parts = {hp, gp, cp};
+  return jyScore(s, gp==null ? (0.70*hp + 0.10*cp)/0.80 : 0.70*hp + 0.20*gp + 0.10*cp, rs.length>0 && s.state==='past' && rs.every(r=>r>=0.999));
+}
+function jyLetter(score){ return score>=85 ? 'A' : score>=70 ? 'B' : score>=55 ? 'C' : 'D'; }
+function jyScore(s, frac, allMet){ s.score = Math.round(Math.max(0, Math.min(1, frac))*100); s.letter = jyLetter(s.score); s.allGoalsMet = !!allMet; return s; }
+// Two people added up (the Together view): numbers sum, the grade is the average of the two grades.
+function jyCombine(list){
+  if(list.length < 2) return list[0];
+  const a = list[0];
+  const o = {pid:'both', i:a.i, sp:a.sp, state:a.state, target:0, hours:0, hoursGoal:0, hoursGoalSet:list.some(x=>x.hoursGoalSet), active:0, hit:0,
+    elapsed:a.elapsed, consDays:0, lec:{}, lecTotal:0, chap:0, rev:0, mock:0, goals:{lec:{}, chap:0, rev:0, mock:0}, goalLecTotal:0, members:list,
+    score:null, letter:'', goalsSet:false, allGoalsMet:false, parts:null};
+  list.forEach(s=>{
+    o.target += s.target; o.consDays += s.consDays; o.hours += s.hours; o.hoursGoal += s.hoursGoal; o.active += s.active; o.hit += s.hit;
+    o.lecTotal += s.lecTotal; o.chap += s.chap; o.rev += s.rev; o.mock += s.mock; o.goalLecTotal += s.goalLecTotal;
+    o.goals.chap += s.goals.chap; o.goals.rev += s.goals.rev; o.goals.mock += s.goals.mock;
+    Object.keys(s.lec).forEach(p=>{ o.lec[p] = (o.lec[p]||0) + s.lec[p]; });
+    Object.keys(s.goals.lec).forEach(p=>{ o.goals.lec[p] = (o.goals.lec[p]||0) + s.goals.lec[p]; });
+    if(s.goalsSet) o.goalsSet = true;
+  });
+  const sc = list.map(s=>s.score).filter(x=>x!=null);
+  if(sc.length){ o.score = Math.round(sc.reduce((x,y)=>x+y, 0)/sc.length); o.letter = jyLetter(o.score); }
+  o.allGoalsMet = list.every(s=>s.allGoalsMet);
+  return o;
+}
+function jyMetricOf(s, k){
+  switch(k){
+    case 'hours': return {v:s.hours, g:s.hoursGoal};
+    case 'lec':   return {v:s.lecTotal, g:s.goalLecTotal};
+    case 'chap':  return {v:s.chap, g:s.goals.chap};
+    case 'rev':   return {v:s.rev, g:s.goals.rev};
+    case 'mock':  return {v:s.mock, g:s.goals.mock};
+    default:      return {v:s.hit, g:s.consDays};
+  }
+}
+// Everything a render needs: for each sprint, the stat objects to draw (1 for Together / Individual, 2 for Compare) plus the single "headline" object.
+function jyBuild(){
+  const ph = jyPhase(), mode = jyMode(), ids = jyProfiles();
+  const pids = mode==='solo' ? [jySoloPid()] : ids;
+  const ix = {}; pids.forEach(p=>{ ix[p] = jyIndex(p); });
+  const series = [];
+  for(let i=0; i<JY_N; i++){
+    const per = pids.map(p=>jyStats(p, i, ix[p]));
+    series.push({i, n:i+1, sp:per[0].sp, state:per[0].state, per, one: mode==='compare' ? jyCombine(per) : (mode==='together' ? jyCombine(per) : per[0]),
+      list: mode==='compare' ? per : [mode==='together' ? jyCombine(per) : per[0]]});
+  }
+  return {ph, mode, pids, series, sel: jySelIdx(ph)};
+}
+function jyColors(b){
+  if(b.mode==='compare') return ['var(--umang)', 'var(--chetna)'];
+  if(b.mode==='solo'){ const p = profileById(b.pids[0]); return [`var(--${p ? p.color : 'umang'})`]; }
+  return ['var(--active-accent,var(--umang))'];
+}
+function jyWho(b){
+  if(b.mode==='together') return 'Both of you';
+  if(b.mode==='compare') return profileById(b.pids[0]).nick + ' vs ' + profileById(b.pids[1]).nick;
+  return profileById(b.pids[0]).nick;
+}
+
+// ── small UI pieces ───────────────────────────────────────────────────────────────────────────────────────────
+function jyBadge(letter, size){
+  if(!letter) return `<span class="jy-grade none" style="--gs:${size||30}px">–</span>`;
+  return `<span class="jy-grade g-${letter}" style="--gs:${size||30}px">${letter}</span>`;
+}
+function jyStateChip(it, ph){
+  const st = it.state;
+  if(st==='current') return `<span class="jy-chip-st live">LIVE · day ${Math.min(it.sp.days, Math.max(1, ph.day - it.i*JY_LEN))} of ${it.sp.days}</span>`;
+  if(st==='past') return `<span class="jy-chip-st done">COMPLETED</span>`;
+  const d = daysBetweenDates(todayStr(), it.sp.start);
+  return `<span class="jy-chip-st soon">${d===1 ? 'STARTS TOMORROW' : 'STARTS IN '+d+' DAYS'}</span>`;
+}
+function jySegHtml(b, ctx){
+  const ids = jyProfiles();
+  if(ids.length < 2) return '';
+  const soloP = profileById(jySoloPid());
+  const opts = [['together','Together'], ['solo', soloP ? soloP.nick : 'Me'], ['compare','Compare']];
+  return `<div class="jy-seg" role="tablist" aria-label="Whose numbers" data-noswipe>
+    ${opts.map(([k,l])=>`<button type="button" role="tab" aria-selected="${b.mode===k}" class="${b.mode===k?'on':''}" onclick="jySetMode('${k}')">${l}</button>`).join('')}
+  </div>`;
+}
+function jySetMode(m){ S.local.jyMode = m; saveLocal(); jyHaptic(8); jyRefresh(true); }
+function jySetMetric(k){ S.local.jyMetric = k; saveLocal(); jyHaptic(6); jyRefresh(true); }
+function jySelect(i, scrollTo){
+  i = Math.max(0, Math.min(JY_N-1, i|0));
+  if(S.local.jySel === i && !scrollTo) return;
+  S.local.jySel = i; saveLocal(); jyHaptic(6);
+  jyRefresh(false);
+  if(scrollTo){ const el = document.getElementById(scrollTo); if(el) el.scrollIntoView({behavior: prefersReducedMotion() ? 'auto' : 'smooth', block:'start'}); }
+}
+function jyHaptic(ms){ try{ if(navigator.vibrate && !prefersReducedMotion()) navigator.vibrate(ms); }catch(e){} }
+function jyCenterChips(){
+  document.querySelectorAll('.jy-chips').forEach(c=>{
+    const on = c.querySelector('.jy-sp.sel'); if(!on) return;
+    const target = on.offsetLeft - (c.clientWidth - on.offsetWidth)/2;
+    c.scrollLeft = Math.max(0, target);
+  });
+}
+
+// ── sprint chips: S1 … S15 ────────────────────────────────────────────────────────────────────────────────────
+function jyChipsHtml(b){
+  return `<div class="jy-chips" role="tablist" aria-label="Sprints">` + b.series.map(it=>{
+    const sel = it.i === b.sel, l = it.one.letter;
+    return `<button type="button" role="tab" aria-selected="${sel}" class="jy-sp st-${it.state}${sel?' sel':''}${l?' g-'+l:''}" onclick="jySelect(${it.i})">
+      <span class="jy-sp-n">S${it.n}</span><span class="jy-sp-d">${jyFmtDay(it.sp.start)}</span>
+      <span class="jy-sp-g">${it.state==='current' ? '<i class="jy-live-dot"></i>' : (l || (it.state==='past' ? '–' : ''))}</span>
+    </button>`;
+  }).join('') + `</div>`;
+}
+
+// ── the 15-column graph ───────────────────────────────────────────────────────────────────────────────────────
+function jyGraphSvg(b){
+  const metric = jyMetric(), cols = jyColors(b), W = 330, H = 176, x0 = 30, x1 = 326, yb = 136, yt = 18;
+  const colW = (x1 - x0) / JY_N, n = b.series[0].list.length;
+  let max = 0;
+  b.series.forEach(it=> it.list.forEach(st=>{ const m = jyMetricOf(st, metric); max = Math.max(max, m.v, m.g||0); }));
+  max = jyNice(max);
+  const Y = v => yb - (Math.max(0, v)/max) * (yb - yt);
+  const fmt = v => metric==='hours' ? (v>=100 ? String(Math.round(v)) : jyNum(v)) : jyNum(v);
+  let out = `<svg class="jy-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${JY_METRICS.find(m=>m.k===metric).label} by sprint, ${jyWho(b)}" preserveAspectRatio="xMidYMid meet">`;
+  [0, 0.5, 1].forEach(f=>{
+    const y = Y(max*f);
+    out += `<line x1="${x0}" x2="${x1}" y1="${y}" y2="${y}" class="jy-grid${f===0?' base':''}"/><text x="${x0-5}" y="${y+3}" class="jy-ytxt" text-anchor="end">${fmt(max*f)}</text>`;
+  });
+  let prevMonth = -1;
+  b.series.forEach(it=>{
+    const cx = x0 + colW*it.i, mid = cx + colW/2, sel = it.i === b.sel;
+    if(sel) out += `<rect x="${cx+0.6}" y="${yt-10}" width="${colW-1.2}" height="${yb-yt+34}" rx="5" class="jy-selbg"/>`;
+    const bw = n===1 ? colW*0.6 : colW*0.36, gap = 1.2;
+    it.list.forEach((st, k)=>{
+      const m = jyMetricOf(st, metric), bx = n===1 ? mid - bw/2 : mid - bw - gap/2 + k*(bw + gap);
+      const col = cols[k] || cols[0], h = Math.max(0, yb - Y(m.v));
+      if(it.state==='future'){
+        if(m.g > 0) out += `<rect x="${bx}" y="${Y(m.g)}" width="${bw}" height="${yb-Y(m.g)}" rx="2.5" class="jy-ghost" style="stroke:${col}"/>`;
+      } else {
+        if(m.v > 0) out += `<rect x="${bx}" y="${yb-h}" width="${bw}" height="${h}" rx="2.5" fill="${col}" class="chart-animate summit-fill${_jyNoAnim?'':' play'}" style="animation-delay:${(it.i*0.035).toFixed(2)}s;opacity:${sel||b.sel<0?1:0.78}"/>`;
+        else out += `<rect x="${bx}" y="${yb-1.6}" width="${bw}" height="1.6" rx="0.8" fill="${col}" opacity=".35"/>`;
+        if(m.g > 0) out += `<line x1="${bx-1.5}" x2="${bx+bw+1.5}" y1="${Y(m.g)}" y2="${Y(m.g)}" class="jy-goal"/>`;
+        if(sel && m.v > 0 && (n===1 || true)) out += `<text x="${bx+bw/2}" y="${yb-h-3.5}" class="jy-vtxt" text-anchor="middle" fill="${col}">${fmt(m.v)}</text>`;
+      }
+    });
+    if(it.state==='current') out += `<circle cx="${mid}" cy="${yb+8}" r="2.2" class="jy-pulse"/>`;
+    out += `<text x="${mid}" y="${yb+14}" class="jy-xtxt${sel?' sel':''}" text-anchor="middle">${it.n}</text>`;
+    const mo = new Date(it.sp.start+'T00:00:00').getMonth();
+    if(mo !== prevMonth){ prevMonth = mo; out += `<text x="${cx+1}" y="${yb+27}" class="jy-mtxt">${new Date(it.sp.start+'T00:00:00').toLocaleDateString('en-IN', {month:'short'})}</text>`; }
+    out += `<rect x="${cx}" y="${yt-12}" width="${colW}" height="${yb-yt+42}" fill="transparent" onclick="jySelect(${it.i})" style="cursor:pointer"/>`;
+  });
+  return out + `</svg>`;
+}
+function jyMetricPills(){
+  const cur = jyMetric();
+  return `<div class="jy-pills" data-noswipe>${JY_METRICS.map(m=>`<button type="button" class="${m.k===cur?'on':''}" onclick="jySetMetric('${m.k}')">${m.label}</button>`).join('')}</div>`;
+}
+function jyLegend(b){
+  const cols = jyColors(b);
+  const items = b.mode==='compare' ? b.pids.map((p,k)=>[cols[k], profileById(p).nick]) : [[cols[0], jyWho(b)]];
+  return `<div class="jy-legend">${items.map(([c,l])=>`<span><i style="background:${c}"></i>${l}</span>`).join('')}<span><i class="goal"></i>Goal</span></div>`;
+}
+
+// ── sprint card: goals vs progress ────────────────────────────────────────────────────────────────────────────
+function jyRowsFor(b, it){
+  const list = it.list, rows = [];
+  const add = (key, label, get, fmt)=>{
+    const vals = list.map(get);
+    if(vals.every(x=>!x.v && !x.g)) return;
+    rows.push({key, label, vals, fmt});
+  };
+  add('hours', 'Study hours', s=>jyMetricOf(s,'hours'), jyH);
+  LECTURE_TRACKER_PAPERS.forEach(p=> add('lec_'+p, paperById(p).nick+' lectures', s=>({v:s.lec[p]||0, g:Number(s.goals.lec[p])||0}), jyNum));
+  add('chap', 'Chapters (lecture done)', s=>jyMetricOf(s,'chap'), jyNum);
+  add('rev', 'Revisions', s=>jyMetricOf(s,'rev'), jyNum);
+  add('mock', 'Mock tests', s=>jyMetricOf(s,'mock'), jyNum);
+  add('cons', 'Days on target', s=>jyMetricOf(s,'cons'), jyNum);
+  return rows;
+}
+function jyRowHtml(r, cols){
+  const compare = r.vals.length > 1;
+  const top = compare
+    ? r.vals.map((v,k)=>`<b style="color:${cols[k]}">${r.fmt(v.v)}${v.g>0?`<span>/${r.fmt(v.g)}</span>`:''}</b>`).join('<em>·</em>')
+    : `<b>${r.fmt(r.vals[0].v)}${r.vals[0].g>0?`<span>/${r.fmt(r.vals[0].g)}</span>`:''}</b>`;
+  const bars = r.vals.map((v,k)=>{
+    if(!(v.g > 0)) return '';
+    const pct = Math.max(0, Math.min(100, v.v/v.g*100));
+    return `<div class="jy-bar${compare?' thin':''}${pct>=100?' full':''}"><i style="width:${pct}%;background:${cols[k]||cols[0]}"></i></div>`;
+  }).join('');
+  return `<div class="jy-row"><div class="jy-row-top"><span>${r.label}</span><span class="jy-row-v">${top}</span></div>${bars}</div>`;
+}
+function jyGradeLine(it, b){
+  const o = it.one;
+  if(it.state==='future') return `<div class="jy-gline">Grade appears once the sprint starts · <b>hours 70 · goals 20 · consistency 10</b></div>`;
+  if(o.score==null) return '';
+  const label = it.state==='current' ? 'Tracking' : 'Final';
+  const parts = o.members ? '' : (o.parts ? ` · hours ${Math.round(o.parts.hp*100)}% · ${o.parts.gp==null?'no goals set':'goals '+Math.round(o.parts.gp*100)+'%'} · consistency ${Math.round(o.parts.cp*100)}%` : '');
+  return `<div class="jy-gline">${label} <b>${o.letter}</b> · ${o.score}/100${parts}</div>`;
+}
+function jySprintCardHtml(b, ctx){
+  const it = b.series[b.sel], cols = jyColors(b), ph = b.ph;
+  const rows = jyRowsFor(b, it);
+  const me = jyMe(), mineSolo = b.mode==='solo' && b.pids[0]===me;
+  const noGoals = !it.one.goalsSet && !(it.list.some(s=>s.hoursGoalSet));
+  const hint = (noGoals && it.state!=='past' && mineSolo)
+    ? `<button type="button" class="jy-link-btn" onclick="jyOpenGoals(${it.i})">Set goals for this sprint ›</button>`
+    : (noGoals && it.state!=='past' ? `<div class="jy-hint">Goals are typed by each person on their own phone — hours default to the daily target × ${it.sp.days} days.</div>` : '');
+  return `<div class="card jy-sprintcard" id="jy-sprintcard-${ctx}" data-noswipe data-jy-swipe="1">
+    <div class="jy-sc-head">
+      <button type="button" class="jy-nav" aria-label="Previous sprint" ${it.i===0?'disabled':''} onclick="jySelect(${it.i-1})">‹</button>
+      <div class="jy-sc-title"><div class="jy-sc-name">Sprint ${it.n} <span>· ${jyRange(it.sp)}</span></div>${jyStateChip(it, ph)}</div>
+      ${jyBadge(it.one.letter, 38)}
+      <button type="button" class="jy-nav" aria-label="Next sprint" ${it.i===JY_N-1?'disabled':''} onclick="jySelect(${it.i+1})">›</button>
+    </div>
+    ${b.mode==='compare' ? `<div class="jy-legend sm">${b.pids.map((p,k)=>`<span><i style="background:${cols[k]}"></i>${profileById(p).nick}</span>`).join('')}</div>` : ''}
+    ${it.state==='future' && !rows.some(r=>r.vals.some(v=>v.g>0 && r.key!=='hours' && r.key!=='cons')) ? '' : ''}
+    <div class="jy-rows">${rows.map(r=>jyRowHtml(r, cols)).join('')}</div>
+    ${jyGradeLine(it, b)}
+    ${hint}
+    ${ctx==='home' && jyMe() && jyReviewDue(jyMe())>=0 ? `<button type="button" class="jy-link-btn" onclick="jyOpenReview(${jyReviewDue(jyMe())})">📝 Sprint ${jyReviewDue(jyMe())+1} review ${jyStateOf(jyReviewDue(jyMe()), ph)==='past'?'is waiting':'is due'} ›</button>` : ''}
+    ${ctx==='home' ? `<button type="button" class="btn jy-open" onclick="jyOpenJourney(${it.i})">Open sprint in Journey ›</button>` : ''}
+  </div>`;
+}
+function jyOpenJourney(i){ S.local.jySel = i; saveLocal(); switchView('journey'); }
+
+// ── the shared graph card (Home + Journey) ────────────────────────────────────────────────────────────────────
+function jyGraphCardHtml(b, ctx){
+  return `<div class="card jy-card">
+    <div class="jy-card-top">${jySegHtml(b, ctx)}</div>
+    ${jyChipsHtml(b)}
+    ${jyMetricPills()}
+    <div class="jy-graph-wrap">${jyGraphSvg(b)}</div>
+    ${jyLegend(b)}
+  </div>
+  ${jySprintCardHtml(b, ctx)}`;
+}
+
+// ── HOME: the "Road to 1 May" block (replaces the plain Countdown) ─────────────────────────────────────────────
+function jyHeadline(ph){
+  const exam = jyExam(), left = Math.max(0, daysUntilExam());
+  const examTxt = new Date(exam+'T00:00:00').toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'});
+  if(ph.phase==='before') return {big:left, small:'Days to CA Final', sub:`Road starts in ${ph.toStart} day${ph.toStart===1?'':'s'} · 1 Dec`, pct:0, examTxt};
+  if(ph.phase==='exam') return {big:0, small:'Exam day', sub:'Today is the day. You are ready.', pct:100, examTxt};
+  if(ph.phase==='after') return {big:0, small:'Road complete', sub:'All 15 sprints are behind you.', pct:100, examTxt};
+  return {big:left, small:'Days to CA Final', sub:`Day ${ph.day} of ${ph.total} · Sprint ${ph.idx+1}`, pct:Math.round(ph.day/ph.total*100), examTxt};
+}
+function jyHomeHtml(vp, isMe, prof, isOverridden){
+  const ph = jyPhase(), hd = jyHeadline(ph);
+  return `
+  <div class="section-title"><span>War Countdown</span><button type="button" class="jy-more" onclick="switchView('journey')">Journey ›</button></div>
+  <div class="top-row">
+    <div class="card countdown-card jy-count" onclick="switchView('journey')" role="button" tabindex="0" style="cursor:pointer">
+      <div class="countdown-n hero-num" data-countup="${hd.big}">0</div>
+      <div class="countdown-l">${hd.small}</div>
+      <div class="jy-count-sub">${hd.sub}</div>
+      <div class="jy-count-bar" aria-hidden="true">${Array.from({length:JY_N}, (_,k)=>`<i class="${ph.idx>k?'done':ph.idx===k?'cur':''}"></i>`).join('')}</div>
+    </div>
+    <div class="card target-card" ${isMe?`onclick="promptEditTodaysTarget('${vp}')" style="cursor:pointer"`:''}>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;display:flex;align-items:center;gap:5px">
+        ${prof.nick}'s target today${isOverridden?' <span style="color:var(--amber);font-weight:700">(raised)</span>':''}
+        ${isMe?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;opacity:.6;flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>`:''}
+      </div>
+      ${liveRegion('homeTarget', vp)}
+      ${isMe && isOverridden ? `<div style="margin-top:6px;text-align:right"><span onclick="event.stopPropagation();clearTodaysTargetOverride('${vp}')" style="font-size:10px;color:var(--text-faint);text-decoration:underline;cursor:pointer">Reset to ${S.shared.targets[vp]||4}h minimum</span></div>` : ''}
+    </div>
+  </div>
+  `;
+}
+// The road's graph (sprint chips, 15-column graph, sprint card) is its own Home card since v173.
+function jyRoadHomeInner(){
+  return `<div class="section-title"><span>Journey</span><button type="button" class="jy-more" onclick="switchView('journey')">Open ›</button></div>
+  ${jyGraphCardHtml(jyBuild(), 'home')}`;
+}
+function jyRoadHomeHtml(){ return `<div id="jy-home-road" style="display:contents">${jyRoadHomeInner()}</div>`; }
+
+// ── JOURNEY TAB: the detailed workspace ──────────────────────────────────────────────────────────────────────────
+function jyHeroHtml(b){
+  const ph = b.ph, hd = jyHeadline(ph), R = 34, C = 2*Math.PI*R;
+  const it = b.series[b.sel], cur = ph.idx>=0 && ph.idx<JY_N ? b.series[ph.idx] : null;
+  const o = (cur||it).one;
+  const stat = (v, l) => `<div class="jy-hs"><b>${v}</b><span>${l}</span></div>`;
+  const me = jyMe();
+  const sg = me ? (typeof liveStreak==='function' ? liveStreak(me) : streak(me)) : 0;
+  return `<div class="card jy-hero">
+    <svg class="jy-ring" viewBox="0 0 80 80" aria-hidden="true">
+      <circle cx="40" cy="40" r="${R}" class="trk"/>
+      <circle cx="40" cy="40" r="${R}" class="fg chart-animate ring-fg${_jyNoAnim?'':' play'}" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-hd.pct/100)).toFixed(1)}" transform="rotate(-90 40 40)"/>
+      <text x="40" y="38" text-anchor="middle" class="rn">${hd.big}</text><text x="40" y="50" text-anchor="middle" class="rl">${ph.phase==='live'||ph.phase==='before' ? 'days to go' : ''}</text>
+    </svg>
+    <div class="jy-hero-body">
+      <div class="jy-hero-t">${ph.phase==='live' ? `Day ${ph.day} of ${ph.total}` : hd.small}</div>
+      <div class="jy-hero-s">${hd.sub}${ph.phase==='live'?'':''}</div>
+      <div class="jy-hs-row">
+        ${stat(jyH(o.hours), cur ? 'this sprint' : 'selected')}
+        ${stat(sg+'🔥', 'day streak')}
+        ${stat(o.letter||'–', cur ? 'tracking grade' : 'grade')}
+      </div>
+    </div>
+  </div>`;
+}
+function jyScorecardsHtml(b){
+  const cols = jyColors(b);
+  return `<div class="jy-cards">` + b.series.map(it=>{
+    const sel = it.i === b.sel;
+    const bars = it.list.map((s,k)=>{
+      const m = jyMetricOf(s,'hours'); const pct = it.state==='future' ? 0 : Math.min(100, m.v/Math.max(m.g,0.01)*100);
+      return `<div class="jy-bar thin${pct>=100?' full':''}"><i style="width:${pct}%;background:${cols[k]||cols[0]}"></i></div>`;
+    }).join('');
+    const o = it.one;
+    const bits = it.state==='future' ? `<span class="soon">${jyRange(it.sp)}</span>` : [
+      `${jyH(o.hours)}/${jyH(o.hoursGoal)}`,
+      o.lecTotal ? `${o.lecTotal} lec` : '', o.chap ? `${o.chap} ch` : '', o.rev ? `${o.rev} rev` : '', o.mock ? `${o.mock} mock` : '',
+    ].filter(Boolean).join(' · ');
+    return `<button type="button" class="jy-sc st-${it.state}${sel?' sel':''}" onclick="jySelect(${it.i}, 'jy-sprintcard-page')">
+      <div class="jy-sc-n"><b>S${it.n}</b><span>${jyFmtDay(it.sp.start)}</span></div>
+      <div class="jy-sc-mid"><div class="jy-sc-line">${bits}</div>${bars}</div>
+      ${jyBadge(o.letter, 30)}
+    </button>`;
+  }).join('') + `</div>`;
+}
+function jySections(b){
+  return {
+    hero:  ()=> jyHeroHtml(b),
+    banner:()=> jyReviewBannerHtml(),
+    graph: ()=> jyGraphCardHtml(b, 'page'),
+    plan:  ()=> jyGoalsCardHtml(b),
+    catch: ()=> jyCatchupHtml(),
+    dl:    ()=> jyAccHtml('dl', 'Lectures · Revision 1 · Revision 2', jyDeadlinesHtml()),
+    pb:    ()=> jyPartnerHtml(b),
+    shelf: ()=> jyShelfHtml(),
+    cards: ()=> jyScorecardsHtml(b),
+  };
+}
+function viewJourney(){
+  if(!jyMe()) return `<div class="card">Sign in to see the road.</div>`;
+  _jyDeferred.clear();
+  const b = jyBuild(), sec = jySections(b);
+  const w = k => `<div id="jy-s-${k}" style="display:contents">${sec[k]()}</div>`;
+  return `
+  <div class="jy-page" id="jy-page">
+    ${w('hero')}${w('banner')}
+    <div class="section-title"><span>Sprint graph</span></div>
+    ${w('graph')}
+    <div class="section-title"><span>Your plan</span></div>
+    ${w('plan')}${w('catch')}
+    <div class="section-title"><span>Paper deadlines</span></div>
+    ${w('dl')}
+    <div class="section-title"><span>Together</span></div>
+    ${w('pb')}
+    <div class="section-title"><span>Milestones</span></div>
+    ${w('shelf')}
+    <div class="section-title"><span>All 15 sprints</span></div>
+    ${w('cards')}
+  </div>`;
+}
+// In-place refresh: re-draws only the Journey sections (or the Home graph) instead of the whole app, keeping scroll, and never replacing the
+// section the person is typing in (it is refreshed once focus leaves it). anim=false keeps bars from re-growing on every tap.
+let _jyNoAnim = false; const _jyDeferred = new Set();
+let _jyInChange = false, _jyPend = null;
+document.addEventListener('change', ()=>{ _jyInChange = true; }, true);   // capture: before the inline onchange handler ...
+document.addEventListener('change', ()=>{ _jyInChange = false; }, false); // ... bubble: after it
+function jyRefresh(anim){
+  // A field commits its value as focus is leaving it (Tab / Next): redraw one tick later, once the browser has settled on the next field.
+  if(_jyInChange){ _jyPend = _jyPend || anim; clearTimeout(jyRefresh._t); jyRefresh._t = setTimeout(()=>{ const a = _jyPend; _jyPend = null; jyRefreshNow(a); }, 60); return; }
+  jyRefreshNow(anim);
+}
+function jyRefreshNow(anim){
+  const y = window.scrollY; _jyNoAnim = !anim;
+  try{
+    if(S.view==='journey' && document.getElementById('jy-page') && jyMe()){
+      const b = jyBuild(), sec = jySections(b), ae = document.activeElement;
+      Object.keys(sec).forEach(k=>{
+        const el = document.getElementById('jy-s-'+k); if(!el) return;
+        if(ae && ae !== document.body && el.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)){ _jyDeferred.add(k); return; }
+        el.innerHTML = sec[k]();
+      });
+    } else if(S.view==='home' && document.getElementById('jy-home-road')){
+      document.getElementById('jy-home-road').innerHTML = jyRoadHomeInner();
+    } else { _jyNoAnim = false; renderApp(); return; }
+  } catch(e){ console.warn('jyRefresh fell back', e); _jyNoAnim = false; renderApp(); return; }
+  finally { _jyNoAnim = false; }
+  try{ window.scrollTo(0, y); }catch(e){}
+  jyCenterChips();
+}
+document.addEventListener('keydown', e=>{ // sprint chips: ← / → move between sprints (tablist keyboard pattern)
+  if(e.key!=='ArrowLeft' && e.key!=='ArrowRight') return;
+  const c = e.target && e.target.closest && e.target.closest('.jy-sp'); if(!c) return;
+  e.preventDefault(); jySelect(jySelIdx() + (e.key==='ArrowRight' ? 1 : -1));
+  const on = document.querySelector('.jy-chips .jy-sp.sel'); if(on) try{ on.focus({preventScroll:true}); }catch(_){}
+});
+document.addEventListener('focusout', ()=>{
+  if(!_jyDeferred.size) return;
+  setTimeout(()=>{
+    const ae = document.activeElement;
+    if(ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) && ae.closest && ae.closest('#jy-page')){ // moved to another field: only refresh sections not containing it
+      const keep = new Set(); _jyDeferred.forEach(k=>{ const el = document.getElementById('jy-s-'+k); if(el && el.contains(ae)) keep.add(k); });
+      if(keep.size === _jyDeferred.size) return;
+    }
+    if(S.view==='journey' && document.getElementById('jy-page')){
+      const b = jyBuild(), sec = jySections(b), ae2 = document.activeElement, y = window.scrollY; _jyNoAnim = true;
+      try{ [..._jyDeferred].forEach(k=>{ const el = document.getElementById('jy-s-'+k); if(!el) { _jyDeferred.delete(k); return; } if(ae2 && el.contains(ae2) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae2.tagName)) return; el.innerHTML = sec[k](); _jyDeferred.delete(k); }); } finally { _jyNoAnim = false; }
+      try{ window.scrollTo(0, y); }catch(e){}
+    } else _jyDeferred.clear();
+  }, 80);
+}, true);
+function jyOpenGoals(i){ S.local.jySel = i; saveLocal(); switchView('journey'); }
+
+// ── gestures: swipe the sprint card sideways for the neighbouring sprint ─────────────────────────────────────
+(function jySwipeInit(){
+  if(window._jySwipeBound) return; window._jySwipeBound = true;
+  let g = null;
+  document.addEventListener('touchstart', e=>{
+    const card = e.target.closest && e.target.closest('[data-jy-swipe]');
+    if(!card || e.touches.length!==1 || e.target.closest('input,textarea,select,button')){ g = null; return; }
+    const t = e.touches[0]; g = {x:t.clientX, y:t.clientY, t:e.timeStamp, card, lock:null};
+  }, {passive:true});
+  document.addEventListener('touchmove', e=>{
+    if(!g) return; const t = e.touches[0], dx = t.clientX - g.x, dy = t.clientY - g.y;
+    if(g.lock===null && (Math.abs(dx)>10 || Math.abs(dy)>10)) g.lock = Math.abs(dx) > Math.abs(dy)*1.2 ? 'h' : 'v';
+    if(g.lock==='h' && !prefersReducedMotion()){ g.card.style.transform = `translateX(${Math.max(-60, Math.min(60, dx*0.35))}px)`; g.card.style.opacity = String(1 - Math.min(0.3, Math.abs(dx)/500)); }
+  }, {passive:true});
+  const end = e=>{
+    if(!g) return; const c = g.card, lock = g.lock, t = (e.changedTouches && e.changedTouches[0]) || null;
+    const dx = t ? t.clientX - g.x : 0, v = Math.abs(dx)/Math.max(1, e.timeStamp - g.t); g = null;
+    c.style.transition = 'transform .18s ease, opacity .18s ease'; c.style.transform = ''; c.style.opacity = '';
+    setTimeout(()=>{ c.style.transition = ''; }, 200);
+    if(lock!=='h') return;
+    if(Math.abs(dx) > 55 || (Math.abs(dx) > 28 && v > 0.4)){
+      const cur = jySelIdx(); const nx = dx < 0 ? cur+1 : cur-1;
+      if(nx>=0 && nx<JY_N) jySelect(nx);
+    }
+  };
+  document.addEventListener('touchend', end, {passive:true});
+  document.addEventListener('touchcancel', ()=>{ if(g){ g.card.style.transform=''; g.card.style.opacity=''; g = null; } }, {passive:true});
+})();
+
+// ── SETTINGS now lives behind a button at the bottom of Home ────────────────────────────────────────────────────
+let _setHistToken = 0, _setSilentPops = 0;
+function openSettingsPage(){
+  if(!S.local.myProfile) return;
+  if(!_setHistToken){ _setHistToken = Date.now(); try{ history.pushState({olympusSet:_setHistToken}, '', location.href); }catch(e){ _setHistToken = 0; } }
+  S._settingsFrom = (S.view==='settings') ? (S._settingsFrom||'home') : S.view;
+  S.view = 'settings'; S._justNavigated = true; renderNav(); renderApp();
+  try{ window.scrollTo(0,0); }catch(e){}
+}
+function closeSettingsPage(){
+  if(S.view!=='settings') return;
+  const back = (S._settingsFrom && S._settingsFrom!=='settings') ? S._settingsFrom : 'home';
+  switchView(back);
+}
+// Called from switchView when the page is left by any other route (bottom nav): hands the history entry back.
+function setHistLeave(newView){
+  if(!_setHistToken || newView==='settings') return;
+  _setHistToken = 0;
+  if(newView==='chat') return; // chat pushes its own entry right now; one stale entry is the lesser evil
+  _setSilentPops++; try{ history.back(); }catch(e){ _setSilentPops--; }
+}
+window.addEventListener('popstate', e=>{
+  if(_setSilentPops>0){ _setSilentPops--; return; }
+  if(_setHistToken && S.view==='settings' && !(e.state && e.state.olympusSet===_setHistToken)){
+    _setHistToken = 0; closeSettingsPage();
+  }
+});
+function settingsButtonHtml(){
+  return `<button type="button" class="jy-settings-btn" onclick="openSettingsPage()">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    <span>Settings</span><em>Profile · display · notifications · sync</em><i>›</i>
+  </button>`;
+}
+function settingsBackBarHtml(){
+  return `<div class="jy-back-bar"><button type="button" class="jy-back" onclick="closeSettingsPage()" aria-label="Back">‹ Back</button><div>Settings</div></div>`;
+}
+
+// after every render: date new chapter ticks, centre the selected sprint chip
+let _jyMsAt = 0;
+function jyPostRender(){
+  try{ jySyncStamps(); }catch(e){ console.warn('jySyncStamps failed', e); }
+  if(Date.now() - _jyMsAt > 15000 && jyMe()){ _jyMsAt = Date.now(); try{ jyCheckMilestones(); }catch(e){ console.warn('jyCheckMilestones failed', e); } }
+  jyCenterChips();
+}
+function jyAccHtml(key, sub, inner){
+  const open = !!(S.local.jyAcc && S.local.jyAcc[key]);
+  return `<div class="card jy-acc ${open?'open':''}"><button type="button" class="jy-acc-h" aria-expanded="${open}" onclick="jyToggleAcc('${key}')"><span>${sub}</span><i>${open?'⌄':'›'}</i></button>${open?`<div class="jy-acc-b">${inner}</div>`:''}</div>`;
+}
+function jyToggleAcc(k){ S.local.jyAcc = Object.assign({}, S.local.jyAcc||{}); S.local.jyAcc[k] = !S.local.jyAcc[k]; saveLocal(); jyRefresh(false); }
+
+
+// ═══ v172b — YOUR PLAN: goals, deadlines, even split, review, catch-up, rest day ══════════════════════════════════════
+// Everything typed here goes into the signed-in person's OWN slice (S.shared.journey[me]) -- lectures differ between the two of you, so each
+// person fills their own paper deadlines and sprint goals. "Even split" only suggests numbers: a field you typed yourself (goal.t[...]) is never
+// touched by it, and everything it fills stays editable.
+function jySprintIdxOf(ds){ const d = daysBetweenDates(JY_START, ds); return d < 0 ? 0 : Math.min(JY_N-1, Math.floor(d/JY_LEN)); }
+function jyKeepScroll(fn){ const y = window.scrollY; fn(); try{ window.scrollTo(0, y); }catch(e){} }
+function jyEnsureGoal(i){
+  const j = jyStore(jyMe(), true), k = String(i+1);
+  if(!j.goals[k] || typeof j.goals[k] !== 'object') j.goals[k] = {};
+  const g = j.goals[k]; if(!g.lec) g.lec = {}; if(!g.t) g.t = {};
+  return g;
+}
+function jySetGoal(i, key, paper, val){
+  if(!jyMe()) return;
+  const raw = String(val).trim(), v = raw==='' ? 0 : Math.max(0, Math.round((Number(raw)||0)*10)/10);
+  if(v===0 && !jyGoalOf(jyMe(), i)) return; // nothing typed, nothing stored
+  const g = jyEnsureGoal(i);
+  const tk = paper ? key+'.'+paper : key;
+  if(key==='lec'){ if(v>0) g.lec[paper] = v; else delete g.lec[paper]; } else g[key] = v>0 ? v : 0;
+  if(v>0) g.t[tk] = 1; else delete g.t[tk]; // cleared = even split may fill it again
+  saveShared(); jyRefresh(false);
+}
+function jySetDeadline(paper, key, val){
+  if(!jyMe()) return;
+  const j = jyStore(jyMe(), true);
+  if(!j.deadlines[paper]) j.deadlines[paper] = {};
+  if(val) j.deadlines[paper][key] = val; else delete j.deadlines[paper][key];
+  saveShared(); jyRefresh(false);
+}
+function jySetRest(i, val){
+  const j = jyStore(jyMe(), true), k = String(i+1);
+  if(val) j.rest[k] = val; else delete j.rest[k];
+  saveShared(); jyHaptic(8); jyRefresh(false);
+}
+function jyShare(pending, a, b, i){
+  if(pending <= 0 || i < a || i > b) return 0;
+  const nS = b - a + 1, base = Math.floor(pending/nS), extra = pending % nS;
+  return base + ((i - a) < extra ? 1 : 0);
+}
+// What an even spread of everything still to do, up to each paper's own deadline, would ask of sprint i.
+function jyEvenSplit(pid, i){
+  const ph = jyPhase(), start = Math.max(0, ph.idx);
+  if(ph.idx > i) return null;
+  const j = jyStore(pid), dl = (j && j.deadlines) || {}, target = Number(S.shared.targets && S.shared.targets[pid]) || 4;
+  const cur = (ph.idx === i) ? jyStats(pid, i) : null;
+  const out = {hours: Math.round(target*jySprint(i).days*10)/10, lec:{}, chap:0, rev:0, missing:[]};
+  const endOf = ds => Math.max(start, jySprintIdxOf(ds));
+  LECTURE_TRACKER_PAPERS.forEach(p=>{
+    if(!jyUsesLectures(pid, p)) return;
+    const pending = lecturesFor(pid, p).filter(l=>l.status!=='done').length, d = dl[p] && dl[p].lec;
+    if(pending > 0 && !d){ out.missing.push(paperById(p).nick+' lectures'); return; }
+    const v = (d ? jyShare(pending, start, endOf(d), i) : 0) + (cur ? (cur.lec[p]||0) : 0);
+    if(v > 0) out.lec[p] = v;
+  });
+  PAPERS.forEach(pp=>{
+    const chs = chaptersFor(pid, pp.id) || [], d = dl[pp.id] || {};
+    if(!jyUsesLectures(pid, pp.id) && chs.length){
+      const pending = chs.filter(c=>!c.lecDone).length;
+      if(pending > 0 && !d.lec) out.missing.push(pp.nick+' lectures'); else out.chap += jyShare(pending, start, endOf(d.lec||JY_START), i);
+    }
+    [['rev1','r1','Revision 1'], ['rev2','r2','Revision 2']].forEach(([flag, dk, lbl])=>{
+      const pending = chs.filter(c=>!c[flag]).length;
+      if(pending > 0 && !d[dk]) out.missing.push(pp.nick+' '+lbl); else if(pending > 0) out.rev += jyShare(pending, start, endOf(d[dk]), i);
+    });
+  });
+  if(cur){ out.chap += cur.chap; out.rev += cur.rev; }
+  return out;
+}
+function jyApplySplit(i, quiet){
+  const me = jyMe(), v = jyEvenSplit(me, i); if(!v) return 0;
+  const g = jyEnsureGoal(i); let n = 0;
+  const put = (key, paper, val)=>{
+    const tk = paper ? key+'.'+paper : key; if(g.t[tk]) return;
+    if(key==='lec'){ if(val>0){ g.lec[paper] = val; n++; } else delete g.lec[paper]; }
+    else { g[key] = val > 0 ? val : 0; if(val>0) n++; }
+  };
+  put('hours', null, v.hours);
+  LECTURE_TRACKER_PAPERS.forEach(p=>{ if(jyUsesLectures(me,p)) put('lec', p, v.lec[p]||0); });
+  put('chap', null, v.chap); put('rev', null, v.rev);
+  saveShared();
+  if(!quiet){
+    jyHaptic(10);
+    showToast(n ? `Even split filled ${n} field${n===1?'':'s'}${v.missing.length ? ' — add deadlines for '+[...new Set(v.missing)].slice(0,3).join(', ')+' for the rest' : ''}.` : (v.missing.length ? 'Add paper deadlines first, then Even split can spread the work.' : 'Nothing to split — all fields are already typed by you.'));
+    jyRefresh(false);
+  }
+  return n;
+}
+function jyApplySplitAll(){
+  const ph = jyPhase(); let n = 0;
+  for(let i = Math.max(0, ph.idx); i < JY_N; i++) n += jyApplySplit(i, true);
+  jyHaptic(14); showToast(n ? `Filled ${n} goal fields across the coming sprints. Everything is editable.` : 'Add paper deadlines first, then Even split can spread the work.');
+  jyRefresh(false);
+}
+function jyClearGoals(i){
+  const j = jyStore(jyMe(), true); delete j.goals[String(i+1)];
+  saveShared(); jyRefresh(false);
+}
+function jyCopyPrev(i){
+  const j = jyStore(jyMe(), true), src = j.goals[String(i)]; // sprint i (1-based) is the one before index i
+  if(!src){ showToast('The sprint before has no goals to copy.'); return; }
+  j.goals[String(i+1)] = JSON.parse(JSON.stringify(Object.assign({}, src, {t: Object.assign({}, src.t||{})})));
+  saveShared(); jyHaptic(8); jyRefresh(false);
+}
+
+// ── editor UI ───────────────────────────────────────────────────────────────────────────────────────────────────
+function jyField(i, label, key, paper, val, ph, sub){
+  return `<label class="jy-fld"><span>${label}${sub?`<em>${sub}</em>`:''}</span>
+    <input type="number" inputmode="decimal" min="0" step="${key==='hours'?'0.5':'1'}" value="${val>0?val:''}" placeholder="${ph==null?'–':ph}" onchange="jySetGoal(${i},'${key}',${paper?`'${paper}'`:'null'},this.value)"></label>`;
+}
+function jyGoalsCardHtml(b){
+  const me = jyMe(), i = b.sel, sp = jySprint(i), state = jyStateOf(i, b.ph), g = jyGoalOf(me, i) || {};
+  const prof = profileById(me), target = Number(S.shared.targets[me]) || 4;
+  if(state==='past'){
+    const rv = ((jyStore(me)||{}).reviews||{})[String(i+1)];
+    return `<div class="card jy-plan"><div class="jy-plan-h"><b>Sprint ${i+1} is over</b></div>
+      ${rv ? jyReviewReadHtml(rv) : `<div class="jy-hint">No review written for this sprint yet — a two-minute look back sets up the next one.</div>`}
+      <button type="button" class="btn btn-accent jy-open" onclick="jyOpenReview(${i})">${rv?'Edit':'Write'} sprint review</button></div>`;
+  }
+  const lecPapers = LECTURE_TRACKER_PAPERS.filter(p=>jyUsesLectures(me, p));
+  const chapPapers = PAPERS.filter(pp=>!jyUsesLectures(me, pp.id) && (chaptersFor(me, pp.id)||[]).length);
+  const rest = (jyStore(me)||{}).rest && (jyStore(me).rest[String(i+1)] || '');
+  const days = Array.from({length:sp.days}, (_,k)=>jyAdd(sp.start, k));
+  return `<div class="card jy-plan">
+    <div class="jy-plan-h"><b>${prof.nick}'s goals · Sprint ${i+1}</b><span>${jyRange(sp)}</span></div>
+    <div class="jy-fgrid">
+      ${jyField(i, 'Study hours', 'hours', null, g.hours, target*sp.days, 'default '+jyH(target*sp.days))}
+      ${lecPapers.map(p=>jyField(i, paperById(p).nick+' lectures', 'lec', p, g.lec && g.lec[p], null, `${lecturesFor(me,p).filter(l=>l.status!=='done').length} left`)).join('')}
+      ${chapPapers.length ? jyField(i, 'Chapters', 'chap', null, g.chap, null, chapPapers.map(pp=>pp.nick).join('/')) : ''}
+      ${jyField(i, 'Revisions', 'rev', null, g.rev, null, 'R1 + R2 ticks')}
+      ${jyField(i, 'Mock tests', 'mock', null, g.mock, null)}
+    </div>
+    <div class="jy-btnrow">
+      <button type="button" class="btn" onclick="jyApplySplit(${i})">✨ Even split</button>
+      <button type="button" class="btn" onclick="jyApplySplitAll()">Fill coming sprints</button>
+      ${i>0 ? `<button type="button" class="btn" onclick="jyCopyPrev(${i})">Copy previous</button>` : ''}
+      ${(g.hours||g.chap||g.rev||g.mock||Object.keys(g.lec||{}).length) ? `<button type="button" class="btn jy-ghostbtn" onclick="jyClearGoals(${i})">Clear</button>` : ''}
+    </div>
+    <label class="jy-rest"><span>🛌 Rest day <em>(a day off that never counts against consistency)</em></span>
+      <select onchange="jySetRest(${i}, this.value)"><option value="">None</option>${days.map(d=>`<option value="${d}"${rest===d?' selected':''}>${new Date(d+'T00:00:00').toLocaleDateString('en-IN',{weekday:'short', day:'numeric', month:'short'})}</option>`).join('')}</select></label>
+  </div>`;
+}
+function jyDeadlinesHtml(){
+  const me = jyMe(), j = jyStore(me) || {}, dl = j.deadlines || {}, ex = jyExam();
+  const dayLeft = ds => ds ? daysBetweenDates(todayStr(), ds) : null;
+  return `<div class="jy-dls">` + PAPERS.map(pp=>{
+    const d = dl[pp.id] || {}, viaLec = jyUsesLectures(me, pp.id), chs = chaptersFor(me, pp.id) || [];
+    const left = viaLec ? lecturesFor(me, pp.id).filter(l=>l.status!=='done').length : chs.filter(c=>!c.lecDone).length;
+    const n = dayLeft(d.lec), pace = (left > 0 && n != null && n > 0) ? ` · ${jyNum(left/n)}/day needed` : '';
+    const dt = (key, label) => `<label class="jy-dl"><span>${label}</span><input type="date" min="${todayStr() < JY_START ? todayStr() : JY_START}" max="${ex}" value="${d[key]||''}" onchange="jySetDeadline('${pp.id}','${key}',this.value)"></label>`;
+    return `<div class="jy-dlp"><div class="jy-dlp-h"><b>${pp.nick}</b><span>${left} ${viaLec?'lectures':'chapters'} to go${pace}</span></div>
+      <div class="jy-dl3">${dt('lec', 'Lectures by')}${dt('r1', 'Revision 1 by')}${dt('r2', 'Revision 2 by')}</div></div>`;
+  }).join('') + `</div>`;
+}
+
+// ── sprint review ───────────────────────────────────────────────────────────────────────────────────────────────
+function jyReviewDue(pid){
+  const ph = jyPhase(); if(ph.phase !== 'live') return -1;
+  const rv = ((jyStore(pid)||{}).reviews)||{};
+  const dayIn = ph.day - ph.idx*JY_LEN;
+  if(dayIn >= 9 && !rv[String(ph.idx+1)]) return ph.idx;
+  if(ph.idx >= 1 && dayIn <= 3 && !rv[String(ph.idx)]) return ph.idx-1;
+  return -1;
+}
+function jyReviewReadHtml(rv){
+  const row = (l, t) => t ? `<div class="jy-rv-r"><b>${l}</b><p>${escChat(t)}</p></div>` : '';
+  return `<div class="jy-rv">${row('What worked', rv.worked)}${row("What didn't", rv.didnt)}${row('Change for next sprint', rv.change)}</div>`;
+}
+function jyOpenReview(i){
+  const me = jyMe(); if(!me) return;
+  jyCloseSheet();
+  const st = jyStats(me, i), rv = ((jyStore(me)||{}).reviews||{})[String(i+1)] || {};
+  const rows = jyRowsFor({}, {list:[st]});
+  const cols = ['var(--'+profileById(me).color+')'];
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay jy-sheet-ov'; ov.id = 'jy-sheet'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+  ov.innerHTML = `<div class="jy-sheet">
+    <div class="jy-sheet-grab" aria-hidden="true"></div>
+    <div class="jy-sheet-h"><div><div class="jy-sheet-t">Sprint ${i+1} review</div><div class="jy-sheet-s">${jyRange(st.sp)} · ${st.state==='current'?'so far':'final'}</div></div>${jyBadge(st.letter, 40)}</div>
+    <div class="jy-rows jy-sheet-rows">${rows.map(r=>jyRowHtml(r, cols)).join('')}</div>
+    ${jyGradeLine({state:st.state, one:st}, null)}
+    <label class="jy-ta"><span>✅ What worked</span><textarea id="jy-rv-worked" rows="2" maxlength="400" placeholder="A habit, a time slot, a paper that clicked…">${escChat(rv.worked||'')}</textarea></label>
+    <label class="jy-ta"><span>⚠️ What didn't</span><textarea id="jy-rv-didnt" rows="2" maxlength="400" placeholder="What slipped, and why?">${escChat(rv.didnt||'')}</textarea></label>
+    <label class="jy-ta"><span>🔧 One change for next sprint</span><textarea id="jy-rv-change" rows="2" maxlength="400" placeholder="One concrete thing.">${escChat(rv.change||'')}</textarea></label>
+    ${i < JY_N-1 ? `<div class="jy-btnrow"><button type="button" class="btn" onclick="jyReviewNext(${i},'split')">✨ Even split Sprint ${i+2}</button><button type="button" class="btn" onclick="jyReviewNext(${i},'copy')">Copy these goals to Sprint ${i+2}</button></div>` : ''}
+    <div class="jy-btnrow end"><button type="button" class="btn" onclick="jyCloseSheet()">Close</button><button type="button" class="btn btn-accent" onclick="jySaveReview(${i})">Save review</button></div>
+  </div>`;
+  ov.addEventListener('click', e=>{ if(e.target===ov) jyCloseSheet(); });
+  document.body.appendChild(ov); document.body.classList.add('jy-sheet-open');
+}
+function jyCloseSheet(){ const el = document.getElementById('jy-sheet'); if(el) el.remove(); document.body.classList.remove('jy-sheet-open'); }
+function jyReviewNext(i, how){
+  if(how==='split') jyApplySplit(i+1, true);
+  else { const j = jyStore(jyMe(), true), src = j.goals[String(i+1)]; if(src) j.goals[String(i+2)] = JSON.parse(JSON.stringify(Object.assign({}, src, {t: Object.assign({}, src.t||{})}))); }
+  saveShared(); jyHaptic(10); showToast(`Sprint ${i+2} goals ready — fine-tune them in your plan.`);
+}
+function jySaveReview(i){
+  const j = jyStore(jyMe(), true), v = id => (document.getElementById(id)||{}).value || '';
+  j.reviews[String(i+1)] = {worked:v('jy-rv-worked').trim(), didnt:v('jy-rv-didnt').trim(), change:v('jy-rv-change').trim(), at:Date.now()};
+  saveShared(); jyCloseSheet(); jyHaptic(12); showToast(`Sprint ${i+1} review saved.`); jyRefresh(false);
+}
+function jyReviewBannerHtml(){
+  const me = jyMe(), i = jyReviewDue(me); if(i < 0) return '';
+  const past = jyStateOf(i, jyPhase()) === 'past';
+  return `<button type="button" class="jy-banner" onclick="jyOpenReview(${i})"><span class="e">📝</span><span class="t"><b>Sprint ${i+1} review ${past?'is waiting':'is due'}</b><em>${past?'A two-minute look back, then set up the next sprint.':'It ends soon — look back while it is fresh.'}</em></span><i>›</i></button>`;
+}
+
+// ── catch-up + burnout ─────────────────────────────────────────────────────────────────────────────────────────
+function jyCatchup(pid){
+  const ph = jyPhase(); if(ph.phase !== 'live') return null;
+  const s = jyStats(pid, ph.idx), left = Math.max(1, s.consDays - s.elapsed + 1), frac = s.elapsed / s.consDays, lines = [];
+  const chk = (label, val, goal, unit, fmt) => {
+    if(!(goal > 0)) return;
+    const behind = goal*frac - val, need = goal - val;
+    if(need > 0 && behind > Math.max(0.5, goal*0.04)) lines.push(`<b>${label}</b> ${fmt(behind)} behind pace — ${fmt(need)} to go, about <b>${fmt(need/left)}${unit}</b> a day for the next ${left} day${left===1?'':'s'}.`);
+  };
+  chk('Hours', s.hours, s.hoursGoal, '', jyH);
+  Object.keys(s.goals.lec).forEach(p=> chk(paperById(p).nick+' lectures', s.lec[p]||0, s.goals.lec[p], '', jyNum));
+  chk('Chapters', s.chap, s.goals.chap, '', jyNum); chk('Revisions', s.rev, s.goals.rev, '', jyNum); chk('Mocks', s.mock, s.goals.mock, '', jyNum);
+  return {lines, left, onPace: lines.length === 0};
+}
+function jyBurnout(pid){
+  const ix = jyIndex(pid), target = Number(S.shared.targets[pid]) || 4, today = todayStr();
+  let run = 0, sum = 0, resting = false;
+  const j = jyStore(pid), rests = new Set(Object.values((j && j.rest) || {}));
+  for(let k = 0; k < 14; k++){
+    const d = jyAdd(today, -k), h = ix.hrs[d] || 0;
+    if(k===0 && h===0) continue; // today may not have started yet
+    if(h > 0 && !rests.has(d)){ run++; if(k < 8) sum += h; } else break;
+  }
+  const hasRest = [...rests].some(d=> d >= jyAdd(today,-8) && d <= today);
+  return (run >= 8 && sum/Math.min(8,run) >= target*1.15 && !hasRest) ? {run, avg: sum/Math.min(8,run)} : null;
+}
+function jyCatchupHtml(){
+  const me = jyMe(), c = jyCatchup(me); if(!c) return '';
+  const bo = jyBurnout(me);
+  const ph = jyPhase(), restSet = ((jyStore(me)||{}).rest||{})[String(ph.idx+1)];
+  return `<div class="card jy-catch ${c.onPace?'ok':''}">
+    <div class="jy-plan-h"><b>${c.onPace ? '✅ On pace' : '🧭 Catch-up plan'}</b><span>Sprint ${ph.idx+1} · ${c.left} day${c.left===1?'':'s'} left</span></div>
+    ${c.onPace ? `<div class="jy-hint" style="margin:0">Everything you set for this sprint is on track. Keep the rhythm.</div>` : `<ul>${c.lines.map(l=>`<li>${l}</li>`).join('')}</ul>`}
+    ${bo ? `<div class="jy-burn">🔥 <b>${bo.run} days straight</b> at ${jyH(bo.avg)} a day and no rest day yet. ${restSet?'':'Pick a rest day for this sprint in your plan — '}rested days make the next ones better.</div>` : ''}
+  </div>`;
+}
+
+// ═══ v172c — MILESTONES, PARTNER MODE ═════════════════════════════════════════════════════════════════════════════════
+// A milestone is "earned" the first time the signed-in person's own data qualifies; the day is stored in journey[me].ms so it fires once.
+// The first time the road is opened, everything already earned is recorded silently (no flood of celebrations for old progress).
+const JY_COUNTDOWNS = [150, 100, 75, 50, 30, 14, 7, 1];
+const JY_STREAKS = [7, 14, 30, 50, 100];
+function jyMilestones(pid){
+  const out = [], ph = jyPhase(), left = daysUntilExam();
+  for(let i=0; i<JY_N; i++){
+    const st = jyStateOf(i, ph);
+    out.push({grp:'sprint', key:'sp:'+(i+1), emoji:'🏁', title:`Sprint ${i+1} finished`, ok: st==='past' && jyStats(pid, i).score!=null, i});
+  }
+  for(let i=0; i<JY_N; i++){
+    if(jyStateOf(i, ph) !== 'past') { out.push({grp:'grade', key:'spA:'+(i+1), emoji:'🅰️', title:`Grade A · Sprint ${i+1}`, ok:false, i}); continue; }
+    const s = jyStats(pid, i);
+    out.push({grp:'grade', key:'spA:'+(i+1), emoji:'🅰️', title:`Grade A · Sprint ${i+1}`, ok: s.letter==='A', i});
+    if(s.allGoalsMet) out.push({grp:'grade', key:'spG:'+(i+1), emoji:'🎯', title:`All goals met · Sprint ${i+1}`, ok:true, i});
+  }
+  JY_COUNTDOWNS.forEach(m=> out.push({grp:'count', key:'cd:'+m, emoji:'⏳', title: m===1 ? 'Exam tomorrow' : `${m} days to go`, ok: (ph.phase==='live' || ph.phase==='before') && left <= m && (ph.phase==='live')}));
+  LECTURE_TRACKER_PAPERS.forEach(p=>{
+    const ls = lecturesFor(pid, p); if(!ls.length) return;
+    const pct = ls.filter(l=>l.status==='done').length / ls.length * 100;
+    [25,50,75,100].forEach(q=> out.push({grp:'lec', key:`lec:${p}:${q}`, emoji: q===100?'🎓':'📚', title:`${paperById(p).nick} lectures ${q}%`, ok: pct >= q}));
+  });
+  const sg = (typeof liveStreak==='function') ? liveStreak(pid) : streak(pid);
+  JY_STREAKS.forEach(n=> out.push({grp:'streak', key:'st:'+n, emoji:'🔥', title:`${n}-day streak`, ok: sg >= n}));
+  return out;
+}
+function jyCoopSprints(){
+  const ph = jyPhase(), ids = jyProfiles(); if(ids.length < 2) return [];
+  const a = jyIndex(ids[0]), b = jyIndex(ids[1]), res = [];
+  for(let i=0; i<JY_N; i++){
+    if(jyStateOf(i, ph) !== 'past') continue;
+    const x = jyStats(ids[0], i, a), y = jyStats(ids[1], i, b);
+    if(x.score!=null && y.score!=null && x.score>=70 && y.score>=70) res.push(i);
+  }
+  return res;
+}
+let _jyMsBusy = false;
+function jyCheckMilestones(){
+  if(_jyMsBusy) return; _jyMsBusy = true;
+  try{
+    const me = jyMe(); if(!me || !S.shared) return;
+    const ph = jyPhase(); if(ph.phase === 'before' && !jyStore(me)) return;
+    const j = jyStore(me, true), list = jyMilestones(me);
+    jyCoopSprints().forEach(i=> list.push({grp:'coop', key:'coop:'+(i+1), emoji:'🤝', title:`Team sprint ${i+1} — you both hit B or better`, ok:true, i}));
+    const fresh = list.filter(m=>m.ok && !j.ms[m.key]);
+    if(!fresh.length) return;
+    const today = todayStr(), silent = !j.msInit;
+    fresh.forEach(m=>{ j.ms[m.key] = today; });
+    j.msInit = true; saveShared();
+    if(silent) return;
+    const order = ['coop','count','sprint','grade','lec','streak'];
+    fresh.sort((a,b)=> order.indexOf(a.grp) - order.indexOf(b.grp));
+    fresh.slice(0, 2).forEach(m=>{ try{ celebrateMilestone(`${m.emoji} ${m.title}`); }catch(e){} });
+    fresh.filter(m=>m.key.startsWith('sp:')).forEach(m=>{ const s = jyStats(me, m.i); jyNotifyPartner('sprint', `🏁 ${profileById(me).nick} finished Sprint ${m.i+1}`, `Grade ${s.letter} · ${jyH(s.hours)} studied. Your turn to match it? 😄`); });
+  } finally { _jyMsBusy = false; }
+}
+function jyNotifyPartner(kind, title, body){
+  try{
+    const me = jyMe(); if(!me) return;
+    const other = otherProfileId(me);
+    if(me==='umang' && umangHasBlocked()) return;
+    if(!pushPrefEnabled(other, 'journey')) return;
+    sendPush(other, title, String(body||'').slice(0,120), {url:'./?go=journey', go:'journey', kind:'journey', ts:Date.now()}, {urgency:'normal', ttl:86400});
+  }catch(e){}
+}
+function jyShelfHtml(){
+  const me = jyMe(), j = jyStore(me) || {}, ms = j.ms || {};
+  const ph = jyPhase(), list = jyMilestones(me);
+  const coop = new Set(); Object.keys(ms).forEach(k=>{ if(k.startsWith('coop:')) coop.add(k); });
+  const earned = k => !!ms[k];
+  const chip = (m, isE) => `<div class="jy-ms ${isE?'on':''}" title="${m.title}"><span class="e">${m.emoji}</span><span class="t">${m.title.replace(/^Sprint \d+ finished$/, '')||m.title}</span></div>`;
+  const group = (t, items) => items.length ? `<div class="jy-ms-g"><div class="jy-ms-t">${t}</div><div class="jy-ms-row">${items.join('')}</div></div>` : '';
+  const sprint = [];
+  for(let i=0; i<JY_N; i++){
+    const e = earned('sp:'+(i+1)), a = earned('spA:'+(i+1)), g = earned('spG:'+(i+1));
+    const s = e ? jyStats(me, i) : null;
+    sprint.push(`<div class="jy-medal ${e?'on g-'+(s?s.letter:'B'):''}" title="Sprint ${i+1}"><b>${i+1}</b>${a?'<i>★</i>':''}${g?'<u>◎</u>':''}</div>`);
+  }
+  const count = JY_COUNTDOWNS.map(m=>chip({emoji:'⏳', title: m===1?'Exam eve':`${m} days`}, earned('cd:'+m)));
+  const lec = []; LECTURE_TRACKER_PAPERS.forEach(p=>{ if(!lecturesFor(me,p).length) return; [25,50,75,100].forEach(q=> lec.push(chip({emoji:q===100?'🎓':'📚', title:`${paperById(p).nick} ${q}%`}, earned(`lec:${p}:${q}`)))); });
+  const st = JY_STREAKS.map(n=>chip({emoji:'🔥', title:`${n} days`}, earned('st:'+n)));
+  const co = coop.size ? [...coop].sort().map(k=>chip({emoji:'🤝', title:'Team S'+k.split(':')[1]}, true)) : [];
+  const total = Object.keys(ms).length;
+  return `<div class="card jy-shelf">
+    <div class="jy-plan-h"><b>🏆 Milestone shelf</b><span>${total} earned</span></div>
+    <div class="jy-ms-t">Sprint medals <em>★ grade A · ◎ every goal met</em></div><div class="jy-medals">${sprint.join('')}</div>
+    ${group('Countdown moments', count)}${group('Lectures', lec)}${group('Streaks', st)}${group('Team (both of you)', co)}
+  </div>`;
+}
+
+// ── partner board ───────────────────────────────────────────────────────────────────────────────────────────────────
+function jyPartnerHtml(b){
+  const ids = jyProfiles(); if(ids.length < 2) return '';
+  const i = b.sel, a = jyStats(ids[0], i), c = jyStats(ids[1], i);
+  const pa = profileById(ids[0]), pc = profileById(ids[1]);
+  if(a.state==='future') return `<div class="card jy-pb"><div class="jy-plan-h"><b>🤝 Together</b><span>Sprint ${i+1}</span></div><div class="jy-hint" style="margin:0">The board opens when this sprint starts.</div></div>`;
+  const rows = [['Hours', a.hours, c.hours, jyH], ['Lectures', a.lecTotal, c.lecTotal, jyNum], ['Days on target', a.hit, c.hit, jyNum], ['Grade', a.score==null?-1:a.score, c.score==null?-1:c.score, (v)=> v<0?'–':jyLetter(v)]];
+  const lead = (x, y) => Math.abs(x-y) < 1e-6 ? 0 : (x > y ? 1 : 2);
+  let wa = 0, wc = 0;
+  const body = rows.map(([l, x, y, f])=>{
+    const w = lead(x, y); if(w===1) wa++; if(w===2) wc++;
+    return `<div class="jy-pb-r"><span class="${w===1?'lead':''}" style="color:var(--${pa.color})">${w===1?'👑 ':''}${f(x)}</span><em>${l}</em><span class="${w===2?'lead':''}" style="color:var(--${pc.color})">${f(y)}${w===2?' 👑':''}</span></div>`;
+  }).join('');
+  const verdict = wa===wc ? 'Neck and neck 🤝' : `${wa>wc?pa.nick:pc.nick} led ${a.state==='current'?'so far':'this sprint'} 👑`;
+  const me = jyMe(), other = otherProfileId(me), po = profileById(other);
+  const both = a.score!=null && c.score!=null && a.score>=70 && c.score>=70;
+  return `<div class="card jy-pb">
+    <div class="jy-plan-h"><b>🤝 Who led Sprint ${i+1}</b><span>just for fun</span></div>
+    <div class="jy-pb-h"><b style="color:var(--${pa.color})">${pa.nick}</b><b style="color:var(--${pc.color})">${pc.nick}</b></div>
+    ${body}
+    <div class="jy-pb-v">${verdict}${both ? '<br><span>🎉 Team sprint — you both hit B or better</span>' : ''}</div>
+    <button type="button" class="btn jy-open" onclick="jyCheer()">📣 Cheer ${po.nick} on</button>
+  </div>`;
+}
+const JY_CHEERS = ['You are doing great — keep the streak alive! 💪', 'Proud of how you are showing up. One more session today? 🔥', 'Small steps, every day. You have got this! ✨', 'Sprint mode on — I am right here with you. 🏃'];
+function jyCheer(){
+  const me = jyMe(); if(!me) return;
+  if(Date.now() - (Number(S.local.jyCheerAt)||0) < 60000){ showToast('Cheer sent a moment ago — give it a minute.'); return; }
+  S.local.jyCheerAt = Date.now(); saveLocal();
+  const other = otherProfileId(me), ph = jyPhase();
+  const msg = JY_CHEERS[Math.floor(Math.random()*JY_CHEERS.length)];
+  if(!pushPrefEnabled(other, 'journey') || !pushSubscribedFor(other)){ showToast(`${profileById(other).nick} will see your cheer when they open the app… or message them in Chat.`); return; }
+  sendPush(other, `📣 ${profileById(me).nick} is cheering you on`, msg, {url:'./?go=journey', go:'journey', kind:'journey', ts:Date.now()}, {urgency:'normal', ttl:86400});
+  jyHaptic(14); showToast(`Cheer sent to ${profileById(other).nick} 📣`);
+}
+function pushSubscribedFor(pid){ return !!(S.shared.pushSubscriptions && S.shared.pushSubscriptions[pid]); }
+
+
+// ═══ v172d — PROGRESS: Targets + Statistics merged into one Home section ═══════════════════════════════════════════════
+// Two inline tabs (Targets / Stats) show the day's hours against target, the running sprint, a mini week chart and the targets that need
+// attention. "See all" opens the existing full Targets / Statistics pages; both pages carry a small switcher in their header so they read as
+// one sheet (the swap re-uses the open page's history entry, so the phone's back button still closes it in one press).
+function jyProgTab(){ return (S.local && S.local.jyProgTab === 'stats') ? 'stats' : 'targets'; }
+function jySetProgTab(t){ S.local.jyProgTab = t; saveLocal(); jyHaptic(6); jyKeepScroll(()=>renderApp()); }
+function jySwapPopup(to){
+  jyHaptic(8);
+  if(to === 'targets' && S.statsPopupOpen){ closeStatsPopup(); openTargetsPopup(undefined, true); }
+  else if(to === 'stats' && S.targetsPopupOpen){ closeTargetsPopup(); openStatsPopup(true); }
+}
+function jyPopSeg(active){
+  return `<div class="jy-popseg" role="tablist" aria-label="Switch page"><button type="button" role="tab" aria-selected="${active==='targets'}" class="${active==='targets'?'on':''}" onclick="${active==='targets'?'':"jySwapPopup('targets')"}">Targets</button><button type="button" role="tab" aria-selected="${active==='stats'}" class="${active==='stats'?'on':''}" onclick="${active==='stats'?'':"jySwapPopup('stats')"}">Stats</button></div>`;
+}
+function jyWeekChartSvg(vp){
+  const today = todayStr(), tgt = Number(S.shared.targets[vp]) || 4, days = [];
+  for(let k=6; k>=0; k--){ const d = jyAdd(today, -k); days.push({d, h: liveHoursOnDate(vp, d)}); }
+  const max = Math.max(tgt*1.15, ...days.map(x=>x.h), 1), W = 300, H = 118, x0 = 8, x1 = 292, yb = 92, yt = 14, cw = (x1-x0)/7;
+  const Y = v => yb - (v/max)*(yb-yt);
+  let o = `<svg class="jy-week" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hours over the last 7 days">`;
+  o += `<line x1="${x0}" x2="${x1}" y1="${yb}" y2="${yb}" class="jy-grid base"/><line x1="${x0}" x2="${x1}" y1="${Y(tgt)}" y2="${Y(tgt)}" class="jy-tgt"/><text x="${x1}" y="${Y(tgt)-3}" text-anchor="end" class="jy-ytxt">target ${jyNum(tgt)}h</text>`;
+  days.forEach((x,k)=>{
+    const bw = cw*0.5, bx = x0 + cw*k + (cw-bw)/2, h = Math.max(0, yb - Y(x.h)), hit = x.h >= tgt - 1e-9, isT = x.d === today;
+    o += `<rect x="${bx}" y="${yb-h}" width="${bw}" height="${Math.max(h, x.h>0?2:0)}" rx="3" fill="${hit?'var(--good)':'var(--active-accent,var(--umang))'}" class="chart-animate summit-fill play" style="animation-delay:${(k*0.05).toFixed(2)}s;opacity:${isT?1:0.8}"/>`;
+    if(x.h > 0) o += `<text x="${bx+bw/2}" y="${yb-h-3}" text-anchor="middle" class="jy-vtxt" fill="var(--text-muted)">${jyNum(x.h)}</text>`;
+    const dn = new Date(x.d+'T00:00:00').toLocaleDateString('en-IN', {weekday:'short'}).slice(0,2);
+    o += `<text x="${bx+bw/2}" y="${yb+14}" text-anchor="middle" class="jy-xtxt${isT?' sel':''}">${dn}</text>`;
+  });
+  return o + `</svg>`;
+}
+function jyProgressHtml(vp, isMe){
+  const prof = profileById(vp), tab = jyProgTab(), today = todayStr();
+  const hToday = liveHoursOnDate(vp, today), tg = effectiveTodayTarget(vp) || (Number(S.shared.targets[vp])||4);
+  const pct = tg > 0 ? Math.min(100, hToday/tg*100) : 0;
+  const ph = jyPhase();
+  let sprint = '';
+  if(ph.phase === 'live'){
+    const s = jyStats(vp, ph.idx), g = jyMetricOf(s, 'hours'), p = Math.min(100, g.v/Math.max(0.01, g.g)*100);
+    sprint = `<div class="jy-prog-r"><div class="jy-prog-l"><span>Sprint ${s.i+1} · day ${ph.day - ph.idx*JY_LEN} of ${s.sp.days}</span><b>${jyH(g.v)}<em>/${jyH(g.g)}</em></b></div><div class="jy-bar"><i style="width:${p}%;background:var(--${prof.color})"></i></div><div class="jy-prog-n">${s.score==null?'':`Tracking <b>${s.letter}</b> · `}${s.hit}/${s.consDays} days on target${s.goalsSet?'':' · <a onclick="switchView(\'journey\')">set goals</a>'}</div></div>`;
+  } else if(ph.phase === 'before'){
+    sprint = `<div class="jy-prog-n" style="margin-top:10px">🛣 The road starts in <b>${ph.toStart} day${ph.toStart===1?'':'s'}</b> — set paper deadlines and Sprint 1 goals in <a onclick="switchView('journey')">Journey</a>.</div>`;
+  }
+  let body;
+  if(tab === 'stats'){
+    const wk = jyWeekTotal(vp), sg = (typeof liveStreak==='function') ? liveStreak(vp) : streak(vp);
+    body = `<div class="card jy-prog">
+      <div class="jy-prog-kpis"><div><b>${jyH(hToday)}</b><span>today</span></div><div><b>${jyH(wk)}</b><span>last 7 days</span></div><div><b>${sg}🔥</b><span>day streak</span></div></div>
+      ${jyWeekChartSvg(vp)}
+      <button type="button" class="btn jy-open" onclick="openStatsPopup()">See all statistics ›</button>
+    </div>`;
+  } else {
+    if(isMe) refreshAllTargets(vp);
+    const nA = targetsNeedsAttentionWidgetHtml(vp, isMe);
+    const hasAny = milestoneTargetsFor(vp).length > 0;
+    body = `<div class="card jy-prog">
+      <div class="jy-prog-r"><div class="jy-prog-l"><span>${isMe ? 'Today' : prof.nick+' today'}</span><b>${jyH(hToday)}<em>/${jyH(tg)}</em></b></div><div class="jy-bar"><i style="width:${pct}%;background:${hToday>=tg?'var(--good)':'var(--'+prof.color+')'}"></i></div></div>
+      ${sprint}
+      <button type="button" class="btn jy-open" onclick="openTargetsPopup('${vp}')">${hasAny ? 'See all targets ›' : (isMe ? 'Create your first target ›' : 'See targets ›')}</button>
+    </div>
+    ${nA ? `<div class="jy-prog-na">${nA.replace(/<div class="section-title">/, '<div class="jy-prog-nat">')}</div>` : ''}`;
+  }
+  return `<div class="section-title"><span>Progress</span><span class="jy-tabs" role="tablist" aria-label="Progress view"><button type="button" role="tab" aria-selected="${tab==='targets'}" class="${tab==='targets'?'on':''}" onclick="jySetProgTab('targets')">Targets</button><button type="button" role="tab" aria-selected="${tab==='stats'}" class="${tab==='stats'?'on':''}" onclick="jySetProgTab('stats')">Stats</button></span></div>${body}`;
+}
+function jyWeekTotal(pid){ let t = 0; for(let k=0; k<7; k++) t += liveHoursOnDate(pid, jyAdd(todayStr(), -k)); return t; }
 
 // Feature: "Pending Targets" dashboard widget — next 3-5 incomplete targets for this
 // profile, soonest first. Only shown for the viewer's own profile (a target list is
@@ -15904,115 +17124,148 @@ function addLog(profileId){
 // ═══════════════════════════════════════════════════════════
 // COMPARISON
 // ═══════════════════════════════════════════════════════════
-function comparisonBlock(){
-  const a = PROFILES[0], b = PROFILES[1]; // Umang, Chetna
-  const prepA = overallPrep(a.id), prepB = overallPrep(b.id);
-  const scoreA = prepA.prepScore, scoreB = prepB.prepScore;
-  const aLeads = scoreA >= scoreB;
-  const diff = Math.abs(scoreA - scoreB);
 
-  // Full-circle score ring for each profile card
-  function scoreRing(score, colorVar){
-    const RS = 72, RW = 7, RR = (RS-RW)/2;
-    const circ = 2*Math.PI*RR;
-    const offset = circ*(1-(score/100));
-    const uid = 'cpr'+(Math.random()*1e6|0);
-    return `<svg width="${RS}" height="${RS}" viewBox="0 0 ${RS} ${RS}" style="display:block;margin:0 auto 4px">
-      <defs>
-        <linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${colorVar}" stop-opacity="0.7"/>
-          <stop offset="100%" stop-color="${colorVar}" stop-opacity="1"/>
-        </linearGradient>
-      </defs>
-      <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none" stroke="color-mix(in srgb,${colorVar} 14%,var(--surface2))" stroke-width="${RW}"/>
-      <circle cx="${RS/2}" cy="${RS/2}" r="${RR}" fill="none" stroke="url(#${uid})" stroke-width="${RW}"
-        stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
-        stroke-linecap="round" transform="rotate(-90 ${RS/2} ${RS/2})"/>
-      <text x="${RS/2}" y="${RS/2}" text-anchor="middle" dominant-baseline="central"
-        font-size="15" font-weight="800" fill="${colorVar}" font-family="inherit">${score}%</text>
-    </svg>`;
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// v173 — INTER-PROFILE COMPARISON, rebuilt from scratch ("head-to-head").
+//   Standards it follows: one shared scale per row so bar lengths are honest; diverging (butterfly) bars with the values at the outer
+//   edges; a named delta on every row ("Mangu +3.5h" / "Level") so colour is never the only signal; a period switch (Today / 7 / 30 days /
+//   Road); a grouped-bar daily trend with one shared axis; grouped bars per paper (replaces the radar, which is hard to compare by eye);
+//   and the road's sprint grades side by side. Every number is read through the same live-aware helpers as the rest of Home, so it
+//   agrees with the timer card and moves while a session runs (the region only swaps its DOM when a rounded figure changes).
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+const HH_RANGES = [{k:'today', l:'Today'}, {k:'week', l:'7 days'}, {k:'month', l:'30 days'}, {k:'road', l:'Road'}];
+function hhRange(){
+  const r = S.local && S.local.cmpRange, ok = HH_RANGES.some(x=>x.k===r);
+  if(r==='road' && jyPhase().phase==='before') return 'week';
+  return ok ? r : 'week';
+}
+function hhSetRange(r){ S.local.cmpRange = r; saveLocal(); jyHaptic(6); jyKeepScroll(()=>renderApp()); }
+function hhDays(range){
+  const t = todayStr();
+  if(range==='today') return [t];
+  if(range==='road'){ const n = Math.max(1, Math.min(200, daysBetweenDates(JY_START, t)+1)); return Array.from({length:n}, (_,k)=>jyAdd(JY_START, k)); }
+  const n = range==='week' ? 7 : 30;
+  return Array.from({length:n}, (_,k)=>jyAdd(t, -(n-1-k)));
+}
+function hhStats(pid, days){
+  const target = Number(S.shared.targets[pid]) || 4;
+  let hours = 0, hit = 0, active = 0, best = 0;
+  days.forEach(d=>{ const h = liveHoursOnDate(pid, d); hours += h; if(h > 0) active++; if(h >= target - 1e-9) hit++; if(h > best) best = h; });
+  return {pid, hours, avg: hours/days.length, hit, active, best, target, n: days.length, streak: liveStreak(pid), prep: overallPrep(pid)};
+}
+function hhRingSvg(score, color){
+  const S0 = 76, W = 7, R = (S0-W)/2, C = 2*Math.PI*R;
+  return `<svg width="${S0}" height="${S0}" viewBox="0 0 ${S0} ${S0}" aria-hidden="true"><circle cx="${S0/2}" cy="${S0/2}" r="${R}" fill="none" stroke="color-mix(in srgb,${color} 16%,var(--surface2))" stroke-width="${W}"/>
+    <circle cx="${S0/2}" cy="${S0/2}" r="${R}" fill="none" stroke="${color}" stroke-width="${W}" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-Math.min(100,score)/100)).toFixed(1)}" transform="rotate(-90 ${S0/2} ${S0/2})"/>
+    <text x="${S0/2}" y="${S0/2+1}" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="900" fill="var(--text)" font-family="inherit">${score}<tspan font-size="9" font-weight="700" fill="var(--text-faint)">%</tspan></text></svg>`;
+}
+// One diverging row. fmt: value formatter. pctScale: scale to 100 instead of to the row's own max.
+function hhRow(label, va, vb, fmt, o){
+  o = o || {};
+  const a = PROFILES[0], b = PROFILES[1], eps = o.eps != null ? o.eps : 0.05;
+  const mx = o.pctScale ? 100 : Math.max(va, vb, 0.0001);
+  const wa = Math.max(va > 0 ? 3 : 0, Math.round(va/mx*100)), wb = Math.max(vb > 0 ? 3 : 0, Math.round(vb/mx*100));
+  const d = va - vb, lead = Math.abs(d) <= eps ? 0 : (d > 0 ? 1 : 2);
+  const dTxt = lead===0 ? 'Level' : `${lead===1 ? a.nick : b.nick} +${o.diffFmt ? o.diffFmt(Math.abs(d)) : fmt(Math.abs(d))}`;
+  return {lead, html: `<div class="hh-row" role="group" aria-label="${label}: ${a.nick} ${fmt(va)}, ${b.nick} ${fmt(vb)}">
+    <div class="hh-head"><span class="hh-lab">${label}</span><span class="hh-delta ${lead===1?'a':lead===2?'b':''}">${lead===0?'':'▲ '}${dTxt}</span></div>
+    <div class="hh-bars">
+      <div class="hh-side a${lead===1?' win':''}"><b>${fmt(va)}</b><div class="hh-track"><i style="width:${wa}%"></i></div></div>
+      <div class="hh-side b${lead===2?' win':''}"><div class="hh-track"><i style="width:${wb}%"></i></div><b>${fmt(vb)}</b></div>
+    </div>
+  </div>`};
+}
+function hhTrendSvg(){
+  const a = PROFILES[0], b = PROFILES[1], N = 14, t = todayStr();
+  const days = Array.from({length:N}, (_,k)=>jyAdd(t, -(N-1-k)));
+  const ha = days.map(d=>liveHoursOnDate(a.id, d)), hb = days.map(d=>liveHoursOnDate(b.id, d));
+  const mx = jyNice(Math.max(1, ...ha, ...hb)), W = 320, H = 138, x0 = 24, x1 = 316, yb = 112, yt = 10, cw = (x1-x0)/N;
+  const Y = v => Math.round((yb - (v/mx)*(yb-yt))*2)/2;
+  let o = `<svg class="hh-trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily study hours, last 14 days, ${a.nick} and ${b.nick}">`;
+  [0, 0.5, 1].forEach(f=>{ const y = Y(mx*f); o += `<line x1="${x0}" x2="${x1}" y1="${y}" y2="${y}" class="jy-grid${f===0?' base':''}"/><text x="${x0-4}" y="${y+3}" text-anchor="end" class="jy-ytxt">${jyNum(mx*f)}</text>`; });
+  days.forEach((d,k)=>{
+    const gx = x0 + cw*k, bw = cw*0.36, ax = gx + cw*0.12, bx = ax + bw + 1.2, isT = d===t;
+    const hA = yb - Y(ha[k]), hB = yb - Y(hb[k]);
+    if(ha[k] > 0) o += `<rect x="${ax.toFixed(1)}" y="${Y(ha[k])}" width="${bw.toFixed(1)}" height="${hA}" rx="2" fill="var(--umang)"/>`;
+    if(hb[k] > 0) o += `<rect x="${bx.toFixed(1)}" y="${Y(hb[k])}" width="${bw.toFixed(1)}" height="${hB}" rx="2" fill="var(--chetna)"/>`;
+    if(k%2===(N-1)%2 || isT) o += `<text x="${(gx+cw/2).toFixed(1)}" y="${yb+13}" text-anchor="middle" class="jy-xtxt${isT?' sel':''}">${new Date(d+'T00:00:00').getDate()}</text>`;
+  });
+  return o + `</svg>`;
+}
+function hhPaperRows(){
+  const a = PROFILES[0], b = PROFILES[1];
+  return PAPERS.map(p=>{
+    const sa = paperComponents(a.id, p.id).prepScore, sb = paperComponents(b.id, p.id).prepScore;
+    return `<div class="hh-pp"><span class="hh-pp-n">${p.nick}</span><div class="hh-pp-b">
+      <div class="hh-pp-t"><i style="width:${Math.max(sa>0?2:0, sa)}%;background:var(--umang)"></i></div><em>${sa}</em>
+      <div class="hh-pp-t"><i style="width:${Math.max(sb>0?2:0, sb)}%;background:var(--chetna)"></i></div><em>${sb}</em></div></div>`;
+  }).join('');
+}
+function hhRoadHtml(){
+  const ph = jyPhase(), a = PROFILES[0], b = PROFILES[1];
+  if(ph.phase === 'before') return `<div class="hh-note">Sprint grades appear here from 1 December — the road starts in ${ph.toStart} day${ph.toStart===1?'':'s'}.</div>`;
+  const ia = jyIndex(a.id), ib = jyIndex(b.id);
+  const sa = [], sb = []; let wa = 0, wb = 0;
+  for(let i=0; i<JY_N; i++){
+    const x = jyStats(a.id, i, ia), y = jyStats(b.id, i, ib);
+    sa.push(x); sb.push(y);
+    if(x.state==='past' && x.score!=null && y.score!=null){ if(x.score > y.score) wa++; else if(y.score > x.score) wb++; }
   }
-
-  // Horizontal VS bar — metric flows left-to-right; winner side is wider & brighter
-  function vsBar(label, numA, numB, suffix, decimals){
-    suffix = suffix||''; decimals = decimals||0;
-    const total = Math.max(0.01, numA+numB);
-    const pctA = Math.round(numA/total*100), pctB = 100-pctA;
-    const aW = numA >= numB, bW = numB >= numA;
-    const fmtA = decimals ? numA.toFixed(decimals) : Math.round(numA);
-    const fmtB = decimals ? numB.toFixed(decimals) : Math.round(numB);
-    return `
-    <div style="margin-bottom:10px">
-      <div style="font-size:9.5px;font-weight:700;color:var(--text-faint);text-align:center;letter-spacing:.05em;margin-bottom:4px;text-transform:uppercase">${label}</div>
-      <div style="display:flex;align-items:center;gap:7px">
-        <span style="font-size:12.5px;font-weight:${aW?'800':'500'};color:${aW?'var(--umang)':'var(--text-muted)'};min-width:36px;text-align:right">${fmtA}${suffix}</span>
-        <div style="flex:1;display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface2)">
-          <div style="width:${pctA}%;background:var(--umang);border-radius:4px 0 0 4px;transition:width .6s cubic-bezier(.22,.8,.4,1)"></div>
-          <div style="width:${pctB}%;background:var(--chetna);border-radius:0 4px 4px 0;transition:width .6s cubic-bezier(.22,.8,.4,1)"></div>
-        </div>
-        <span style="font-size:12.5px;font-weight:${bW?'800':'500'};color:${bW?'var(--chetna)':'var(--text-muted)'};min-width:36px">${fmtB}${suffix}</span>
-      </div>
-    </div>`;
+  const cell = (s)=> `<span class="hh-g ${s.letter?'g-'+s.letter:''}${s.state==='current'?' cur':''}" title="Sprint ${s.i+1}">${s.letter||'·'}</span>`;
+  return `<div class="hh-road"><div class="hh-road-r"><b style="color:var(--umang)">${a.nick}</b><div>${sa.map(cell).join('')}</div></div>
+    <div class="hh-road-r"><b style="color:var(--chetna)">${b.nick}</b><div>${sb.map(cell).join('')}</div></div></div>
+    <div class="hh-note">Sprints won (completed): <b style="color:var(--umang)">${a.nick} ${wa}</b> · <b style="color:var(--chetna)">${b.nick} ${wb}</b></div>`;
+}
+function hhBody(range){
+  const a = PROFILES[0], b = PROFILES[1], days = hhDays(range), A = hhStats(a.id, days), B = hhStats(b.id, days);
+  const single = range === 'today';
+  const rows = [];
+  const hH = h => jyH(h);
+  const add = (r)=> rows.push(r);
+  const effort = [], syl = [];
+  effort.push(hhRow('Study hours', A.hours, B.hours, hH, {eps:0.05}));
+  if(!single){
+    effort.push(hhRow('Daily average', A.avg, B.avg, hH, {eps:0.05}));
+    effort.push(hhRow('Days on target', A.hit, B.hit, v=>`${Math.round(v)}/${A.n}`, {eps:0.5, diffFmt:v=>Math.round(v)+' d'}));
+    effort.push(hhRow('Best day', A.best, B.best, hH, {eps:0.05}));
   }
-
-  // Who's ahead banner
-  const bannerMsg = scoreA === scoreB
-    ? `Dead even at ${scoreA}%`
-    : `${aLeads?a.nick:b.nick} leads by ${diff} pts`;
-  const bannerColor = aLeads ? 'var(--umang)' : 'var(--chetna)';
-
+  effort.push(hhRow('Current streak', A.streak, B.streak, v=>Math.round(v)+'d', {eps:0.5, diffFmt:v=>Math.round(v)+' d'}));
+  const pc = v=>Math.round(v)+'%', pts = v=>Math.round(v)+' pts';
+  syl.push(hhRow('Lectures', A.prep.lecPct, B.prep.lecPct, pc, {pctScale:true, eps:0.5, diffFmt:pts}));
+  syl.push(hhRow('Revision', Math.round((A.prep.rev1Pct+A.prep.rev2Pct)/2), Math.round((B.prep.rev1Pct+B.prep.rev2Pct)/2), pc, {pctScale:true, eps:0.5, diffFmt:pts}));
+  syl.push(hhRow('Practice', A.prep.practicePct, B.prep.practicePct, pc, {pctScale:true, eps:0.5, diffFmt:pts}));
+  syl.push(hhRow('Mock average', A.prep.mockAvg, B.prep.mockAvg, pc, {pctScale:true, eps:0.5, diffFmt:pts}));
+  const all = effort.concat(syl);
+  const wa = all.filter(r=>r.lead===1).length, wb = all.filter(r=>r.lead===2).length, tie = all.length - wa - wb;
+  const pa = A.prep.prepScore, pb = B.prep.prepScore;
+  const verdict = wa===wb ? `All square · ${wa}–${wb}` : `${wa>wb?a.nick:b.nick} leads ${Math.max(wa,wb)}–${Math.min(wa,wb)}`;
+  const vcol = wa===wb ? 'var(--text-muted)' : (wa>wb ? 'var(--umang)' : 'var(--chetna)');
+  const scoreLead = pa===pb ? 'Prep scores level' : `${pa>pb?a.nick:b.nick} ahead on prep by ${Math.abs(pa-pb)} pts`;
   return `
-  <div class="card" style="padding:0;overflow:hidden">
-
-    <!-- Head-to-head hero panel -->
-    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--surface2)">
-      <!-- Umang side -->
-      <div style="padding:16px 12px 14px;text-align:center;background:${aLeads?'color-mix(in srgb,var(--umang) 7%,transparent)':'transparent'};border-right:1px solid var(--border)">
-        ${scoreRing(scoreA,'var(--umang)')}
-        <div style="font-size:12px;font-weight:800;color:var(--text);margin-top:2px">${a.nick}${aLeads?' 🏆':''}</div>
-      </div>
-      <!-- VS divider -->
-      <div style="padding:0 10px;display:flex;flex-direction:column;align-items:center;gap:6px">
-        <div style="font-size:11px;font-weight:800;color:var(--text-faint);letter-spacing:.04em">VS</div>
-        <div style="width:1px;height:32px;background:var(--border)"></div>
-      </div>
-      <!-- Chetna side -->
-      <div style="padding:16px 12px 14px;text-align:center;background:${!aLeads?'color-mix(in srgb,var(--chetna) 7%,transparent)':'transparent'};border-left:1px solid var(--border)">
-        ${scoreRing(scoreB,'var(--chetna)')}
-        <div style="font-size:12px;font-weight:800;color:var(--text);margin-top:2px">${b.nick}${!aLeads?' 🏆':''}</div>
-      </div>
-    </div>
-
-    <!-- Leader banner -->
-    <div style="padding:8px 14px;background:color-mix(in srgb,${bannerColor} 9%,var(--surface));border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:7px">
-      <span style="font-size:13px">${scoreA===scoreB?'🤝':'⚡'}</span>
-      <span style="font-size:12.5px;font-weight:700;color:${bannerColor}">${bannerMsg}</span>
-    </div>
-
-    <!-- Dual-bar metrics -->
-    <div style="padding:14px 16px 6px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:10px;font-weight:800;color:var(--umang);letter-spacing:.03em">${a.nick}</span>
-        <span style="font-size:10px;font-weight:800;color:var(--chetna);letter-spacing:.03em">${b.nick}</span>
-      </div>
-      ${liveRegion('cmp','today')}
-      ${liveRegion('cmp','week')}
-      ${liveRegion('cmp','total')}
-      ${vsBar('Lectures',    prepA.lecPct, prepB.lecPct, '%', 0)}
-      ${vsBar('Revision',    Math.round((prepA.rev1Pct+prepA.rev2Pct)/2), Math.round((prepB.rev1Pct+prepB.rev2Pct)/2), '%', 0)}
-      ${vsBar('Mock Avg',    prepA.mockAvg, prepB.mockAvg, '%', 0)}
-      ${liveRegion('cmp','streak')}
-    </div>
-
-    <!-- Radar chart -->
-    <div style="border-top:1px solid var(--border);padding:14px 14px 16px">
-      <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);text-align:center;margin-bottom:10px">Skill Radar</div>
-      ${radarSVG()}
-      <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
-        <span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--umang)"><span style="width:10px;height:10px;border-radius:50%;background:var(--umang);display:inline-block"></span>${a.nick}</span>
-        <span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--chetna)"><span style="width:10px;height:10px;border-radius:50%;background:var(--chetna);display:inline-block"></span>${b.nick}</span>
-      </div>
-    </div>
+  <div class="hh-hero">
+    <div class="hh-p">${hhRingSvg(pa, 'var(--umang)')}<div class="hh-name" style="color:var(--umang)">${a.nick}${pa>pb?' 🏆':''}</div><div class="hh-sub">🔥 ${A.streak}d · ${hH(A.hours)}</div></div>
+    <div class="hh-vs"><span>VS</span></div>
+    <div class="hh-p">${hhRingSvg(pb, 'var(--chetna)')}<div class="hh-name" style="color:var(--chetna)">${b.nick}${pb>pa?' 🏆':''}</div><div class="hh-sub">🔥 ${B.streak}d · ${hH(B.hours)}</div></div>
+  </div>
+  <div class="hh-verdict" style="color:${vcol}"><b>${verdict}</b><span>${tie} level · ${scoreLead}</span></div>
+  <div class="hh-sec">Effort · ${HH_RANGES.find(r=>r.k===range).l}</div>
+  ${effort.map(r=>r.html).join('')}
+  <div class="hh-sec">Syllabus · overall</div>
+  ${syl.map(r=>r.html).join('')}
+  <div class="hh-sec">Daily hours · last 14 days</div>
+  ${hhTrendSvg()}
+  <div class="hh-leg"><span><i style="background:var(--umang)"></i>${a.nick}</span><span><i style="background:var(--chetna)"></i>${b.nick}</span></div>
+  <div class="hh-sec">Readiness by paper <em>prep score</em></div>
+  ${hhPaperRows()}
+  <div class="hh-sec">Road to 1 May · sprint grades</div>
+  ${hhRoadHtml()}`;
+}
+function comparisonBlock(){
+  if(isUmangBlockedForViewer()) return `<div class="card hh-card"><div class="hh-note" style="margin:0">Comparison isn't available right now.</div></div>`;
+  const range = hhRange();
+  return `<div class="card hh-card">
+    <div class="jy-pills hh-seg" role="tablist" aria-label="Comparison period" data-noswipe>${HH_RANGES.map(r=>{ const off = r.k==='road' && jyPhase().phase==='before'; return `<button type="button" role="tab" aria-selected="${r.k===range}" class="${r.k===range?'on':''}"${off?' disabled style="opacity:.4"':''} onclick="hhSetRange('${r.k}')">${r.l}</button>`; }).join('')}</div>
+    ${liveRegion('hh', range)}
   </div>`;
 }
 
@@ -19484,6 +20737,7 @@ function settingsSectionNotifications(){
     ${pushPrefToggleRow('habitReminder', '✅ Habit reminders (evening + time-linked)')}
     ${pushPrefToggleRow('diaryReminder', '📔 Diary reminder (morning if yesterday is open, 9 PM for today)')}
     ${pushPrefToggleRow('weeklyReview', '📊 Monday weekly review (statistics, ~8 AM)')}
+    ${pushPrefToggleRow('journey', '🛣 Road to 1 May — sprint starts, check-ins & partner milestones')}
     ` : ''}
   </div>
   <div class="card settings-group" style="margin-top:12px">
@@ -19615,17 +20869,17 @@ function notifToggleRow(key, label){
 // ── Home page cards: which ones show, in what order, and which paper Lecture Completion uses ──
 // Stored per profile in S.shared.prefs[profile] (homeOrder / homeHidden / homeLecturePaper) -- prefs
 // is already a SINGLE_OWNER_SHARED_KEYS entry, so these sync across devices without a new key.
-const HOME_KPIS = [
-  {key:'quote',     label:'Daily motivation quote'},
+const HOME_KPIS = [   // v173: this is also the default order (date header first, Settings button last -- both are fixed)
+  {key:'countdown', label:"War Countdown (days to go & today's target)"},
   {key:'timer',     label:'Study timer shortcut',      ownOnly:true},
   {key:'partner',   label:"Partner's live status",     ownOnly:true},
-  {key:'countdown', label:"Exam countdown & today's target"},
-  {key:'habits',    label:'Challenges',                ownOnly:true},
-  {key:'targets',   label:'Targets needing attention'},
-  {key:'features',  label:'Features shortcuts'},
   {key:'papers',    label:'Papers'},
-  {key:'lectures',  label:'Lecture Completion'},
+  {key:'habits',    label:'Challenges',                ownOnly:true},
+  {key:'journey',   label:'Journey graph (sprints)'},
+  {key:'targets',   label:'Progress (Targets & Stats)'},
   {key:'hours',     label:'Study Hours (weekly chart)'},
+  {key:'lectures',  label:'Lecture Completion'},
+  {key:'features',  label:'Features shortcuts'},
   {key:'compare',   label:'Inter-Profile Comparison'},
 ];
 function homeLayoutFor(profileId){
@@ -19854,13 +21108,7 @@ function syncChaptersToOfficial(){
 
 // ═══════════════════════════════════════════════════════════
 // AI FEATURES — occasional, user-triggered calls only (never automatic)
-// EXCEPTION: ensureDailyQuote() below. Flagging this rather than quietly breaking the rule —
-// Umang asked for a quote that refreshes automatically once/day. It's capped at exactly one
-// real call per calendar day: S.shared.dailyQuote.date is checked first and the result is
-// synced (not regenerated) to the other device, so a 2-person household costs at most one
-// call/day total, not one per device per app-open. Triggered from initAfterLogin() — see
-// there — same fire-and-forget convention as maybeSweepArchive()/applyBgTheme().
-let _dailyQuoteFetching = false;
+// (v173: the one automatic exception, the once-a-day motivation message, no longer exists.)
 // Feature 4: escalates certain events to a real device-level notification via the Service
 // Worker's showNotification() (works even if the tab isn't focused), rather than the plain
 // `new Notification(...)` used elsewhere in this app for on-screen-only nags (see
@@ -19875,186 +21123,7 @@ function fireLocalPushNotification(title, body, opts){
     reg.showNotification(title, Object.assign({ body, icon:'./icon-192.png' }, opts||{}));
   }).catch(e=> console.warn('Local push notification failed:', e));
 }
-// ═══ v124: DAILY MOTIVATION — generation ═══════════════════════════════════════════════════════════════════════
-// Exactly one AI call per profile per study day (the result is stored in S.shared.dailyQuote[profile] and synced, and
-// 'dailyQuote' is a single-owner key so the partner's phone can never roll it back and trigger a second call). If the AI
-// is unreachable the person still gets a warm hand-written message from the bank below -- never a permanent "loading" --
-// and the AI is retried quietly (at most 3 more times, 20+ minutes apart); the real message replaces the fallback.
-const MOTIVATION_VERSION = 2; // entries from the old generator (no/lower v) are treated as "not generated yet" -> one fresh message
-const MOTIVATION_ANGLES = [
-  'Start before you feel ready: momentum arrives after the first 10 minutes, not before them.',
-  'Small honest sessions beat heroic ones: consistency is the real superpower.',
-  'Remember why they chose CA and who they are doing this for.',
-  'Their future self is already grateful for what they do today.',
-  'The progress already made is real (lectures done, hours logged) and today adds to it.',
-  'Discipline over mood: they do not need to feel like it, they only need to begin.',
-  'One paper, one chapter, one session at a time: do not carry the whole syllabus at once.',
-  'Rest is part of the plan, but the first focused session comes first.',
-  'A rough or missed day does not define them: today is a clean page.',
-  'Be proud of how far they have come, then take the very next step.',
-  'Focus is a gift they give themselves: phone away, timer on, full attention.',
-  'Quiet confidence: they have done hard things before and this is one more.',
-];
-// Hand-written fallbacks, same voice. Hindi verbs are kept gender-neutral on purpose (imperatives, "ho jaayega", "tumse hoga"),
-// because the message is addressed to either of two people. need: 'days' | 'streak' | 'comeback' limits a line to when it is true.
-const MOTIVATION_FALLBACKS = [
-  {t:"{nick}, aaj ka din simple rakhte hain: ek focused session, phir doosra. Phone door, timer on, shuruaat tum karo, momentum baaki sambhal lega. Mujhe tum par poora bharosa hai."},
-  {t:"Good morning {nick}! Tumne pehle bhi mushkil cheezein paar ki hain, aur yeh syllabus bhi ek ek chapter karke hi khatam hota hai. Chalo, aaj ka pehla session abhi lagate hain."},
-  {t:"{nick}, perfect hone ki zarurat nahi, bas aaj bhi aana hai, baithna hai aur apna best dena hai. Chhote steps, solid kaam. Ho jaayega, main tumhare saath hoon."},
-  {t:"Jab man na kare na, tab sirf 25 minute ka timer lagao. Shuruaat hi sabse bhaari hoti hai, uske baad sab halka lagta hai. Yeh tumne pehle bhi kiya hai, aaj bhi hoga, {nick}."},
-  {t:"{nick}, tumhari mehnat sach mein dikhti hai, chahe tumhe khud na dikhe. Aaj ka din bhi us mehnat mein jodo: ek honest session, aur din tumhara."},
-  {t:"Aaj ke liye bas ek kaam: sabse zaroori topic uthao aur usse poora dhyaan do. Baaki sab uske baad. Tumse ho jaayega, {nick}, mujhe yaqeen hai."},
-  {t:"Future wale tum abhi se thank-you bol rahe hain, {nick}. Aaj ke session ko kal ka sabse bada tohfa bana do. Chalo, shuru karte hain!"},
-  {t:"{nick}, mood par nahi, routine par chalna hai. Pehla session lagao, phir dekho kaise man khud lag jaata hai. Main yahin hoon, tumhe cheer karte hue."},
-  {t:"Thoda thakan ho toh bhi theek hai, rest plan ka hissa hai. Par pehle ek solid session, phir chai-break. Tumhari mehnat rang layegi, {nick}."},
-  {t:"Aaj ka goal: kal se bas ek step aage. Ek chapter, ek revision, ek chhoti si jeet. Itna kaafi hai, aur yeh tumse aaram se ho jaayega, {nick}."},
-  {t:"{nick}, ek ek lecture, ek ek chapter, yahi toh poora syllabus banta hai. Aaj ki apni ek eent rakho. Main proud hoon tumpe, ab chalo kaam pe!"},
-  {t:"Tumhara focus tumhari superpower hai, {nick}. Aaj phone ko side mein rakho, timer chalao, aur dekho kitna kuch ho jaata hai. Full support tumhare saath."},
-  {t:"{days} din bache hain, {nick}, aur har focused ghanta tumhe finish line ke kareeb le jaata hai. Aaj ke ghante kamao, tumhari taiyari roz mazboot ho rahi hai.", need:'days'},
-  {t:"Sirf {days} din, aur roz ek honest session ho toh itna time kaafi hai. Aaj ka session lagao, {nick}, baaki kal ka din sambhal lega.", need:'days'},
-  {t:"{nick}, {days} din ka countdown chal raha hai, aur ek ek din tumhare naam ho raha hai. Aaj bhi jeeto: pehla session abhi.", need:'days'},
-  {t:"Streak chal rahi hai, {nick}! Isse todna nahi, aaj ka ek session kal ke tumhe thank-you bolne ki wajah dega. Chalo, aaj bhi!", need:'streak'},
-  {t:"{nick}, consistency tumpe bahut suit karti hai, dekho kitne din ho gaye lagataar. Aaj ek aur din jod do, main tumhare saath hoon.", need:'streak'},
-  {t:"Kal jaisa bhi gaya, chhodo, aaj ek fresh page hai, {nick}. Pehla session chhota hi lo, bas shuru karo. Mujhe tum par bharosa hai.", need:'comeback'},
-  {t:"{nick}, ek din ka break koi problem nahi, wapas aana hi asli jeet hai. Aaj ek focused session se wapsi karo, baaki din khud ban jaayega.", need:'comeback'},
-  {t:"Kisi ek din se tumhari kahani nahi banti, {nick}. Aaj wapsi ka din hai: ek chapter, poora dhyaan, aur sab wapas track pe.", need:'comeback'},
-];
-function motivationStudyDays(pid){ return new Set(logsFor(pid).filter(l=>Number(l.hours||0)>0).map(l=>l.date)); }
-// Facts about today that are TRUE, so the message can be specific without inventing anything.
-function motivationContext(pid){
-  const today = todayStr();
-  const yd = new Date(today+'T00:00:00'); yd.setDate(yd.getDate()-1);
-  const yStr = localDateStr(yd);
-  const target = effectiveTodayTarget(pid);
-  const days = motivationStudyDays(pid);
-  const hasHistory = days.size>0;
-  const yH = hoursOnDate(pid, yStr);
-  const todayH = hoursOnDate(pid, today);
-  const weekH = hoursInRange(pid, 7);
-  // streak as of "yesterday or today", so a morning with nothing logged yet doesn't read as a broken streak
-  let streakN = 0; const sd = new Date(today+'T00:00:00');
-  if(!days.has(today)) sd.setDate(sd.getDate()-1);
-  while(days.has(localDateStr(sd))){ streakN++; sd.setDate(sd.getDate()-1); }
-  const examDays = daysUntilExam();
-  const prep = overallPrep(pid);
-  const ranked = PAPERS.map(p=>({p, score:paperComponents(pid, p.id).prepScore})).sort((a,b)=>a.score-b.score);
-  const lowest = ranked[0];
-  let mostPending = null;
-  LECTURE_TRACKER_PAPERS.forEach(id=>{
-    const left = lecturesFor(pid, id).filter(l=>l.status!=='done').length;
-    if(left>0 && (!mostPending || left>mostPending.left)) mostPending = {p:paperById(id), left};
-  });
-  const hr = new Date().getHours();
-  const part = hr>=5 && hr<12 ? 'morning' : hr>=12 && hr<17 ? 'afternoon' : hr>=17 && hr<21 ? 'evening' : 'late night';
-  const weekday = new Date(today+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long'});
-  const comeback = hasHistory && yH<0.2;
-  const facts = [];
-  facts.push(`It is ${weekday} ${part} for them right now.`);
-  if(examDays>0) facts.push(`${examDays} days are left until the CA Final exam.`);
-  if(!hasHistory) facts.push('They are just getting started with tracking their study here.');
-  else if(yH>=target) facts.push(`Yesterday they studied ${yH.toFixed(1)}h and hit their ${target}h target.`);
-  else if(yH>=0.2) facts.push(`Yesterday they studied ${yH.toFixed(1)}h (their target is ${target}h).`);
-  else facts.push('Yesterday they did not log any study. Be gentle: no guilt, just a fresh start today.');
-  if(streakN>=2) facts.push(`Their study streak is ${streakN} days.`);
-  if(weekH>0) facts.push(`They studied ${weekH.toFixed(1)}h over the last 7 days.`);
-  if(todayH>0) facts.push(`They have already studied ${todayH.toFixed(1)}h today.`);
-  facts.push(`Today's target is ${target}h.`);
-  facts.push(`Overall exam readiness is ${prep.prepScore}%.`);
-  if(lowest) facts.push(`The paper with the lowest readiness is ${lowest.p.nick} (${lowest.p.code}) at ${lowest.score}%.`);
-  if(mostPending) facts.push(`${mostPending.left} lecture${mostPending.left>1?'s':''} are still pending in ${mostPending.p.nick}.`);
-  // angle: rotates daily; a missed day / long streak overrides it with the one that fits
-  const dayNo = Math.floor(Date.parse(today+'T00:00:00Z')/86400000);
-  let angleIdx = (dayNo + parseInt(liveHash(pid),36)) % MOTIVATION_ANGLES.length;
-  if(comeback) angleIdx = 8; else if(streakN>=7) angleIdx = 9;
-  const focusPaper = (mostPending && mostPending.p) ? mostPending.p.nick : (lowest ? lowest.p.nick : '');
-  return {nick: profileById(pid).nick, facts, angle: MOTIVATION_ANGLES[angleIdx], focusPaper, days: examDays, streakN, comeback};
-}
-function motivationRecent(pid){
-  const cur = (S.shared.dailyQuote||{})[pid];
-  if(!cur) return [];
-  const base = Array.isArray(cur.recent) ? cur.recent.slice() : [];
-  if(cur.date!==todayStr() && cur.text) base.push(cur.text);
-  return base.filter(Boolean).slice(-6);
-}
-function buildMotivationPrompt(pid, recent){
-  const c = motivationContext(pid);
-  const info = profileInfoPromptBlock(pid);
-  return `${info}You are writing today's message to ${c.nick}, a CA Final student in India, in the voice of the person who loves them most: their partner and biggest supporter. You are warm, affectionate, proud of them, a little playful, and you truly believe in them. You also want them to actually sit down and study well today, so the message must gently but clearly push them to start and to stay focused.
-
-What is true about today (weave in at most two of these naturally; never list them and never invent numbers):
-${c.facts.map(f=>'- '+f).join('\n')}
-
-Today's angle: ${c.angle}
-
-Write 3 or 4 short sentences, about 45 to 70 words in total:
-1. Open warmly and personally, using the name "${c.nick}" or a natural, affectionate address. No romantic clichés, and do not sign off or claim to be a named person.
-2. Make them feel seen and capable, reflecting where they really are today (coming back after a missed day without guilt, proud of a streak, a fresh start, the exam getting closer).
-3. Give ONE concrete thing to do first${c.focusPaper?`, for example a focused session on ${c.focusPaper}`:''}, small enough to start within ten minutes.
-4. End with energy and belief, as a statement, not a question.
-
-Style rules:
-- Hinglish: Hindi and English mixed naturally in Roman letters, the way Indian students talk. Never use Devanagari script.
-- Keep Hindi verbs gender-neutral. Avoid forms such as "karoge/karogi", "sakte/sakti", "chuke/chuki", "rahe ho/rahi ho", "karte ho/karti ho". Prefer imperatives ("shuru karo"), "ho jaayega", "tumse hoga", "chalo shuru karte hain".
-- Uplifting and kind: no guilt, no pressure, no comparing them with anyone, no "hustle until you break". If they might be tired, say rest is part of the plan but the first focused session comes first.
-- Not generic: no clichés like "journey", "sky is the limit", "hard work pays off", "never give up".
-- No quotation marks, no lists, no markdown, no headings. At most one emoji (💛 or 🔥) at the very end, or none.
-${recent.length?`- Do not reuse the openings, images or phrases of these recent messages:\n${recent.map(r=>'  * '+r.replace(/\s+/g,' ').slice(0,170)).join('\n')}\n`:''}
-Return ONLY the message text.`;
-}
-function cleanMotivationText(raw){
-  let t = String(raw||'').replace(/```[\s\S]*?```/g,' ').replace(/[*_#>`~]/g,'').replace(/\s*\n+\s*/g,' ').replace(/\s{2,}/g,' ').trim();
-  t = t.replace(/^(today'?s\s+)?(message|motivation)\s*[:\-–]\s*/i,'').replace(/^["“”'‘’]+|["“”'‘’]+$/g,'').trim();
-  if(t.length>520){
-    const cut = t.slice(0,520), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
-    t = end>200 ? cut.slice(0,end+1) : cut.replace(/\s+\S*$/,'')+'…';
-  }
-  if(t.length<30) return '';
-  if(/\b(as an ai|language model|i cannot|i can't (help|assist))\b/i.test(t)) return '';
-  return t;
-}
-function offlineMotivationFor(pid){
-  const c = motivationContext(pid);
-  const pool = MOTIVATION_FALLBACKS.filter(l=> !l.need || (l.need==='days' && c.days>0) || (l.need==='streak' && c.streakN>=3) || (l.need==='comeback' && c.comeback));
-  const idx = parseInt(liveHash(todayStr()+'|'+pid),36) % pool.length;
-  return pool[idx].t.replace(/\{nick\}/g, c.nick).replace(/\{days\}/g, String(Math.max(0,c.days)));
-}
-async function ensureDailyQuote(){
-  if(!S.shared.dailyQuote) S.shared.dailyQuote = {};
-  const pid = S.local && S.local.myProfile;
-  if(!pid) return; // no profile chosen yet, nothing to write for
-  const today = todayStr();
-  const cur = S.shared.dailyQuote[pid];
-  const haveToday = !!(cur && cur.date===today && cur.v>=MOTIVATION_VERSION && cur.text);
-  if(haveToday){
-    if(cur.source!=='offline') return;                                       // the real message for today exists: never generate again
-    if((cur.tries||1) >= 4) return;                                          // gave up on the AI for today; the warm fallback stays
-    if(Date.now() - new Date(cur.at||0).getTime() < 20*60*1000) return;     // retry quietly, at most every 20 minutes
-  }
-  if(_dailyQuoteFetching) return;
-  _dailyQuoteFetching = true;
-  try{
-    const recent = motivationRecent(pid);
-    let text = '';
-    try{ text = cleanMotivationText(await callClaudeAI(buildMotivationPrompt(pid, recent))); }
-    catch(e){ console.warn('Daily motivation: AI unavailable, using the hand-written fallback.', e); }
-    if(todayStr() !== today) return; // the study day rolled over mid-request; the next trigger handles the new day
-    const latest = S.shared.dailyQuote[pid]; // another device of the same profile may have finished first
-    if(latest && latest.date===today && latest.v>=MOTIVATION_VERSION && latest.text && latest.source!=='offline') return;
-    const tries = (haveToday ? (cur.tries||1) : 0) + 1;
-    if(!text && haveToday){ if(latest){ latest.tries = tries; latest.at = new Date().toISOString(); saveShared(); } return; } // still offline: keep the fallback, count the try
-    const source = text ? 'ai' : 'offline';
-    if(!text) text = offlineMotivationFor(pid);
-    S.shared.dailyQuote[pid] = {v:MOTIVATION_VERSION, date:today, text, source, at:new Date().toISOString(), tries,
-      recent: haveToday ? (cur.recent||[]) : motivationRecent(pid)};
-    saveShared(); // normal debounced Drive sync
-    refreshMotivationCard();
-    if(source==='ai') fireLocalPushNotification("Today's Motivation", text, {tag:'olympus-daily-quote'});
-  }catch(e){
-    console.warn('Daily motivation failed:', e);
-  }finally{
-    _dailyQuoteFetching = false;
-  }
-}
+// v173: the daily AI motivation message (generation, fallback bank, Home card, push) was removed for both profiles.
 async function callClaudeAI(promptText){
   if(!S.appSession) throw new Error('Not signed in');
   let response;
@@ -20383,7 +21452,7 @@ function sharedDataHasContent(data){
   );
   return perProfile
     || (data.chat?.messages||[]).length > 0
-    || (data.examDate && data.examDate !== '2027-05-02'); // buildDefaultShared()'s starting value
+    || (data.examDate && data.examDate !== '2027-05-01' && data.examDate !== '2027-05-02'); // buildDefaultShared()'s starting value (or the one it had before v172)
 }
 async function doSync(manual){
   try{
@@ -21119,7 +22188,6 @@ function bootStartBackgroundWork(){
   }, 3000);
   maybeRolloverOverdueTasks(); // same convention — rolls overdue incomplete tasks onto today
   refreshAllTargets(S.local.myProfile); // snapshots progress + fires completion celebrations on every load (own targets only -- see checkTargetCompletion)
-  ensureDailyQuote(); // fire-and-forget; gated to once/day (shared, not per-device) internally
   applyPendingTimerActionFromUrl();
 }
 // The second half of the local-first open: read Drive, then apply the same rules initAfterLogin() always used.
@@ -21566,6 +22634,7 @@ if('serviceWorker' in navigator){
     } else if(d.type==='OPEN_GO'){
       if(d.go==='stats') openWeeklyReview(); // tapped the Monday review notification
       else if(d.go==='challenges' && !S.dcPopupOpen && S.local && S.local.myProfile) openDailyChallengesPopup(); // tapped a challenge reminder
+      else if(d.go==='journey' && S.appSession && S.local && S.local.myProfile) switchView('journey'); // v172: tapped a Road-to-1-May reminder
     } else if(d.type==='PUSH_RECEIVED'){
       const kind = d.payload && d.payload.data && d.payload.data.kind;
       // v128: a chat push used to call pollChatUpdates(), which does nothing unless the chat is the open screen -- so a message that

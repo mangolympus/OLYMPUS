@@ -290,7 +290,10 @@
 // v160 — timer-start notifications: own running-timer notification now also works when the page has no SW controller (first visit / hard refresh)
 //        and is shown via waitUntil; partner's "started studying" push only for a session still running, throttled, says what is studied, replaces
 //        instead of stacking, is skipped while the app is visible and is cleared when the session ends. index.html + sw.js.
-const CACHE_VERSION = 'olympus-v171';
+// v172 — Road to 1 May: 15 ten-day sprints (1 Dec → exam) on Home + new Journey tab (goals, paper deadlines, even split, review, catch-up, rest day, grades, milestones, partner board); Targets+Statistics merged into a Progress section; Settings moved to a button at the bottom of Home; exam date 1 May 2027; go=journey deep link.
+// v173 — Daily AI motivation removed (both profiles). Home re-ordered: date → War Countdown → Papers → Challenges → Journey graph → Progress → Study hours → Lecture Completion → Features → Inter-Profile Comparison → Settings. Inter-Profile Comparison rebuilt as a head-to-head (period switch, diverging bars with named deltas, 14-day grouped trend, per-paper grouped bars, sprint-grade strip).
+// v174 — Consolidated audit of the Journey additions: sprint chips, goal fields, toggles and Home graph now refresh in place (no whole-app re-render, keyboard focus and scroll kept, bars no longer re-grow on every tap); ←/→ move between sprint chips; empty goal fields no longer create stray records.
+const CACHE_VERSION = 'olympus-v174';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
