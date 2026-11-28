@@ -2199,6 +2199,38 @@ html[data-mode="dark"] .trend-area-fill{ opacity:.25; }
 .jy-link-btn{margin-top:10px;background:none;border:0;color:var(--active-accent,var(--umang));font:inherit;font-size:12.5px;font-weight:800;padding:2px 0;cursor:pointer}
 .jy-open{width:100%;margin-top:12px}
 /* Journey page */
+/* v175 lecture KPIs */
+.lk{border-top:1px solid var(--border);padding-top:12px;margin:2px 0 14px}
+.lk-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.lk-h>b{font-size:12.5px;font-weight:800}
+.lk-vs{display:flex;gap:10px;font-size:11px;font-weight:800;font-style:normal}.lk-vs i{font-style:normal}
+.lk-chip{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:99px;background:var(--surface2);border:1px solid var(--border);white-space:nowrap}
+.lk-chip.good{color:var(--good)}.lk-chip.warn{color:var(--warn,#e0a02b)}.lk-chip.faint{color:var(--text-muted)}
+.lk-bars{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.lk-bar-h{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--text-muted);font-weight:700}
+.lk-bar-h b{font-size:15px;color:var(--text);font-variant-numeric:tabular-nums}
+.lk-trk{height:8px;border-radius:99px;background:var(--surface2);border:1px solid var(--border);overflow:hidden;margin:5px 0 4px}
+.lk-trk i{display:block;height:100%;border-radius:99px;transition:width .5s cubic-bezier(.22,.8,.4,1)}
+.lk-bar-s{font-size:10.5px;color:var(--text-faint);font-variant-numeric:tabular-nums}
+.lk-nodur{grid-column:2;font-size:11px;color:var(--text-faint);align-self:center}
+.lk-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.lk-tile{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:7px 6px;text-align:center;min-width:0}
+.lk-tile em{display:block;font-style:normal;font-size:9.5px;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.lk-tile b{display:block;font-size:13px;margin:2px 0;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk-tile span{display:block;font-size:9.5px;color:var(--text-muted)}
+.lk-cap{font-size:10.5px;color:var(--text-faint);font-weight:700;margin:4px 0 2px}
+.lk-grid{stroke:var(--border);stroke-width:.6;stroke-dasharray:2 3}.lk-base{stroke:var(--border);stroke-width:1}
+.lk-ax{font-size:8.5px;fill:var(--text-faint)}
+.lk-note{font-size:11.5px;color:var(--text-muted);line-height:1.45;margin-top:8px}
+.lk-verdict{font-size:12px;font-weight:700;text-align:center;margin:10px 0 4px}
+.lk-tbl{display:flex;flex-direction:column}
+.lk-r{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--border)}
+.lk-r:first-child{border-top:0}
+.lk-r>em{font-style:normal;font-size:11px;color:var(--text-muted);font-weight:700}
+.lk-c{font-size:12.5px;text-align:right;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.lk-mb{display:block;width:100%;height:5px;border-radius:99px;background:var(--surface2);overflow:hidden}.lk-mb u{display:block;height:100%;border-radius:99px;text-decoration:none}
+@media (max-width:480px){.lk-tiles{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:360px){.lk-bars{grid-template-columns:1fr}.lk-nodur{grid-column:1}}
 .jy-page{display:block}
 .jy-hero{display:flex;gap:14px;align-items:center;background:linear-gradient(135deg,color-mix(in srgb,var(--active-accent,var(--umang)) 14%,var(--surface)),var(--surface))}
 .jy-ring{width:92px;height:92px;flex-shrink:0}
@@ -16348,6 +16380,148 @@ function homeLectureRows(){
   });
 }
 function homeLectureWho(r){ return r.prof.nick + (r.isMe ? ' (you)' : ''); }
+// ═══ v175 — LECTURE KPIs: completion by NUMBER of lectures AND by DURATION (hours), pace, projected finish ═══════════════════════════
+// A lecture count alone hides a lot: ten 1-hour lectures and ten 2.5-hour ones look the same. Every figure below comes from the same lecture
+// list as the rings (status + duration + completionDate), so nothing is stored separately. Lectures with no duration are left out of the
+// hours figures (and said so), never guessed.
+function lkH(h){ const t = Math.round((h||0)*60), H = Math.floor(t/60), M = t%60; return H ? (M ? `${H}h ${M}m` : `${H}h`) : `${M}m`; }
+function lkDate(ds){ return new Date(ds+'T00:00:00').toLocaleDateString('en-IN', {day:'numeric', month:'short'}); }
+function lecKpis(pid, paperId){
+  const lecs = lecturesFor(pid, paperId), today = todayStr();
+  const k = {pid, paperId, total:lecs.length, done:0, hTotal:0, hDone:0, untimed:0, nTimedDone:0, nTimedLeft:0, byDay:{}};
+  lecs.forEach(l=>{
+    const h = parseDurationToHours(l.duration), isDone = l.status==='done';
+    k.hTotal += h; if(!h) k.untimed++;
+    if(isDone){ k.done++; k.hDone += h; if(h) k.nTimedDone++; if(l.completionDate){ const d = k.byDay[l.completionDate] || (k.byDay[l.completionDate] = {n:0, h:0}); d.n++; d.h += h; } }
+    else if(h) k.nTimedLeft++;
+  });
+  k.pending = k.total - k.done; k.hLeft = Math.max(0, k.hTotal - k.hDone); k.timed = k.hTotal > 0;
+  k.pct = k.total ? Math.round(k.done/k.total*100) : 0;
+  k.hPct = k.hTotal ? Math.round(k.hDone/k.hTotal*100) : 0;
+  k.avgDone = k.nTimedDone ? k.hDone/k.nTimedDone : 0; k.avgLeft = k.nTimedLeft ? k.hLeft/k.nTimedLeft : 0;
+  // last 14 study days, oldest first
+  k.days = []; let first = null, sumN = 0, sumH = 0;
+  for(let i=13; i>=0; i--){
+    const ds = jyAdd(today, -i), d = k.byDay[ds] || {n:0, h:0};
+    k.days.push({ds, n:d.n, h:d.h}); sumN += d.n; sumH += d.h; if(first===null && d.n) first = i;
+  }
+  const span = first===null ? 14 : Math.min(14, first + 1); // a newcomer is not penalised for the days before they started
+  k.paceN = sumN/span; k.paceH = sumH/span; k.sumN = sumN; k.sumH = sumH; k.span = span;
+  // projection at that pace (hours if durations exist, otherwise lectures)
+  const left = k.timed ? k.hLeft : k.pending, rate = k.timed ? k.paceH : k.paceN;
+  k.eta = (left > 0 && rate > 0) ? jyAdd(today, Math.ceil(left/rate)) : null;
+  const dls = (S.shared.journey && S.shared.journey[pid] && S.shared.journey[pid].deadlines) || {};
+  k.dl = (dls[paperId] && dls[paperId].lec) || null;
+  k.needH = k.needN = null; k.state = k.pending===0 && k.total>0 ? 'done' : (k.total===0 ? 'none' : (rate>0 ? 'pace' : 'idle'));
+  if(k.dl && k.pending>0){
+    const dLeft = daysBetweenDates(today, k.dl);
+    if(dLeft < 0) k.state = 'overdue';
+    else {
+      const n = Math.max(1, dLeft); k.needH = k.hLeft/n; k.needN = k.pending/n;
+      if(rate > 0) k.state = (k.eta && k.eta <= k.dl) ? 'ontrack' : 'behind'; else k.state = 'idle';
+    }
+  }
+  return k;
+}
+const LK_STATE = {done:['🎉','Finished','good'], ontrack:['✅','On track','good'], behind:['⚠️','Behind pace','warn'], overdue:['⏰','Past deadline','warn'], pace:['📈','Pace set','faint'], idle:['💤','No recent lectures','faint'], none:['–','No lectures','faint']};
+function lkBar(label, val, pct, color, soft){
+  return `<div class="lk-bar"><div class="lk-bar-h"><span>${label}</span><b>${pct}%</b></div>
+    <div class="lk-trk" role="img" aria-label="${label} ${pct} percent"><i style="width:${pct}%;background:${color};${soft?'opacity:.6;':''}"></i></div>
+    <div class="lk-bar-s">${val}</div></div>`;
+}
+function lkTile(label, val, sub){ return `<div class="lk-tile"><em>${label}</em><b>${val}</b>${sub?`<span>${sub}</span>`:''}</div>`; }
+// 14-day grouped bars: lecture hours finished per day (or lectures, when no durations exist)
+function lkTrendSvg(ks, cols){
+  const timed = ks.some(k=>k.timed), W = 320, H = 82, padL = 4, padR = 4, yb = 62, yt = 8, n = 14;
+  const val = d => timed ? d.h : d.n;
+  const max = Math.max(timed ? 1 : 2, ...ks.flatMap(k=>k.days.map(val)));
+  const colW = (W-padL-padR)/n, m = ks.length, bw = Math.min(14, colW*0.74/m), gap = 1;
+  let out = '';
+  [0.5, 1].forEach(f=>{ const y = yb - (yb-yt)*f; out += `<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" class="lk-grid"/>`; });
+  out += `<text x="${W-padR}" y="${yt-1}" text-anchor="end" class="lk-ax">${timed ? lkH(max) : Math.round(max)+' lec'}</text>`;
+  for(let i=0; i<n; i++){
+    const cx = padL + i*colW + colW/2;
+    ks.forEach((k, j)=>{
+      const v = val(k.days[i]), h = v>0 ? Math.max(2, (yb-yt)*v/max) : 0, x = cx - (m*bw + (m-1)*gap)/2 + j*(bw+gap);
+      if(h) out += `<rect x="${x.toFixed(1)}" y="${(yb-h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${cols[j]}"><title>${lkDate(k.days[i].ds)} · ${k.days[i].n} lecture${k.days[i].n===1?'':'s'} · ${lkH(k.days[i].h)}</title></rect>`;
+      else out += `<rect x="${x.toFixed(1)}" y="${yb-1.4}" width="${bw.toFixed(1)}" height="1.4" rx=".7" fill="${cols[j]}" opacity=".3"/>`;
+    });
+  }
+  out += `<line x1="${padL}" x2="${W-padR}" y1="${yb}" y2="${yb}" class="lk-base"/>
+    <text x="${padL}" y="${H-6}" class="lk-ax">${lkDate(ks[0].days[0].ds)}</text><text x="${W-padR}" y="${H-6}" text-anchor="end" class="lk-ax">today</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Lecture ${timed?'hours':'count'} finished per day, last 14 days" style="display:block">${out}</svg>`;
+}
+function lkInsight(k, who){
+  if(!k.total) return '';
+  if(k.state==='done') return `${who} finished every lecture — ${lkH(k.hTotal)} of teaching in all. 🎓`;
+  const bits = [];
+  if(k.timed){
+    const gap = k.hPct - k.pct;
+    if(k.done && gap <= -3) bits.push(`By duration it is ${-gap} pts behind the lecture count — the longer lectures are still ahead (average ${lkH(k.avgLeft)} left vs ${lkH(k.avgDone)} done).`);
+    else if(k.done && gap >= 3) bits.push(`By duration it is ${gap} pts ahead of the lecture count — the longer lectures are already done.`);
+    else if(k.done) bits.push(`Lecture count and duration are moving together (${k.pct}% · ${k.hPct}%).`);
+  }
+  if(k.state==='ontrack') bits.push(`At ${k.timed ? lkH(k.paceH)+'/day' : jyNum(k.paceN)+' lectures/day'}, finish by ${lkDate(k.eta)} — before the ${lkDate(k.dl)} deadline.`);
+  else if(k.state==='behind') bits.push(`At the current pace the finish is ${lkDate(k.eta)}, after the ${lkDate(k.dl)} deadline — about ${k.timed ? lkH(k.needH)+'/day' : jyNum(k.needN)+' lectures/day'} gets there.`);
+  else if(k.state==='overdue') bits.push(`The ${lkDate(k.dl)} lecture deadline has passed with ${k.pending} lecture${k.pending===1?'':'s'} (${lkH(k.hLeft)}) left.`);
+  else if(k.state==='pace' && k.eta) bits.push(`At this pace everything is finished by ${lkDate(k.eta)}. Set a deadline in Journey to see if that is enough.`);
+  else if(k.state==='idle') bits.push(`Nothing marked done in the last 14 days.`);
+  if(k.untimed && k.timed) bits.push(`${k.untimed} lecture${k.untimed===1?' has':'s have'} no duration and ${k.untimed===1?'is':'are'} left out of the hours figures.`);
+  return bits.join(' ');
+}
+function lkStateChip(k){ const s = LK_STATE[k.state] || LK_STATE.none; return `<span class="lk-chip ${s[2]}">${s[0]} ${s[1]}</span>`; }
+function lkPaceCell(k){ return k.timed ? `${lkH(k.paceH)}/day` : `${jyNum(k.paceN)} lec/day`; }
+function lkFinishCell(k){ return k.state==='done' ? 'Done' : (k.eta ? lkDate(k.eta) : '–'); }
+function lecKpiSingle(r){
+  const k = lecKpis(r.pid, r.paperId); if(!k.total) return '';
+  const col = `var(--${r.prof.color})`;
+  const tiles = [
+    k.timed ? lkTile('Hours left', lkH(k.hLeft), `${k.pending} lecture${k.pending===1?'':'s'}`) : lkTile('Lectures left', k.pending, ''),
+    lkTile('Pace · 14d', lkPaceCell(k), `${jyNum(k.paceN)} lec/day`),
+    lkTile('Finish by', lkFinishCell(k), k.dl ? `deadline ${lkDate(k.dl)}` : 'at this pace'),
+    k.needH!=null ? lkTile('Needed/day', k.timed ? lkH(k.needH) : jyNum(k.needN)+' lec', 'to hit deadline') : lkTile('Watched · 14d', k.timed ? lkH(k.sumH) : k.sumN+' lec', `${k.sumN} lectures`),
+  ].join('');
+  return `<div class="lk">
+    <div class="lk-h"><b>Count vs duration</b>${lkStateChip(k)}</div>
+    <div class="lk-bars">${lkBar('Lectures', `${k.done} of ${k.total} done`, k.pct, col)}${k.timed ? lkBar('Duration', `${lkH(k.hDone)} of ${lkH(k.hTotal)} watched`, k.hPct, col, true) : `<div class="lk-nodur">Add lecture durations on the Lectures page to see progress by hours.</div>`}</div>
+    <div class="lk-tiles">${tiles}</div>
+    <div class="lk-cap">${k.timed ? 'Lecture hours finished' : 'Lectures finished'} per day · last 14 days</div>
+    ${lkTrendSvg([k], [col])}
+    <div class="lk-note">${lkInsight(k, r.isMe ? 'you' : r.prof.nick)}</div>
+  </div>`;
+}
+function lecKpiMerged(rows){
+  const ks = rows.map(r=>lecKpis(r.pid, r.paperId)); if(!ks.some(k=>k.total)) return '';
+  const cols = rows.map(r=>`var(--${r.prof.color})`), anyTimed = ks.some(k=>k.timed);
+  const cell = (v, i, bar) => `<div class="lk-c" style="color:var(--${rows[i].prof.color})">${bar!=null?`<i class="lk-mb"><u style="width:${bar}%;background:${cols[i]}"></u></i>`:''}<b>${v}</b></div>`;
+  const row = (label, a, b, bars) => `<div class="lk-r"><em>${label}</em>${cell(a, 0, bars?bars[0]:null)}${cell(b, 1, bars?bars[1]:null)}</div>`;
+  let verdict = '';
+  if(anyTimed && ks[0].timed && ks[1].timed){
+    const dh = ks[0].hPct - ks[1].hPct, dn = ks[0].pct - ks[1].pct;
+    const f = dh>0 ? rows[0] : rows[1];
+    if(dh===0) verdict = `Level by duration too — ${ks[0].hPct}% each. 🤝`;
+    else verdict = `By duration ${f.prof.nick} leads by ${Math.abs(dh)}% (${lkH(f===rows[0]?ks[0].hDone:ks[1].hDone)} vs ${lkH(f===rows[0]?ks[1].hDone:ks[0].hDone)})${(dh>0)!==(dn>0) && dn!==0 ? ' — the lecture-count lead goes the other way' : ''}.`;
+  }
+  const who = i => rows[i].isMe ? 'you' : rows[i].prof.nick;
+  const notes = ks.map((k,i)=>{ const t = lkInsight(k, who(i)); return t ? `<div class="lk-note"><b style="color:${cols[i]}">${rows[i].prof.nick}</b> · ${t}</div>` : ''; }).join('');
+  return `<div class="lk">
+    <div class="lk-h"><b>Count vs duration</b><span class="lk-vs">${rows.map((r,i)=>`<i style="color:${cols[i]}">● ${r.prof.nick}</i>`).join('')}</span></div>
+    <div class="lk-tbl">
+      ${row('Lectures done', ks[0].pct+'%', ks[1].pct+'%', [ks[0].pct, ks[1].pct])}
+      ${anyTimed ? row('Duration watched', ks[0].timed ? ks[0].hPct+'%' : '–', ks[1].timed ? ks[1].hPct+'%' : '–', [ks[0].hPct, ks[1].hPct]) : ''}
+      ${anyTimed ? row('Hours watched', ks[0].timed ? lkH(ks[0].hDone) : '–', ks[1].timed ? lkH(ks[1].hDone) : '–') : ''}
+      ${row(anyTimed ? 'Hours left' : 'Lectures left', anyTimed ? (ks[0].timed ? lkH(ks[0].hLeft) : '–') : ks[0].pending, anyTimed ? (ks[1].timed ? lkH(ks[1].hLeft) : '–') : ks[1].pending)}
+      ${row('Pace · 14 days', lkPaceCell(ks[0]), lkPaceCell(ks[1]))}
+      ${row('Finish by', lkFinishCell(ks[0]), lkFinishCell(ks[1]))}
+      <div class="lk-r"><em>Status</em><div class="lk-c">${lkStateChip(ks[0])}</div><div class="lk-c">${lkStateChip(ks[1])}</div></div>
+    </div>
+    ${verdict ? `<div class="lk-verdict">${verdict}</div>` : ''}
+    <div class="lk-cap">${anyTimed ? 'Lecture hours finished' : 'Lectures finished'} per day · last 14 days</div>
+    ${lkTrendSvg(ks, cols)}
+    ${notes}
+  </div>`;
+}
+
 function homeLectureCompletionBlock(viewedId){
   const rows = homeLectureRows();
   if(rows[0].paperId === rows[1].paperId) return homeLectureMergedCard(rows, viewedId);
@@ -16373,6 +16547,7 @@ function homeLectureSingleCard(r){
         <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:inline-block"></span>Pending — <b>${pending}</b></div>
       </div>
     </div>
+    ${lecKpiSingle(r)}
     ${total===0?`<div style="font-size:11.5px;color:var(--text-faint);margin:-4px 0 10px">No ${paper.nick} lectures added yet — add them on the Lectures page.</div>`:''}
     <button class="btn btn-accent" style="width:100%" onclick="openWorkspaceFor('${pid}','${paperId}','lectures')">${total===0?'Add':'Go to'} ${paper.code} · ${paper.nick} Lectures Page${r.isMe?'':' ('+prof.nick+')'} →</button>
   </div>`;
@@ -16404,6 +16579,7 @@ function homeLectureMergedCard(rows, viewedId){
     ${raceTrackMergedSVG(rows)}
     <div style="font-size:12.5px;font-weight:700;text-align:center;margin:10px 0 14px">${lead}</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">${rows.map(ring).join('')}</div>
+    ${lecKpiMerged(rows)}
     ${rows.some(r=>r.total===0)?`<div style="font-size:11.5px;color:var(--text-faint);margin:-4px 0 10px">${rows.filter(r=>r.total===0).map(r=>r.prof.nick).join(' and ')} ${rows.filter(r=>r.total===0).length>1?"haven't":"hasn't"} added ${paper.nick} lectures yet.</div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap">${btns}</div>
   </div>`;

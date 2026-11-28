@@ -293,7 +293,8 @@
 // v172 — Road to 1 May: 15 ten-day sprints (1 Dec → exam) on Home + new Journey tab (goals, paper deadlines, even split, review, catch-up, rest day, grades, milestones, partner board); Targets+Statistics merged into a Progress section; Settings moved to a button at the bottom of Home; exam date 1 May 2027; go=journey deep link.
 // v173 — Daily AI motivation removed (both profiles). Home re-ordered: date → War Countdown → Papers → Challenges → Journey graph → Progress → Study hours → Lecture Completion → Features → Inter-Profile Comparison → Settings. Inter-Profile Comparison rebuilt as a head-to-head (period switch, diverging bars with named deltas, 14-day grouped trend, per-paper grouped bars, sprint-grade strip).
 // v174 — Consolidated audit of the Journey additions: sprint chips, goal fields, toggles and Home graph now refresh in place (no whole-app re-render, keyboard focus and scroll kept, bars no longer re-grow on every tap); ←/→ move between sprint chips; empty goal fields no longer create stray records.
-const CACHE_VERSION = 'olympus-v174';
+// v175 — Home Lecture Completion gains duration-based KPIs beside the lecture-count ones: hours watched vs total, hours left, 14-day pace (hours + lectures/day), projected finish date, needed/day and on-track status against the Journey lecture deadline, a 14-day hours chart, and a plain-language count-vs-duration insight (single and both-of-you cards).
+const CACHE_VERSION = 'olympus-v175';
 
 // NOTE: intro.mp4 is deliberately NOT in APP_SHELL below. It is ~1.7 MB and only ever
 // played by the "Replay Intro" button in Settings > About, so precaching it would put the
